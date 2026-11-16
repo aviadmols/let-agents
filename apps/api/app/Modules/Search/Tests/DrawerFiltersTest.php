@@ -167,6 +167,13 @@ class DrawerFiltersTest extends TestCase
         $this->assertGreaterThan(0, substr_count(self::drawer("(function () { var x = turn('Gold Ring', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'title'; return T.resultsHtml(x); })()"), 'class="ls-card'), 'a name still shows what else holds it');
     }
 
+    public function test_a_word_written_as_it_sounds_is_said_by_what_sounds_the_same(): void
+    {
+        // Miss Nori, 16.11: "מחנסים אדומים" showed the red trousers and said "מחנסים is not on the site"
+        $left = self::drawer("(function () { var list = [{ title: 'שורטס הארט | בז/אדום', kw: 'מכנסיים קצרים אדום מכנסי מכנס' }, { title: 'מכנסי מיה | בורדו', kw: 'מכנסיים בורדו' }]; return [T.unsaid('מחנסים אדומים', list, [], []), T.unsaid('מכנסיים ירוקים', list, [], [])]; })()");
+        $this->assertSame([[], ['ירוקים']], $left, 'ח as כ is the same word; a colour none says is still said missing');
+    }
+
     public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void
     {
         // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"

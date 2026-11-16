@@ -366,12 +366,77 @@ final class SearchCatalog
             return $result;
         }
         $first = array_shift($found);
+        // Without the colour asked ("מכנסיים ירוקים", none green here), those nearest it first: its own colour as a second one
+        // or another shade of it ("בורדו" for red), then a colour of its tone, each side in the order the search gave
+        // (as Aviad asked, 16.11: in a clothing store, the same colour first)
+        $wanted = Colours::dominant($first['left'], true);
+        if ($wanted !== null) {
+            $first['result'] = self::byColourNear($first['result'], $index['records'], $wanted);
+        }
 
         return $first['result'] + ['loosened' => [
             'left' => $first['left'],
             'query' => $first['query'],
             'also' => array_map(fn (array $f): array => ['query' => $f['query'], 'count' => (int) ($f['result']['counts']['product'] ?? 0)], $found),
         ]];
+    }
+
+    /**
+     * A search's products, those whose colour is nearest the one wanted first (colourNear), each side in the order it had:
+     * its shown products and its ids alike, every other result where it was.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array<string, array<string, mixed>>  $records
+     * @param  array{family: string, tone: string}  $wanted
+     * @return array<string, mixed>
+     */
+    private static function byColourNear(array $result, array $records, array $wanted): array
+    {
+        $near = [];
+        $rank = function (array $ids) use ($records, $wanted, &$near): array {
+            $at = array_flip($ids);
+            foreach ($ids as $id) {
+                $near[$id] ??= self::colourNear($records[$id] ?? [], $wanted);
+            }
+            usort($ids, fn (string $a, string $b): int => [$near[$b], $at[$a]] <=> [$near[$a], $at[$b]]);
+
+            return $ids;
+        };
+        if (isset($result['groups']['product'])) {
+            $byId = [];
+            foreach ($result['groups']['product'] as $r) {
+                $byId[(string) $r['id']] = $r;
+            }
+            $result['groups']['product'] = array_map(fn (string $id): array => $byId[$id], $rank(array_keys($byId)));
+        }
+        if (isset($result['ids']) && is_array($result['ids'])) {
+            $products = array_values(array_filter($result['ids'], fn ($id): bool => str_starts_with((string) $id, 'p:')));
+            $ranked = $rank(array_map('strval', $products));
+            $next = 0;
+            $result['ids'] = array_map(fn ($id) => str_starts_with((string) $id, 'p:') ? $ranked[$next++] : $id, $result['ids']);
+        }
+
+        return $result;
+    }
+
+    /**
+     * How near a product's colour is to the one wanted, from the colours its picture shows (mc, the most first) and those
+     * its title names ("| בז/אדום"): the same colour 1, as a second colour less, a colour of its tone .5 at most; 0 for none.
+     *
+     * @param  array<string, mixed>  $record
+     * @param  array{family: string, tone: string}  $wanted
+     */
+    private static function colourNear(array $record, array $wanted): float
+    {
+        $title = (string) ($record['title'] ?? '');
+        $named = str_contains($title, '|') ? substr($title, (int) strrpos($title, '|') + 1) : $title;
+        $best = 0.0;
+        foreach ([...array_map('strval', (array) ($record['mc'] ?? [])), ...preg_split('/[\/,]|\s+ו/u', $named) ?: []] as $at => $phrase) {
+            $near = Colours::near($wanted, Colours::dominant([trim($phrase)], true));
+            $best = max($best, $at === 0 ? $near : $near * 0.9);
+        }
+
+        return $best;
     }
 
     /**

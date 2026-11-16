@@ -171,9 +171,17 @@ final class BuildSearchIndex
         return array_slice(array_keys($stems), 0, self::KIND_STEMS * 2);
     }
 
-    private static function kindStems(CatalogProduct $product): array
+    /**
+     * What the store files a product as (its type, tags, categories) and what its picture says it is (its first words,
+     * "שורטס", "מכנסיים קצרים"), as word stems; the picture's first, so a long list of tags never pushes it out. Shorts titled
+     * "שורטס הארט" were no trousers, their tags months and campaigns (Miss Nori, 16.11: "מכנסיים אדומים" left out the red
+     * shorts and showed every trouser but red).
+     */
+    private static function kindStems(CatalogProduct $product, ?RetrievalImage $picture = null): array
     {
-        $names = [(string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
+        $seen = $picture === null ? [] : array_values(array_filter(array_slice(array_values(array_filter((array) $picture->caption_words, 'is_string')), 0, self::PICTURE_KIND_PHRASES),
+            fn (string $phrase): bool => HebrewSearch::colorOf(HebrewSearch::normalize($phrase)) === null));
+        $names = [...$seen, (string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
             ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all()];
         $stems = [];
         foreach ($names as $name) {
@@ -381,7 +389,7 @@ final class BuildSearchIndex
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
                 // what the store files it as (its type, categories, tags), as word stems: a kind a search names holds it
                 // though its title opens with another word ("סניקרס" tagged "נעליים" is shoes)
-                'kd' => self::kindStems($product) ?: null,
+                'kd' => self::kindStems($product, $pictures->get($product->id)) ?: null,
                 // the print its picture shows and how much of it the print covers (Patterns): "נעלי משבצות" shows what is
                 // covered in checks before what has checks on a logo
                 'pt' => self::pattern($pictures->get($product->id)),

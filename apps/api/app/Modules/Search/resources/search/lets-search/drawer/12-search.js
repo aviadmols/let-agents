@@ -639,8 +639,9 @@
     // one word left over is said too when the rest of the search was read ("neckles men green": the necklaces and green
     // shown, and "men" said, not dropped in silence; 15.11); a search of one word is its own matter
     if (!typed.length || (typed.length < 2 && wordsOf(q).length < 2)) { return []; }
-    var said = {};
-    list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; }); }); });
+    var said = {}, heard = {};
+    var hear = function (w) { return E.sound ? E.sound(w) : ''; };
+    list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; var h = f.length >= 4 && hear(f); if (h) { heard[h] = 1; } }); }); });
     return typed.filter(function (w) {
       var n = E.normalize(w), whom = whomOf(n);
       if (whom) {
@@ -655,7 +656,9 @@
       // over the hoops was told "without hoop" (Rocks QA, 16.11)
       var term = (near || []).filter(function (x) { return x && x.word === n && x.term; })[0];
       if (term && wordForms(E.normalize(String(term.term))).some(function (f) { return said[f]; })) { return false; }
-      return !wordForms(n).some(function (f) { return said[f]; });
+      // and a word written as it sounds ("מחנסים" for "מכנסים": ח and כ, as the engine hears them) is said by what sounds
+      // the same: the trousers were shown and "מחנסים is not on the site" was said (Miss Nori, 16.11)
+      return !wordForms(n).some(function (f) { return said[f] || (f.length >= 4 && heard[hear(f)]); });
     });
   }
   // the words that say whom a product is for, in English and Hebrew, each form

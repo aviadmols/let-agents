@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Tests;
 
+use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Actions\BuildProductVariants;
@@ -9,6 +10,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogSibling;
 use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\HebrewSearch;
@@ -53,6 +55,51 @@ final class ColourFamiliesTest extends TestCase
         app(BuildSearchIndex::class)->handle($shop->id);
         $items = array_column((array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['items'], null, 'id');
         $this->assertArrayNotHasKey('tg', $items['p:3']);
+    }
+
+    public function test_trousers_of_the_colour_asked_are_found_by_what_their_picture_says_they_are_and_the_nearest_colour_comes_first(): void
+    {
+        // Miss Nori, 16.11: "מכנסיים אדומים" said "nothing exactly" and showed every trouser, brown and black first: the red
+        // shorts ("שורטס הארט | בז/אדום") were no trousers by their title or their tags (months, campaigns)
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        Features::override('search.semantic', false, $shop->id);
+        Features::override('search.pictures', false, $shop->id);
+        $add = fn (string $id, string $title, array $words) => app(TenantContext::class)->run($shop->id, function () use ($shop, $id, $title, $words): void {
+            $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => ['tags' => ['נובמבר', 'אוקטובר']]]);
+            RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
+        });
+        $add('1', 'מכנסי בלון גומי | חום', ['מכנסיים', 'מכנסי בלון', 'חום']);
+        $add('2', 'מכנסי טובי גזרה מחויטת | שחור', ['מכנסיים', 'גזרה מחויטת', 'שחור']);
+        $add('3', 'מכנסי כריסטה גזרה ישרה | לבן', ['מכנסיים', 'גזרה ישרה', 'לבן']);
+        $add('4', 'מכנסי מיה בד פייזלי | בורדו/תכלת', ['מכנסיים', 'בד פייזלי', 'בורדו']);
+        // a red top whose picture shows trousers with it: it holds both words, and is no trouser
+        $add('5', 'חולצת לאנה בשילוב קשירות | אדום', ['חולצה', 'קשירות', 'אדום', 'מכנסיים לבנים']);
+        $add('6', 'חולצת בייסיק | שחור', ['חולצה', 'שחור']);
+        foreach (['11' => 'שמלת סאטן | ירוק', '12' => 'שמלת מקסי | לבן', '13' => 'חצאית מיני | שחור', '14' => 'חצאית מידי | חום', '15' => 'סריג אוברסייז | אפור'] as $id => $title) {
+            $add((string) $id, $title, [explode(' ', $title)[0]]);
+        }
+        $search = function (string $q) use ($shop): array {
+            app(BuildSearchIndex::class)->handle($shop->id);
+            LoadedIndex::forget();
+
+            return app(SearchCatalog::class)->handle($shop->id, $q, count: false);
+        };
+
+        // none red: the trousers without it, the burgundy ones first, never the red shirt
+        $found = $search('מכנסיים אדומים');
+        $ids = array_column($found['groups']['product'], 'external_id');
+        $this->assertSame(['אדומים'], $found['loosened']['left'] ?? null);
+        $this->assertSame('4', $ids[0], 'burgundy is red: nearest the colour asked');
+        $this->assertNotContains('5', $ids, 'a red shirt is no trouser');
+
+        // red shorts: trousers, by what their picture says they are, and what is shown
+        $add('7', 'שורטס הארט סטרייפס סיומת קיפול | בז/אדום', ['שורטס', 'מכנסיים קצרים', 'פסים אדום']);
+        $found = $search('מכנסיים אדומים');
+        $this->assertArrayNotHasKey('loosened', $found);
+        $this->assertSame(['7'], array_column($found['groups']['product'], 'external_id'));
     }
 
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
