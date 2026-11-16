@@ -174,6 +174,15 @@ class DrawerFiltersTest extends TestCase
         $this->assertStringNotContainsString('hoop', $note);
     }
 
+    public function test_what_people_ask_here_is_only_in_the_sites_language(): void
+    {
+        // Jean Rachel, 16.11: a Hebrew question kept from when the demo spoke Hebrew, among its English ones
+        $seed = "[['a:1','what is your return policy?'],['a:2','אפשר להחזיר טבעת אם המידה לא מתאימה?'],['a:3','Do you ship abroad?'],['a:4','יש משלוח ל-Eilat?']].forEach(function (x) { S.records[x[0]] = { id: x[0], t: 'answer', title: x[1], ans: 'yes', ak: 'store', an: 2, w: 1 }; });";
+        $this->assertSame(['what is your return policy?', 'Do you ship abroad?'], self::drawer("(function () { {$seed} return T.peopleAsk().map(function (r) { return r.title; }); })()"));
+        // and a Hebrew site its Hebrew ones, a Latin name inside one included
+        $this->assertSame(['אפשר להחזיר טבעת אם המידה לא מתאימה?', 'יש משלוח ל-Eilat?'], self::drawer("(function () { LANG_SET('he'); {$seed} return T.peopleAsk().map(function (r) { return r.title; }); })()"));
+    }
+
     public function test_a_tag_all_in_capitals_or_small_letters_is_shown_in_title_case_and_a_brand_as_it_is(): void
     {
         $this->assertSame(['Sterling Silver', 'Mens Bracelets', 'Big-Bold', 'APMA Accepted', 'VANS', 'צמידים'], self::drawer(

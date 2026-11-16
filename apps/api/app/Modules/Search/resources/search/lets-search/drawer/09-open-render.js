@@ -177,7 +177,10 @@
   function peopleAsk() {
     var E = S.engine;
     var asks = function (q) { q = String(q || '').trim(); return /\?\s*$/.test(q) || !!(E && E.isQuestion && E.isQuestion(q)); };
-    var all = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.ans && asks(r.title); });
+    // only questions in the site's own language: a Hebrew question kept from when an English store's demo spoke Hebrew was
+    // offered among its English ones (Jean Rachel, 16.11), as an English one would be in a Hebrew store
+    var ownLanguage = function (q) { return /[֐-׿]/.test(String(q || '')) === (LANG === 'he'); };
+    var all = Object.keys(S.records).map(function (k) { return S.records[k]; }).filter(function (r) { return r.t === 'answer' && r.ans && asks(r.title) && ownLanguage(r.title); });
     // an index from before kinds were kept: its store answers, as before
     if (!all.some(function (r) { return r.ak; })) { return all.filter(function (r) { return r.w === 1; }).slice(0, 2); }
     var rank = { store: 0, content: 1, product: 2 };
