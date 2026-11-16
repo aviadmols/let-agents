@@ -177,9 +177,20 @@ final class CrossLanguageSearchTest extends TestCase
             '1' => ['14K Gold Wrap Ring', 'x'], '2' => ['Mixed Metal Lace Ring', 'x'], '3' => ['Stacking Rings Set', 'x'],
             '4' => ['CZ Hoop Earrings', 'x'], '5' => ['Wire Wrap Earrings', 'x'], '6' => ['Gold Heart Necklace', 'x'],
             '7' => ['Layered Necklaces', 'x'], '8' => ['Jewelry Boxes', 'x'], '9' => ['Gift Box', 'x'], '10' => ['Baby Bracelet', 'x'], '11' => ['Babies Gift Set', 'x'],
+            // earrings enough that, held inside their word, they were "rings" as typed and the rings were left out (Jean, 16.11)
+            '12' => ['Pearl Drop Earrings', 'x'], '13' => ['Gold Stud Earrings', 'x'], '14' => ['Silver Huggie Earrings', 'x'], '15' => ['Opal Earrings', 'x'],
         ]);
 
         $this->assertEqualsCanonicalizing(['1', '2', '3'], $this->found($shop, 'rings'), 'every ring, never the earrings');
+
+        // Jean Rachel: "rings" said whole by the few in the store's "Rings" collection, enough to stand alone, and the rings
+        // whose words say "ring" were left out
+        $jean = $this->store('en', [
+            '1' => ['Gold Wrap Ring', 'Rings'], '2' => ['Lace Ring', 'Rings'], '3' => ['Leaf Ring', 'Rings'], '4' => ['Cross Ring', 'x'], '5' => ['Band Ring', 'x'],
+            '6' => ['Hoop Earrings', 'Earrings'], '7' => ['Stud Earrings', 'Earrings'], '8' => ['Heart Necklace', 'Necklaces'], '9' => ['Chain Necklace', 'Necklaces'],
+        ]);
+        $this->assertEqualsCanonicalizing(['1', '2', '3', '4', '5'], $this->found($jean, 'rings'), 'every ring');
+        $this->assertEqualsCanonicalizing(['1', '2', '3', '4', '5'], $this->found($jean, 'ring'));
         $this->assertEqualsCanonicalizing($this->found($shop, 'ring'), $this->found($shop, 'rings'));
         $this->assertEqualsCanonicalizing(['6', '7'], $this->found($shop, 'necklaces'));
         $this->assertEqualsCanonicalizing(['8', '9'], $this->found($shop, 'boxes'));

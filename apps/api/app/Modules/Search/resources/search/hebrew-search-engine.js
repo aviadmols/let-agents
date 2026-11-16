@@ -341,7 +341,12 @@
   }
   function holdsToken(hay, token, whole) {
     // an English word's plural is the word too ("tour" in "Israel Tours"), as a Hebrew word's endings are
+    // and an English plural is said by its singular: "rings" by "Gold Ring" (HebrewSearch::holdsToken, Jean Rachel QA, 16.11)
+    var one = singular(token);
+    if (one !== token && new RegExp('(?:^| )' + one + '(?:s|es)?(?: |$)').test(hay)) { return true; }
     if (whole) { return new RegExp('(?:^| )[והבלמשכ]{0,2}' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:ימ|ות|ה|י|ת|s|es)?(?: |$)').test(hay); }
+    // an English word at a word's start, never inside another: "rings" is no "earrings", "ring" no "earring"
+    if (/^[a-z]{3,}$/.test(token)) { return new RegExp('(?:^| )' + token).test(hay); }
     if (token.length >= 3) { return hay.indexOf(token) !== -1; }
     return new RegExp('(?:^| )[והבלמשכ]?' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?: |$)').test(hay);
   }
