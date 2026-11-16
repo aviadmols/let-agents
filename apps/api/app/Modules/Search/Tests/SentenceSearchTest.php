@@ -40,6 +40,8 @@ final class SentenceSearchTest extends TestCase
             ['4', 'טבעת זהב לבן עדינה', 'טבעות פס זהב צהוב בשוליים', 900, [0, 1001]],
             ['5', 'תליון משובץ יהלומים', 'תליונים סגר טבעת', 2300, [1, 1000, 2000]],
             ['6', 'עגיל בודד משובץ יהלום', 'עגילים עגיל נעצים', 1100, [2000]],
+            // its title says yellow gold, its metal filter lists only the white of its two tones
+            ['7', 'טבעת שני גוונים זהב צהוב וזהב לבן', 'טבעות', 1500, [0, 1001]],
         ]);
         $json = (string) json_encode(['items' => $items, 'facets' => $facets, 'actions' => []], JSON_UNESCAPED_UNICODE);
         app(TenantContext::class)->run($this->shop->id, fn () => SearchIndex::query()->create(['shop_id' => $this->shop->id, 'hash' => md5($json), 'items' => $json, 'counts' => [], 'built_at' => now()]));
@@ -76,6 +78,9 @@ final class SentenceSearchTest extends TestCase
 
         $this->assertContains('1', $found['ids']);
         $this->assertNotContains('4', $found['ids'], 'it carries white gold; its words mention a yellow-gold rim');
+        // its own title saying the value is it, whatever else its filter lists, as the drawer reads it (Rocks QA, 16.11: the
+        // corundum rings titled "כחול" left out once "כחול" was read as the stone colour filter: 132, then 76)
+        $this->assertContains('7', $found['ids']);
         $this->assertNotContains('2', $found['ids']);
     }
 

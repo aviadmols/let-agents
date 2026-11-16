@@ -103,6 +103,8 @@ final class SearchIndexController
             'currency' => Settings::get('search.store_currency', $shopId) ? (string) (Shop::query()->whereKey($shopId)->value('currency') ?? '') : null,
             // Product pictures fill their square ("cover"), or show whole in a light frame ("frame").
             'images' => (string) Settings::get('search.image_fit', $shopId),
+            // square, or upright (4:5) for clothes photographed on a model
+            'shape' => (string) Settings::get('search.image_shape', $shopId),
             // "Not sure what fits?" under the results: the store's AI recommends among them (inside), or an outside AI (outside).
             'notSure' => (string) Settings::get('search.not_sure', $shopId),
             'notSureMax' => (int) Settings::get('search.not_sure_max', $shopId),

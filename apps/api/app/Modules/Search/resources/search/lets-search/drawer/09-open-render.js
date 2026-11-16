@@ -141,20 +141,33 @@
     SUG.classList.toggle('is-away', S.tab !== 'chat' || !!S.wide);
     if (S.tab === 'saved') { FLOW.innerHTML = savedView(); return; }
     if (S.wide) { FLOW.innerHTML = wideView(); return; }
+    // As a conversation reads: the earliest first, the newest under it (QA, 16.11: "the new message still shows above the
+    // one before"; until then the newest came first, as asked on 2026-10-25). What came before, and the conversation
+    // before this one, are opened from above.
     var all = chatTurns(), list = all.filter(function (x) { return !x.prev; }), before = all.filter(function (x) { return x.prev; });
-    var prevHtml = before.length ? '<div class="ls-prev">' + (S.showPrev ? '<span class="ls-prev__label">' + esc(t('prevChat')) + '</span>'
-      : '<button class="ls-prev__btn" data-prev>' + icon('history', 'ls-icon--sm') + esc(t('loadPrev')) + ' <span class="ls-num">(' + before.length + ')</span></button>') + '</div>' +
-      (S.showPrev ? '<div class="ls-turns ls-turns--prev">' + before.slice(-8).map(turnHtml).reverse().join('') + '</div>' : '') : '';
+    var prevHtml = before.length ? (S.showPrev ? '<div class="ls-turns ls-turns--prev">' + before.slice(-8).map(turnHtml).join('') + '</div>' : '') +
+      '<div class="ls-prev">' + (S.showPrev ? '<span class="ls-prev__label">' + esc(t('prevChat')) + '</span>'
+      : '<button class="ls-prev__btn" data-prev>' + icon('history', 'ls-icon--sm') + esc(t('loadPrev')) + ' <span class="ls-num">(' + before.length + ')</span></button>') + '</div>' : '';
     if (!list.length) { FLOW.innerHTML = welcome() + prevHtml; return; }
     var shown = S.showAll ? list : list.slice(-8);
-    var html = shown.map(turnHtml).reverse().join('');
-    if (list.length > shown.length) { html += '<div class="ls-earlier"><button class="ls-btn ls-btn--ghost ls-btn--sm" data-earlier>' + esc(LANG === 'he' ? 'הצגת ' + (list.length - shown.length) + ' פניות קודמות' : 'Show ' + (list.length - shown.length) + ' earlier') + '</button></div>'; }
-    var newest = Object.keys(fresh).length, keep = BODY.scrollTop;
-    FLOW.innerHTML = '<div class="ls-turns">' + html + '</div>' + prevHtml;
+    var html = shown.map(turnHtml).join('');
+    if (list.length > shown.length) { html = '<div class="ls-earlier"><button class="ls-btn ls-btn--ghost ls-btn--sm" data-earlier>' + esc(LANG === 'he' ? 'הצגת ' + (list.length - shown.length) + ' פניות קודמות' : 'Show ' + (list.length - shown.length) + ' earlier') + '</button></div>' + html; }
+    var changed = Object.keys(fresh), keep = BODY.scrollTop;
+    FLOW.innerHTML = prevHtml + '<div class="ls-turns">' + html + '</div>';
     fresh = {};
-    // the newest turn first, on a phone too (as Aviad asked, 2026-10-25): a question asked under the results comes up
-    // to the top with its answer, and the search it was asked about goes down below it
-    BODY.scrollTop = newest ? 0 : keep;
+    BODY.scrollTop = keep;
+    // a turn just added, or one that changed low on the screen or under it: brought up to the top, read from its start.
+    // One being read (its top already above) stays where it is.
+    for (var i = changed.length - 1; i >= 0; i--) { if (toTurn(changed[i], true)) { break; } }
+  }
+  // Scrolls the conversation so a turn starts at the top. soft: only when its start is low on the screen or under it.
+  function toTurn(id, soft) {
+    var el = FLOW.querySelector('[data-tid="' + id + '"]');
+    if (!el) { return false; }
+    var at = el.getBoundingClientRect().top - BODY.getBoundingClientRect().top;
+    if (soft && at <= BODY.clientHeight * 0.6) { return true; }
+    BODY.scrollTop = Math.max(0, BODY.scrollTop + at - 8);
+    return true;
   }
   function credit() { return '<div class="ls-credit">' + mark() + '<a href="https://lets.co.il/" target="_blank" rel="noopener">' + esc(t('powered')) + '</a></div>'; }
   // On a product page the questions go with the product, invisibly: the field says so, nothing else does.

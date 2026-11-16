@@ -18,6 +18,10 @@
                     'frame' => [...$t('fits')['frame'], 'mini' => 'frame'],
                 ]" />
             </div>
+            <div>
+                <div class="lp-set-label">{{ $t('shape') }}<span class="lp-tip" tabindex="0" data-tip="{{ $t('shape_tip') }}" aria-label="{{ $t('shape_tip') }}">i</span></div>
+                <x-lp::opts model="data.shape" :options="$t('shapes')" />
+            </div>
         </div>
 
         <x-lp::kv style="margin-top: 18px">

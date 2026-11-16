@@ -65,9 +65,9 @@ final class ColourFamiliesTest extends TestCase
         $shop = Shop::factory()->create(['content_locale' => 'he']);
         Features::override('search.semantic', false, $shop->id);
         Features::override('search.pictures', false, $shop->id);
-        $add = fn (string $id, string $title, array $words) => app(TenantContext::class)->run($shop->id, function () use ($shop, $id, $title, $words): void {
+        $add = fn (string $id, string $title, array $words, array $attributes = []) => app(TenantContext::class)->run($shop->id, function () use ($shop, $id, $title, $words, $attributes): void {
             $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
-                'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => ['tags' => ['נובמבר', 'אוקטובר']]]);
+                'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => ['tags' => ['נובמבר', 'אוקטובר'], 'attributes' => $attributes]]);
             RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
                 'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
         });
@@ -75,8 +75,8 @@ final class ColourFamiliesTest extends TestCase
         $add('2', 'מכנסי טובי גזרה מחויטת | שחור', ['מכנסיים', 'גזרה מחויטת', 'שחור']);
         $add('3', 'מכנסי כריסטה גזרה ישרה | לבן', ['מכנסיים', 'גזרה ישרה', 'לבן']);
         $add('4', 'מכנסי מיה בד פייזלי | בורדו/תכלת', ['מכנסיים', 'בד פייזלי', 'בורדו']);
-        // a red top whose picture shows trousers with it: it holds both words, and is no trouser
-        $add('5', 'חולצת לאנה בשילוב קשירות | אדום', ['חולצה', 'קשירות', 'אדום', 'מכנסיים לבנים']);
+        // a red top the store says goes with trousers: it holds both words, and is no trouser
+        $add('5', 'חולצת לאנה בשילוב קשירות | אדום', ['חולצה', 'קשירות', 'אדום'], [['name' => 'מתאים עם', 'values' => ['מכנסיים לבנים']]]);
         $add('6', 'חולצת בייסיק | שחור', ['חולצה', 'שחור']);
         foreach (['11' => 'שמלת סאטן | ירוק', '12' => 'שמלת מקסי | לבן', '13' => 'חצאית מיני | שחור', '14' => 'חצאית מידי | חום', '15' => 'סריג אוברסייז | אפור'] as $id => $title) {
             $add((string) $id, $title, [explode(' ', $title)[0]]);
@@ -103,6 +103,12 @@ final class ColourFamiliesTest extends TestCase
         $found = $search('מכנסיים אדומים');
         $this->assertArrayNotHasKey('loosened', $found);
         $this->assertSame(['7'], array_column($found['groups']['product'], 'external_id'));
+
+        // a set of a sweatshirt and wide trousers, as its picture lists its pieces: trousers too (Miss Nori, 16.11)
+        $add('8', 'חליפת ווידלג וסוויטשירט עם רוכסן | אדום', ['חליפת ספורט', 'ווידלג', 'אדום', 'סוויטשירט', 'מכנסיים רחבים', 'רוכסן']);
+        $found = $search('מכנסיים אדומים');
+        $this->assertEqualsCanonicalizing(['7', '8'], array_column($found['groups']['product'], 'external_id'));
+        $this->assertNotContains('5', array_column($found['groups']['product'], 'external_id'), 'still no red top, whatever its picture shows beside it');
     }
 
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void

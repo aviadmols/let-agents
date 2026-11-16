@@ -55,6 +55,7 @@ class LookSettings extends Page
         return [
             'theme' => 'setting:search.theme',
             'images' => 'setting:search.image_fit',
+            'shape' => 'setting:search.image_shape',
             'language' => 'setting:search.widget_language',
         ];
     }

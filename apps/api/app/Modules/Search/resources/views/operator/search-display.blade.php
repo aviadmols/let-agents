@@ -154,6 +154,12 @@
                             <label class="lad-chk"><input type="radio" name="lad-images" value="{{ $fit }}" wire:model.live="data.images">{{ $t('look.images_'.$fit) }}</label>
                         @endforeach
                     </div>
+                    <div style="flex:1 1 240px">
+                        <span class="lad-lbl">{{ $t('look.shape') }}</span>
+                        @foreach (['square', 'portrait'] as $shape)
+                            <label class="lad-chk"><input type="radio" name="lad-shape" value="{{ $shape }}" wire:model.live="data.shape">{{ $t('look.shape_'.$shape) }}</label>
+                        @endforeach
+                    </div>
                 </div>
 
                 <div class="lad-opt">

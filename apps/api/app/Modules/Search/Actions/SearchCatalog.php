@@ -3300,6 +3300,13 @@ final class SearchCatalog
             return true;
         }
 
+        // its own name saying it is it, whatever else the attribute lists, as the drawer reads it (filtered()): a ring titled
+        // "משובצת קורונדום כחול" is blue though its stone colour lists the diamonds' white too (Rocks QA, 16.11: "טבעת יהלום כחו"
+        // showed 132 by the word, and "כחול", read as the filter, 76)
+        if (array_any($values, fn (string $label): bool => HebrewSearch::says((string) ($r['title'] ?? ''), $label))) {
+            return true;
+        }
+
         $words = fn (string $label): array => explode(' ', HebrewSearch::normalize($label));
         $text = (string) ($r['title'] ?? '').' '.(string) ($r['kw'] ?? '');
 

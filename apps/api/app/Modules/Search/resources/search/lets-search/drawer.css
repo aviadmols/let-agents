@@ -592,3 +592,7 @@
 /* on the drawer's own background it is a field as the search box is one: sunken, never white on white */
 .ls-reply .ls-field { background: var(--ls-bg-sunken); }
 .ls-reply .ls-field:focus-within { background: var(--ls-bg); }
+
+/* Upright pictures (search.image_shape portrait): clothes on a model, whole from head to toe, on cards and in answers */
+.is-portrait .ls-card__media { aspect-ratio: 4 / 5; }
+.is-portrait .ls-pick__media { height: auto; aspect-ratio: 4 / 5; }

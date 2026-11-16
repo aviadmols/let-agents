@@ -142,6 +142,9 @@ final class BuildSearchIndex
     /** Of the store's own filing, at most this many word stems a product keeps for the kind a search names. */
     private const KIND_STEMS = 16;
 
+    /** Beside those, at most this many stems of the pieces its picture names (kindStems). */
+    private const PICTURE_PIECES = 8;
+
     /**
      * The Hebrew words the store files a product under, as stems: its type, its categories and its tags, each word on
      * its own ("נעליים_נשים" is "נעליים" and "נשים"). Never its title or description: a keychain whose title says
@@ -176,13 +179,19 @@ final class BuildSearchIndex
      * "שורטס", "מכנסיים קצרים"), as word stems; the picture's first, so a long list of tags never pushes it out. Shorts titled
      * "שורטס הארט" were no trousers, their tags months and campaigns (Miss Nori, 16.11: "מכנסיים אדומים" left out the red
      * shorts and showed every trouser but red).
+     * And the first word of each of its picture's other phrases, after the store's: the pieces a set is made of ("חליפת
+     * ווידלג וסוויטשירט", its picture "סוויטשירט", "מכנסיים רחבים": trousers too, Miss Nori 16.11). The picture names only
+     * the product, never what the model wears with it (caption v8; none of Miss Nori's 158 tops names trousers), nor what is
+     * only drawn on it (shown()).
      */
     private static function kindStems(CatalogProduct $product, ?RetrievalImage $picture = null): array
     {
-        $seen = $picture === null ? [] : array_values(array_filter(array_slice(array_values(array_filter((array) $picture->caption_words, 'is_string')), 0, self::PICTURE_KIND_PHRASES),
+        $phrases = $picture === null ? [] : array_values(array_filter(self::shown($picture),
             fn (string $phrase): bool => HebrewSearch::colorOf(HebrewSearch::normalize($phrase)) === null));
+        $seen = array_slice($phrases, 0, self::PICTURE_KIND_PHRASES);
+        $pieces = array_map(fn (string $phrase): string => explode(' ', trim($phrase))[0], array_slice($phrases, self::PICTURE_KIND_PHRASES));
         $names = [...$seen, (string) ($product->payload['product_type'] ?? ''), ...array_map('strval', (array) ($product->payload['tags'] ?? [])),
-            ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all()];
+            ...$product->categories->pluck('name')->map(fn ($n): string => (string) $n)->all(), ...$pieces];
         $stems = [];
         foreach ($names as $name) {
             foreach (explode(' ', HebrewSearch::normalize(str_replace('_', ' ', $name))) as $word) {
@@ -192,7 +201,8 @@ final class BuildSearchIndex
             }
         }
 
-        return array_slice(array_keys($stems), 0, self::KIND_STEMS);
+        // the picture's pieces after the store's own filing, room kept for them
+        return array_slice(array_keys($stems), 0, self::KIND_STEMS + self::PICTURE_PIECES);
     }
 
     /**

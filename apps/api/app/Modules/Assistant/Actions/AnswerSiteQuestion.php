@@ -3721,7 +3721,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         // cheapest in the price" with two toddler's shoes (Vans; Rocks QA, 16.11: one ring for an anniversary gift): the
         // writer chooses among what is inside it (withinPrice())
         if ($asks === 'in_range' && app()->bound(ProductsNamed::class) && app()->bound(PriceRange::class)) {
-            $left = self::wishWords((string) (app(PriceRange::class)->read($question)['words'] ?? ''));
+            // the words left of its price, or, a reply whose price is the conversation's ("שרשרת עדינה" after "מתנה לאשתי עד
+            // 2000"), all of its words: a wish in a reply is the writer's as well
+            $said = app(PriceRange::class)->read($question);
+            $left = self::wishWords((string) ($said['words'] ?? (($said['min'] ?? null) === null && ($said['max'] ?? null) === null ? $question : '')));
             if ($left !== '' && ! app(ProductsNamed::class)->holds($this->tenant->require(), $left)) {
                 return null;
             }
@@ -3731,7 +3734,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         // A question that names a product is answered from every product of the store the words name, as the
         // store's search reads them (categories, stones, synonyms): "איזו טבעת עם יהלום הכי זולה" from all the
         // diamond rings, never from the two a shopper had on screen (Rocks, 24.10: it named the cheaper of two).
-        $byName = (! $followUp && $named !== [] && $asks !== null && app()->bound(ProductsNamed::class)
+        // A reply inside the conversation's price that names a kind of its own ("שרשרת עדינה", not "מהם"): every one of
+        // that kind in the store, never the few the answer before showed (Rocks QA, 16.11: one necklace, "the cheapest")
+        $ownKind = $followUp && $asks === 'in_range' && ! self::pointsBack($question);
+        $byName = ((! $followUp || $ownKind) && $named !== [] && $asks !== null && app()->bound(ProductsNamed::class)
             ? app(ProductsNamed::class)->all($this->tenant->require(), $question)
             : null) ?: null;
 

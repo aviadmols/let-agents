@@ -2,7 +2,11 @@
   // As the shopper types, the results come up the way Enter shows them (count, sort, filters, cards,
   // guides), at the top of the conversation: from the index at once, then the server's list a beat
   // later. Filters chosen here stay while typing, and go with the search when it's sent.
-  var liveTimer = null, pauseTimer = null, meaningTimer = null, wordTimer = null;
+  var liveTimer = null, pauseTimer = null, meaningTimer = null, wordTimer = null, holdTimer = null;
+  // A search waits this long for the server, and for its first products' live details (stock), before anything shows: the server reads
+  // colours, kinds and filters the index does not, and its list replaced the index's a moment after ("טבעת יהלום כחול": 124,
+  // then 76; "מכנסיים אדומים": the red trousers, then every trouser: QA, 16.11). Slower than this, the index's show first.
+  var HOLD_MS = 900;
   // Words, not letters: the results change when a word is finished (a space) or the typing rests a moment, never on
   // every letter, so the cards do not flicker under the shopper's fingers (as Aviad asked, 2026-10-21).
   var WORD_REST_MS = 280;
@@ -35,11 +39,18 @@
       var local = hits(q).filter(function (r) { return r.t === 'product'; });
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
       readTags(S.live);
-      clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer);
+      S.live.held = true;
+      clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(holdTimer);
       liveTimer = setTimeout(function () { liveServer(q); }, 60);
     } else if (/\s$/.test(INPUT.value)) {
       // the same words, now whole ("ריישי "): read again, so one word shows its chip
       readTags(S.live);
+    }
+    if (S.live.held) {
+      var lvHeld = S.live;
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(function () { if (S.live === lvHeld && lvHeld.held) { lvHeld.held = false; renderLive(!SUG.classList.contains('is-on')); } }, HOLD_MS);
+      return;
     }
     renderLive(isNew);
     announce(isQuestion(q) ? t('announceQuestion') : t('announceResults', { n: filtered(S.live).length }));
@@ -83,13 +94,20 @@
       lv.willMean = lv.willMean || willMean;
       lv.pending = willMean && !ids.length;
       readTags(lv);
-      renderLive(false);
+      // what was held shows once the server's list and its first products' live details are in, never a count that
+      // changes a moment later ("שמלה": 17, then 18)
+      var firstShown = !!lv.held;
+      if (!firstShown) { renderLive(false); }
       if (!byMeaning) {
         clearTimeout(pauseTimer);
         pauseTimer = setTimeout(function () { if (S.live === lv) { countSearch(q, lv.ids.length); } }, PAUSE_MS);
         if (willMean) { clearTimeout(meaningTimer); meaningTimer = setTimeout(function () { if (S.live === lv) { liveServer(q, true, lv.words || null); } }, 500); }
       }
-      return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () { if (S.live === lv) { renderLive(false); } });
+      return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () {
+        if (S.live !== lv) { return; }
+        if (firstShown && lv.held) { lv.held = false; clearTimeout(holdTimer); renderLive(!SUG.classList.contains('is-on')); return; }
+        renderLive(false);
+      });
     }).catch(function () {
       // the index results stay; a thinking mark never stays forever
       if (S.live && S.live.q === q && S.live.pending) { S.live.pending = false; renderLive(false); }
@@ -120,7 +138,7 @@
     mark_active();
   }
   function hideLive() {
-    clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(wordTimer);
+    clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(wordTimer); clearTimeout(holdTimer);
     S.live = null; S.active = -1;
     if (SUG.classList.contains('is-on')) { SUG.classList.remove('is-on'); SUGIN.innerHTML = ''; SUGIN.lsHtml = null; }
     INPUT.setAttribute('aria-expanded', 'false'); INPUT.removeAttribute('aria-activedescendant');

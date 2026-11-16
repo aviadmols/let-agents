@@ -12,7 +12,7 @@
     S.showPrev = false; hideLive(); keepInField('');
     var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
-    BODY.scrollTop = 0;
+    toTurn(turn.id);
     json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : ''))
       // the alike are kept by the index's records: an answer that came before the index (the drawer just opened on a
       // new page) waits for it, or every one of them went and "0 similar items" stood (Gil Travel, 30.10)
@@ -21,10 +21,10 @@
       // few or none look like it: those of its kind its look left out (another colour, a print), shown apart as "maybe these"
       var others = ((r.body && r.body.others) || []).map(function (p) { return 'p:' + pid(p.external_id || p.id); }).filter(function (x) { return rec(x) && pid(x) !== String(id) && ids.indexOf(x) < 0; });
       return products(ids.slice(0, 24).map(pid).concat(others.map(pid))).then(function () {
-        if (oos) { update(turn, oosPatch(turn, ids, oos)); BODY.scrollTop = 0; return; }
+        if (oos) { update(turn, oosPatch(turn, ids, oos)); toTurn(turn.id); return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
         update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others });
-        BODY.scrollTop = 0;
+        toTurn(turn.id);
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
   }
@@ -144,7 +144,7 @@
     // the photo search stands first, alone: what was on screen waits behind the dashed line
     S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; hideLive(); INPUT.value = ''; FIELD.classList.remove('has-text');
     var turn = addTurn({ kind: 'photo', src: src, loading: true });
-    BODY.scrollTop = 0;
+    toTurn(turn.id);
     // kept in memory (never stored) for "which of the things in the photo": the same photo is sent again
     PHOTOS[turn.id] = blob;
     photoFetch(turn, blob, 0);

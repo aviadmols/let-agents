@@ -14,6 +14,12 @@ return [
         ],
         'images' => 'Product pictures',
         'images_tip' => 'cover: the picture fills the square and is cropped a little at the edges, suits studio shots. frame: the whole picture inside the square with a margin, suits long or narrow products.',
+        'shape' => 'Picture shape',
+        'shape_tip' => 'Square suits most products. An upright rectangle suits clothes photographed on a model from head to toe: the picture is not cut at the top and bottom.',
+        'shapes' => [
+            'square' => ['title' => 'Square', 'text' => 'Suits most products.'],
+            'portrait' => ['title' => 'Upright rectangle', 'text' => 'Suits clothes on a model.'],
+        ],
         'fits' => [
             'cover' => ['title' => 'Fill the frame (cover)', 'text' => 'The picture is cropped a little at the edges. Suits studio shots.'],
             'frame' => ['title' => 'Inside a frame (frame)', 'text' => 'The whole picture shows, with white margins. Suits long products and products on a white ground.'],

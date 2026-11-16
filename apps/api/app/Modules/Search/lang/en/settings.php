@@ -378,6 +378,11 @@ return [
         'description' => 'Fill the square and crop the edges, or show whole inside a light frame (suits pictures on a white ground).',
         'options' => ['cover' => 'Fill the square', 'frame' => 'Whole, in a frame'],
     ],
+    'image_shape' => [
+        'label' => 'Picture shape',
+        'description' => 'Square, or an upright rectangle (4:5), as fashion photos of a model from head to toe are.',
+        'options' => ['square' => 'Square', 'portrait' => 'Upright rectangle'],
+    ],
     'photo_rank_provider' => [
         'label' => 'Provider of the model that orders the results',
         'description' => 'anthropic, openai or gemini.',

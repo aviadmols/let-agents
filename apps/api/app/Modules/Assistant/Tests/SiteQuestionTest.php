@@ -718,6 +718,45 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('code', $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data.from'));
     }
 
+    public function test_a_reply_naming_a_kind_inside_the_conversations_price_is_every_one_of_it_never_called_the_cheapest(): void
+    {
+        // Rocks QA, 16.11: "מתנה לאישתי עד 2000 ש"ח?", then "שרשרת עדינה": one necklace of the answer before, "במחיר שביקשת,
+        // הזול ביותר שבמלאי", though no one asked for the cheapest and the store has many under 2000
+        foreach (['981' => 1600, '982' => 900, '983' => 1200, '984' => 1900, '985' => 2600] as $id => $price) {
+            $this->product((string) $id, 'שרשרת עדינה '.$id, 'שרשרת.', [], ['price' => $price.'.00', 'in_stock' => true]);
+        }
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return str_contains($words, 'שרשרת');
+            }
+
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'שרשרת') ? ['981', '982', '983', '984', '985'] : [];
+            }
+        });
+        $thread = [['q' => 'מתנה לאישתי עד 2000 ש"ח?', 'a' => 'עגילים הם בחירה נוחה במיוחד.']];
+
+        $data = $this->reply('שרשרת עדינה', $thread, ['981'])->json('data');
+
+        $this->assertSame('code', $data['from']);
+        $ids = $data['set']['ids'] ?? array_column($data['picks'], 'external_id');
+        $this->assertEqualsCanonicalizing(['981', '982', '983', '984'], $ids, 'every necklace in the store under the conversation\'s 2000, not the one shown before');
+        $this->assertStringNotContainsString('הזול', $data['answer'], 'no one asked for the cheapest');
+    }
+
     public function test_a_wish_with_a_price_that_names_no_product_is_chosen_from_every_kind_inside_it_a_gift_card_last(): void
     {
         // Rocks QA, 16.11: "אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500" was answered with the gift card at 250,

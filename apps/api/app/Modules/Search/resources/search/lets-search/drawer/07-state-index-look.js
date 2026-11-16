@@ -52,6 +52,8 @@
     R.classList.toggle('no-similar', off('similar'));
     // product pictures shown whole in a light frame, for a shop whose pictures sit on a white ground (search.image_fit)
     R.classList.toggle('is-frame', S.config.images === 'frame');
+    // upright pictures (4:5): clothes photographed on a model, never cut at the head and the feet
+    R.classList.toggle('is-portrait', S.config.shape === 'portrait');
     doc.querySelectorAll('.lets-inline').forEach(function (h) { var b = h.shadowRoot && h.shadowRoot.querySelector('[data-photo]'); if (b) { b.hidden = off('photos'); b.previousElementSibling.hidden = off('photos'); } });
     if (S.config.selector && S.config.selector !== CFG.fieldSelector) { CFG.fieldSelector = CFG.fieldSelector + ', ' + S.config.selector; hookFields(); }
   }

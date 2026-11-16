@@ -842,6 +842,16 @@
             "scope": "shop"
         },
         {
+            "name": "image_shape",
+            "type": "enum",
+            "options": [
+                "square",
+                "portrait"
+            ],
+            "default": "square",
+            "scope": "shop"
+        },
+        {
             "name": "card_action",
             "type": "enum",
             "options": [

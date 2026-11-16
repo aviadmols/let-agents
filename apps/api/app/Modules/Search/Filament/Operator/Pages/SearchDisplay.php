@@ -107,6 +107,7 @@ class SearchDisplay extends Page
             'price' => (bool) Settings::get('search.show_price', $shop),
             'cart' => (bool) Settings::get('search.show_cart', $shop),
             'images' => (string) Settings::get('search.image_fit', $shop),
+            'shape' => (string) Settings::get('search.image_shape', $shop),
             'similar' => Features::enabled('search.similar', $shop),
             'selector' => (string) Settings::get('search.input_selector', $shop),
             // The hearts on the store's own pages (Shortlist), shown here because they belong to how the search looks.
@@ -147,6 +148,7 @@ class SearchDisplay extends Page
             Settings::set('search.show_price', (bool) ($d['price'] ?? true), $shop);
             Settings::set('search.show_cart', (bool) ($d['cart'] ?? true), $shop);
             Settings::set('search.image_fit', ($d['images'] ?? 'cover') === 'frame' ? 'frame' : 'cover', $shop);
+            Settings::set('search.image_shape', ($d['shape'] ?? 'square') === 'portrait' ? 'portrait' : 'square', $shop);
             Settings::set('shortlist.heart_on_product', (bool) ($d['heart_product'] ?? true), $shop);
             Settings::set('shortlist.heart_on_cards', (bool) ($d['heart_cards'] ?? true), $shop);
             Settings::set('shortlist.heart_place', in_array($d['heart_place'] ?? '', ['price', 'cart'], true) ? $d['heart_place'] : 'corner', $shop);
