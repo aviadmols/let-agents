@@ -94,6 +94,14 @@ final class ShopVoiceTest extends TestCase
         $this->assertSame([], $this->calls);
     }
 
+    public function test_the_note_describes_a_manner_never_whom_it_addresses(): void
+    {
+        // a note told the writer to address shoppers in the singular, against its fixed plural (16.11)
+        $prompt = (string) file_get_contents(__DIR__.'/../Prompts/'.ReadShopVoice::PROMPT.'.md');
+        $this->assertStringNotContainsString('plural, or as one person', $prompt);
+        $this->assertStringContainsString('never whom it addresses', $prompt);
+    }
+
     public function test_a_style_out_of_the_four_and_a_long_note_are_kept_in_bounds_and_too_few_texts_ask_nothing(): void
     {
         $this->assertSame('few', $this->inShop(fn () => app(ReadShopVoice::class)->handle($this->shop->id))['status'], 'no product says anything yet');

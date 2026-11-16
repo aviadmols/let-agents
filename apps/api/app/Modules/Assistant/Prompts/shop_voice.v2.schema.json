@@ -1,0 +1,10 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["style", "note", "evidence"],
+    "properties": {
+        "style": {"type": "string", "enum": ["warm", "friendly", "professional", "brief"]},
+        "note": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "string"}}
+    }
+}

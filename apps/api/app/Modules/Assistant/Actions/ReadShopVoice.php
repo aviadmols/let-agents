@@ -29,7 +29,8 @@ final class ReadShopVoice
 
     public const ACTION = 'assistant.read_voice';
 
-    public const PROMPT = 'shop_voice.v1';
+    // v2: the manner only, never whom it addresses or how (a note asked for the singular against the writer's plural)
+    public const PROMPT = 'shop_voice.v2';
 
     public const STYLES = ['warm', 'friendly', 'professional', 'brief'];
 
@@ -72,7 +73,8 @@ final class ReadShopVoice
         if (count($samples) < 3) {
             return ['status' => 'few'];
         }
-        $hash = substr(hash('sha256', implode("\n", $samples)), 0, 20);
+        // the prompt is part of what was asked: a new one reads the same pieces again
+        $hash = substr(hash('sha256', self::PROMPT."\n".implode("\n", $samples)), 0, 20);
         if (($read['hash'] ?? null) === $hash) {
             return ['status' => 'same', 'style' => $style, 'note' => $note];
         }
