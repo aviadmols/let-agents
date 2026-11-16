@@ -11,7 +11,8 @@
     INPUT.value = ''; FIELD.classList.remove('has-text'); hideLive();
     S.tab = 'chat'; S.wide = null;
     if (kind === 'ask' && off('ask') && !(about || S.askMode)) { kind = 'search'; }
-    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q) || repliesToChat(q)))) { S.keptQ = null; askTurn(q, null, about || S.askMode); return blurPhone(); }
+    // a question the shopper typed is one of their recent searches too (QA, 16.11: "הדפס לימון", asked of the AI, was not kept)
+    if (kind === 'ask' || (kind !== 'search' && (isQuestion(q) || aboutProduct(q) || repliesToChat(q)))) { S.keptQ = null; if (typed) { remember(q); } askTurn(q, null, about || S.askMode); return blurPhone(); }
     // a search stays in the field as it was typed: back in the field, the shopper goes on from it (as Aviad asked,
     // 2026-10-21). The same words again ask nothing: their results are already on screen.
     keepInField(q);

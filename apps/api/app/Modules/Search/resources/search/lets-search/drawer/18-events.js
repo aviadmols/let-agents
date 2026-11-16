@@ -26,7 +26,7 @@
       e.preventDefault();
       var o = opts[S.active];
       if (o && o.dataset.notSure) { notSure(turnById(o.dataset.notSure)); return; }
-      if (o && o.dataset.ask) { submit(INPUT.value, 'ask'); return; }
+      if (o && o.dataset.ask) { submit(INPUT.value, 'ask', false, true); return; }
       if (o) { o.click(); return; }
       var card = askCardFor(INPUT.value);
       if (card) { card.click(); return; }
@@ -244,7 +244,8 @@
       return;
     }
     // "Search the site for me": the AI is asked "Show me …", the bubble says what the shopper typed (QA, 16.11)
-    if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); S.askAs = String(d.from).trim(); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); S.askAs = null; return; }
+    // the card that asks the AI about what the shopper typed: what they typed is one of their recent searches
+    if (d.ask) { e.preventDefault(); if (d.askcard !== undefined && d.from) { signalEvent('ask_after', d.from, ''); S.askAs = String(d.from).trim(); remember(S.askAs); } submit(d.ask, 'ask', !!el.closest('.ls-about-turn')); S.askAs = null; return; }
     if (d.savedAnswer) {
       e.preventDefault();
       var a = S.records[d.savedAnswer];
@@ -329,7 +330,12 @@
     if (d.why !== undefined) { toast(t('whyShownText')); return; }
     if (d.cmpViewed && viewedBefore()) { S.pick = [viewedBefore().id, pid(S.ctx)]; compare(); return; }
     if (d.cmpViewed) { submit((S.config && S.config.cardAction === 'read_more' ? itemized : String)(LANG === 'he' ? 'מה ההבדל בין המוצר הזה לבין מה שראיתי קודם?' : 'How does this compare with what I viewed?'), 'ask', true); return; }
-    if (d.goto && el.tagName === 'A') { remember(INPUT.value.trim() || ''); }
+    // a product opened while typing: what was searched, never a word half typed ("מכנסים אדו" kept as "מכנסים": QA, 16.11)
+    if (d.goto && el.tagName === 'A') {
+      var typedNow = INPUT.value.trim(), parts = typedNow.split(/\s+/);
+      if (parts.length > 1 && !/\s$/.test(INPUT.value) && parts[parts.length - 1].length < 4) { typedNow = parts.slice(0, -1).join(' '); }
+      remember(typedNow || '');
+    }
   });
   // on a phone the search field slides away while scrolling down, and comes back on the way up (or at the top);
   // never while it is being typed in
