@@ -34,6 +34,10 @@ return [
         'photos_text' => 'Fill the frame, or show the whole photo',
         'fill' => 'Fill',
         'all' => 'Show all',
+        'shape' => 'Photo shape',
+        'shape_text' => 'Square, or tall as in fashion photos',
+        'square' => 'Square',
+        'portrait' => 'Tall',
     ],
 
     'window' => [

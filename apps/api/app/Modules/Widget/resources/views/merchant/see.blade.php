@@ -66,7 +66,7 @@
                             <div class="lp-d-dprods">
                                 @foreach ($p['products'] as $product)
                                     <div class="lp-d-dprod">
-                                        <img src="{{ $product['picture'] }}" alt="">
+                                        <img src="{{ $product['picture'] }}" alt="" @if ($pick['shape'] === 'portrait') style="aspect-ratio: 4 / 5; height: auto" @endif data-shape="{{ $pick['shape'] }}">
                                         @if ($on['heart'])<svg class="lp-d-dheart" viewBox="0 0 24 24" aria-hidden="true">{!! $i['save'] !!}</svg>@endif
                                         <span dir="auto">{{ $product['title'] }}</span>
                                         @if ($on['price'] && $product['price'])<br><span class="lp-d-dprice" data-show="price">{{ $product['price'] }}</span>@endif
@@ -84,6 +84,7 @@
                     <h2><span class="lp-d-kpi-icon"><svg viewBox="0 0 24 24">{!! $i['look'] !!}</svg></span><span>{{ $t('look.title') }}</span></h2>
                     <div class="lp-d-set"><div><b>{{ $t('look.style') }}</b><span>{{ $t('look.style_text') }}</span></div>{!! $seg('look', ['lets' => $t('look.lets'), 'store' => $t('look.store')]) !!}</div>
                     <div class="lp-d-set"><div><b>{{ $t('look.photos') }}</b><span>{{ $t('look.photos_text') }}</span></div>{!! $seg('fit', ['fill' => $t('look.fill'), 'all' => $t('look.all')]) !!}</div>
+                    <div class="lp-d-set"><div><b>{{ $t('look.shape') }}</b><span>{{ $t('look.shape_text') }}</span></div>{!! $seg('shape', ['square' => $t('look.square'), 'portrait' => $t('look.portrait')]) !!}</div>
                     @if ($url = $this->more('look'))<a class="lp-d-more lp-d-set-more" href="{{ $url }}">{{ $t('more') }}</a>@endif
                 </section>
                 <section class="lp-d-setgroup">

@@ -50,6 +50,8 @@ final class WhatShoppersSee extends Page
     public const CHOICES = [
         'look' => ['setting:search.theme', ['lets' => 'lets', 'store' => 'store']],
         'fit' => ['setting:search.image_fit', ['fill' => 'cover', 'all' => 'frame']],
+        // square, or tall as a fashion store's photos are (Miss Nori, 16.11)
+        'shape' => ['setting:search.image_shape', ['square' => 'square', 'portrait' => 'portrait']],
     ];
 
     /** The WhatsApp number as typed; saved on "Save" or leaving the field. */

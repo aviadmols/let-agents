@@ -57,6 +57,9 @@ final class WhatShoppersSeeTest extends TestCase
 
         $page->call('choose', 'look', 'store')->call('choose', 'fit', 'all');
         $this->assertSame(['store', 'frame'], [Settings::get('search.theme', $id), Settings::get('search.image_fit', $id)]);
+        // the photos' shape, chosen here too (Miss Nori, 16.11), and the preview shows it
+        $page->call('choose', 'shape', 'portrait')->assertSeeHtml('wire:click="choose(\'shape\', \'portrait\')" aria-pressed="true"');
+        $this->assertSame('portrait', Settings::get('search.image_shape', $id));
         $page->call('choose', 'look', 'lets');
         $this->assertNull(Settings::overrideFor('search.theme', $id), 'back to what it inherits: no word of its own');
 
