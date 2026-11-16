@@ -1496,12 +1496,6 @@ final class HebrewSearch
         return mb_strlen($word) > 3 ? (string) preg_replace('/(?:ימ|ות|ה|ת|י)$/u', '', $word) : $word;
     }
 
-    /**
-     * Whether a catalogue word is a form of one typed: the same word, the typed one at its start ("עגילימ" for "עגילי"),
-     * or one is the other's core with an ending ("טבעת" for "טבעות").
-     *
-     * @param  list<string>  $typed
-     */
     /** An English plural's singular by its ending: "rings" "ring", "boxes" "box", "babies" "baby"; "dress" stays. */
     public static function singular(string $word): string
     {
@@ -1515,6 +1509,23 @@ final class HebrewSearch
         };
     }
 
+    /**
+     * One word's forms as one key, in either language: an English word's singular ("bracelets" "bracelet"), a Hebrew word
+     * without its ending ("מגבות" and "מגבת" "מגב", "צמידים" and "צמיד" "צמיד").
+     */
+    public static function formKey(string $word): string
+    {
+        $word = self::normalize($word);
+
+        return preg_match('/^[a-z]+$/', $word) === 1 ? self::singular($word) : self::core($word);
+    }
+
+    /**
+     * Whether a catalogue word is a form of one typed: the same word, the typed one at its start ("עגילימ" for "עגילי"),
+     * or one is the other's core with an ending ("טבעת" for "טבעות").
+     *
+     * @param  list<string>  $typed
+     */
     private static function formOf(string $candidate, array $typed): bool
     {
         foreach ($typed as $word) {

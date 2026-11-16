@@ -34,6 +34,12 @@ final class WordMeanings
      */
     public const PROMPT = 'word_meaning.v2';
 
+    /**
+     * The gate's version, beside the prompt's: "+forms" also takes what the word plainly means when the store writes it in
+     * some form (formIn). A "none" read before it is read again once; a word found stays.
+     */
+    private const GATE = '+forms';
+
     public function __construct(
         private readonly ChatModel $chat,
         private readonly SpendGuard $spend,
@@ -69,14 +75,15 @@ final class WordMeanings
 
         $saved = SearchWordMeaning::query()->where('word', $word)->first();
         // an answer read with another version of the question is read again (once, within the day's words)
-        if ($saved !== null && ! str_ends_with((string) $saved->model, '@'.self::PROMPT)) {
+        $read = (string) $saved?->model;
+        if ($saved !== null && ! str_ends_with($read, '@'.self::PROMPT) && ! str_ends_with($read, '@'.self::PROMPT.self::GATE)) {
             $saved = null;
         }
         if ($saved !== null) {
             if ($saved->term !== null && isset($byKey[HebrewSearch::normalize($saved->term)])) {
                 return $saved->term;
             }
-            if ($saved->term === null && $saved->words_hash === $hash) {
+            if ($saved->term === null && $saved->words_hash === $hash && str_ends_with($read, self::GATE)) {
                 return null;
             }
         }
@@ -111,10 +118,39 @@ final class WordMeanings
         // code's gate: a word of the store's own, as the store writes it, that names exactly what the shopper's word does
         // (same), or none
         $said = trim((string) ($reply->data['term'] ?? ''));
-        $term = $said === '' || ($reply->data['same'] ?? false) !== true ? null : ($byKey[HebrewSearch::normalize($said)] ?? null);
-        $term = $term !== null && HebrewSearch::normalize($term) === HebrewSearch::normalize($word) ? null : $term;
-        SearchWordMeaning::query()->updateOrCreate(['shop_id' => $shopId, 'word' => $word], ['term' => $term, 'words_hash' => $hash, 'model' => mb_substr($model.'@'.self::PROMPT, 0, 120)]);
+        $term = $said === '' || ($reply->data['same'] ?? false) !== true ? null : ($byKey[HebrewSearch::normalize($said)] ?? self::formIn($said, $words));
+        // ...or what the word plainly means, when the store writes that very word in some form: "צמיד" is "bracelet", the store
+        // writes "bracelets", and the model called it no match (Jean Rachel, 16.11; "shoes", "hoodie", "towels" the same)
+        $term ??= self::formIn(trim((string) ($reply->data['translation'] ?? '')), $words);
+        $term = $term !== null && HebrewSearch::formKey($term) === HebrewSearch::formKey($word) ? null : $term;
+        SearchWordMeaning::query()->updateOrCreate(['shop_id' => $shopId, 'word' => $word], ['term' => $term, 'words_hash' => $hash, 'model' => mb_substr($model.'@'.self::PROMPT.self::GATE, 0, 120)]);
 
         return $term;
+    }
+
+    /**
+     * The store's word that is this one in some form (HebrewSearch::formKey: "bracelet" for the store's "bracelets"), as
+     * the store writes it, the most said first; null when the store writes no form of it.
+     *
+     * @param  list<string>  $words  the store's words
+     */
+    private static function formIn(string $plain, array $words): ?string
+    {
+        if (mb_strlen($plain) < 2) {
+            return null;
+        }
+        $key = HebrewSearch::formKey($plain);
+        foreach ($words as $w) {
+            if (HebrewSearch::normalize($w) === HebrewSearch::normalize($plain)) {
+                return $w;
+            }
+        }
+        foreach ($words as $w) {
+            if (HebrewSearch::formKey($w) === $key) {
+                return $w;
+            }
+        }
+
+        return null;
     }
 }

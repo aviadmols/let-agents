@@ -10,6 +10,7 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
+use App\Modules\Search\Models\SearchWordMeaning;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
@@ -41,6 +42,8 @@ final class CrossLanguageSearchTest extends TestCase
         {
             private const SAYS = ['טבעת' => 'ring', 'זהב' => 'gold', 'צמיד' => 'bracelet', 'earrings' => 'עגילים', 'ring' => 'טבעת', 'shoes' => 'נעליים'];
 
+            private const SHY = ['צמידון' => 'bracelet', 'towels' => 'מגבת', 'כובע' => 'hat'];
+
             /** @param list<string> $asked */
             public function __construct(private array &$asked) {}
 
@@ -49,6 +52,10 @@ final class CrossLanguageSearchTest extends TestCase
                 $input = json_decode($user, true);
                 $this->asked[] = $input['word'];
                 // a Hebrew store asked in Hebrew finds no English word for "צמיד": none
+                // translated right, and called no match since the store writes another form of it (Jean, Vans, Take Me Home, 16.11)
+                if (isset(self::SHY[$input['word']])) {
+                    return new ModelReply(['translation' => self::SHY[$input['word']], 'term' => '', 'same' => false], 300, 5);
+                }
                 $term = self::SAYS[$input['word']] ?? '';
                 $term = $input['language'] === 'he' && preg_match('/^[a-z]/', $term) === 1 ? '' : $term;
                 $held = array_map(fn (string $w): string => mb_strtolower($w), $input['store_words']);
@@ -111,6 +118,33 @@ final class CrossLanguageSearchTest extends TestCase
         ]);
 
         $this->assertEqualsCanonicalizing(['1', '2', '3', '4'], $this->found($shop, 'shoes'));
+    }
+
+    public function test_what_the_word_plainly_means_is_taken_when_the_store_writes_it_in_another_form(): void
+    {
+        $en = $this->store('en', [
+            '1' => ['Silver Chain Bracelets', 'x'], '2' => ['Gold Cuff Bracelets', 'x'], '3' => ['Gold Ring', 'x'], '4' => ['Silver Ring', 'x'],
+            '5' => ['Gold Necklace', 'x'], '6' => ['Silver Necklace', 'x'], '7' => ['Unisex Chain', 'unisex'], '8' => ['Unisex Band', 'unisex'],
+        ]);
+        $this->assertEqualsCanonicalizing(['1', '2'], $this->found($en, 'צמידון'), '"bracelet", and the store writes "bracelets"');
+        $this->assertArrayNotHasKey('near', $this->search($en, 'כובע'), '"hat", which the store never writes: none');
+
+        $he = $this->store('he', [
+            '1' => ['מגבות רחצה ארנב', 'מגבות'], '2' => ['מגבות חוף פסים', 'מגבות'], '3' => ['שמיכה חורף', 'שמיכות'], '4' => ['שמיכה קיץ', 'שמיכות'], '5' => ['בקבוק', 'x'],
+        ]);
+        $this->assertEqualsCanonicalizing(['1', '2'], $this->found($he, 'towels'), '"מגבת", and the store writes "מגבות"');
+    }
+
+    public function test_a_none_read_before_the_forms_gate_is_read_again_once(): void
+    {
+        $shop = $this->store('en', ['1' => ['Silver Chain Bracelets', 'x'], '2' => ['Gold Cuff Bracelets', 'x'], '3' => ['Gold Ring', 'x'], '4' => ['Silver Ring', 'x'], '5' => ['Gold Necklace', 'x']]);
+        $this->found($shop, 'צמידון');
+        app(TenantContext::class)->run($shop->id, fn () => SearchWordMeaning::query()->update(['term' => null, 'model' => 'gpt-5.4-nano@word_meaning.v2']));
+        $this->asked = [];
+
+        $this->assertEqualsCanonicalizing(['1', '2'], $this->found($shop, 'צמידון'), 'read again with the gate');
+        $this->found($shop, 'צמידון');
+        $this->assertSame(['צמידון'], $this->asked, 'once');
     }
 
     public function test_while_typing_nothing_is_asked(): void
