@@ -39,17 +39,17 @@
       var local = hits(q).filter(function (r) { return r.t === 'product'; });
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
       readTags(S.live);
-      S.live.held = true;
+      S.live.waiting = true;
       clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(holdTimer);
       liveTimer = setTimeout(function () { liveServer(q); }, 60);
     } else if (/\s$/.test(INPUT.value)) {
       // the same words, now whole ("ריישי "): read again, so one word shows its chip
       readTags(S.live);
     }
-    if (S.live.held) {
+    if (S.live.waiting) {
       var lvHeld = S.live;
       clearTimeout(holdTimer);
-      holdTimer = setTimeout(function () { if (S.live === lvHeld && lvHeld.held) { lvHeld.held = false; renderLive(!SUG.classList.contains('is-on')); } }, HOLD_MS);
+      holdTimer = setTimeout(function () { if (S.live === lvHeld && lvHeld.waiting) { lvHeld.waiting = false; renderLive(!SUG.classList.contains('is-on')); } }, HOLD_MS);
       return;
     }
     renderLive(isNew);
@@ -96,7 +96,7 @@
       readTags(lv);
       // what was held shows once the server's list and its first products' live details are in, never a count that
       // changes a moment later ("שמלה": 17, then 18)
-      var firstShown = !!lv.held;
+      var firstShown = !!lv.waiting;
       if (!firstShown) { renderLive(false); }
       if (!byMeaning) {
         clearTimeout(pauseTimer);
@@ -105,7 +105,7 @@
       }
       return products(filtered(lv).slice(0, 8).map(function (x) { return x.id; })).then(function () {
         if (S.live !== lv) { return; }
-        if (firstShown && lv.held) { lv.held = false; clearTimeout(holdTimer); renderLive(!SUG.classList.contains('is-on')); return; }
+        if (firstShown && lv.waiting) { lv.waiting = false; clearTimeout(holdTimer); renderLive(!SUG.classList.contains('is-on')); return; }
         renderLive(false);
       });
     }).catch(function () {

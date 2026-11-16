@@ -772,6 +772,10 @@
     var guideFirst = (!!(S.config && S.config.contentFirst) && guides.length > 0) || (gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0)));
     if (guideFirst) { html += guidesHtml(guides, turn.q); }
     html += noteHtml(turn);
+    // no product holds the words at all (only what is near by meaning, "מכניסים"): the card that asks the AI to search the
+    // site comes first, above what may not be it (as Aviad asked, 16.11), and not again under the products
+    var askTop = !off('ask') && !turn.askShown && turn.held === 0 && !!turn.askBelow;
+    if (askTop) { html += '<div style="margin:4px 0 18px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>'; }
     html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
     html += chipRow(turn);
@@ -790,7 +794,7 @@
     if (!guideFirst && !ga) { html += guidesHtml(guides, turn.q); }
     // results that may not be it: a quiet way to ask the store's AI to search the site (Tomer's ask card, 8.11), never
     // for a question already asked above (its card is there), and only when the shopper presses it
-    if (!off('ask') && !turn.askShown) { html += turn.askBelow ? '<div style="margin-top:20px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
+    if (!off('ask') && !turn.askShown && !askTop) { html += turn.askBelow ? '<div style="margin-top:20px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
     html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }
