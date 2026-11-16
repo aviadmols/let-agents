@@ -72,6 +72,14 @@ final class SentenceSearchTest extends TestCase
         $this->assertFalse($named->namesNothing($this->shop->id, 'טבעת יהלום'));
     }
 
+    public function test_a_colour_still_being_typed_finds_what_its_whole_word_does(): void
+    {
+        // Miss Nori, 16.11: "מכנסים שחורי" 14, "מכנסים שחורים" 12; "חולצה כחו" 14, "חולצה כחולה" 16
+        $this->assertSame($this->search('טבעת זהב צהוב')['ids'], $this->search('טבעת זהב צהו')['ids']);
+        // two letters are no start of a word yet
+        $this->assertNotSame($this->search('טבעת זהב צהוב')['ids'], $this->search('טבעת זהב צה')['ids']);
+    }
+
     public function test_a_value_read_from_the_words_is_what_a_product_carries(): void
     {
         $found = $this->search('טבעת זהב צהוב');
@@ -90,6 +98,9 @@ final class SentenceSearchTest extends TestCase
 
         $this->assertNull($search('עצים'), '"עצים" inside the earring\'s "נעצים" (studs): not shown alone as if it were asked for');
         $this->assertSame(['id' => 'p:6', 'by' => 'words'], $search('עגיל בודד'), 'the only product that says the words, as words');
+        // and by its own name: words its other words hold (a collection, a tag) find it, never as the exact match (Miss Nori,
+        // 16.11: "בגד ים" showed a T-shirt alone, its only tie the collection "בגדי ים וחוף")
+        $this->assertNull($search('עגיל נעצים'), '"נעצים" is in its words, not its name');
     }
 
     public function test_one_letter_is_not_a_search(): void

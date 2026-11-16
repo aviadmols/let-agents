@@ -382,6 +382,42 @@ final class SearchCatalog
     }
 
     /**
+     * The query with its last word, when that word is the start of a colour and of nothing else the store writes ("כחו":
+     * every word of the store that starts so is a form of "כחול"), as that colour. A whole word, a start of two letters, or
+     * one that starts a word of another kind too ("ירו": "ירוק", "ירושלים") stays as typed.
+     *
+     * @param  array<string, mixed>  $engine  HebrewSearch::build's
+     */
+    private static function colourCompleted(array $engine, string $query): string
+    {
+        $words = explode(' ', HebrewSearch::normalize($query));
+        $last = (string) end($words);
+        if (mb_strlen($last) < 3 || preg_match('/^\p{Hebrew}+$/u', $last) !== 1 || HebrewSearch::colorOf($last) !== null) {
+            return $query;
+        }
+        $colours = [];
+        foreach ((array) ($engine['list'] ?? []) as $word) {
+            $word = (string) $word;
+            if ($word === $last) {
+                return $query;
+            }
+            if (str_starts_with($word, $last)) {
+                $colour = HebrewSearch::colorOf($word);
+                if ($colour === null) {
+                    return $query;
+                }
+                $colours[$colour] = true;
+            }
+        }
+        if (count($colours) !== 1) {
+            return $query;
+        }
+        $words[count($words) - 1] = (string) array_key_first($colours);
+
+        return implode(' ', $words);
+    }
+
+    /**
      * A search's products, those whose colour is nearest the one wanted first (colourNear), each side in the order it had:
      * its shown products and its ids alike, every other result where it was.
      *
@@ -573,6 +609,9 @@ final class SearchCatalog
             // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת
             // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The
             // meaning reads the whole sentence: "משהו לחבר קרשים" is about joining boards.
+            // A colour still being typed ("חולצה כחו") is read and searched as that colour, as its whole word is (a filter, its
+            // shades): 14, then 16 once "כחולה" was typed (Miss Nori, 16.11)
+            $query = $index === null ? $query : self::colourCompleted($index['engine'], $query);
             $sentence = null;
             $scattered = null;
             if ($index !== null && str_contains(trim($query), ' ') && self::whole(HebrewSearch::search($index['engine'], $query)) === []) {
@@ -610,10 +649,12 @@ final class SearchCatalog
                 ? HebrewSearch::single($index['codes'] ?? [], $query, $spelling)
                 : null;
             $single = $single !== null && isset($index['records'][$single['id']]) ? $single : null;
-            // alone by its words only when it says them as words: "עצים" inside an earring's "נעצים" is no match to show alone
+            // alone by its words only when it says them as words: "עצים" inside an earring's "נעצים" is no match to show alone;
+            // and by its own name: a collection or a tag that holds the words is no exact match (Miss Nori, 16.11: "בגד ים"
+            // showed a T-shirt as the exact match, its only tie the collection "בגדי ים וחוף"). It is still found, among the rest.
             if ($single !== null && $single['by'] === 'words') {
                 $record = $index['records'][$single['id']];
-                $text = (string) ($record['title'] ?? '').' '.(string) ($record['kw'] ?? '');
+                $text = (string) ($record['title'] ?? '');
                 // each word as typed, or without its own prefix letter ("בכסף" is said by "כסף")
                 $single = array_all(array_filter(explode(' ', HebrewSearch::normalize($query))), fn (string $w): bool => HebrewSearch::says($text, $w)
                     || (mb_strlen($w) > 3 && preg_match('/^[והבלמשכ]/u', $w) === 1 && HebrewSearch::says($text, mb_substr($w, 1)))) ? $single : null;

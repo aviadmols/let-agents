@@ -314,6 +314,14 @@
       // a colour is the product's own (its index's mc: the colour it is sold in, the one its picture shows most), never
       // a part's: "חולצה שחורה" is no olive overshirt with black buttons (Story, 26.10)
       var colour = E.colorOf ? E.colorOf(n) : null;
+      // part of a colour still being typed ("שחורי" of "שחורים") is read as that colour, as the whole word will be: read as a
+      // word it held the camouflage trousers whose words list black among their colours (Miss Nori, 16.11: 14, then 12)
+      if (!colour && E.colorOf && i === words.length - 1 && n.length >= 3) {
+        var done = completed(all, n);
+        colour = done ? E.colorOf(E.normalize(done)) : null;
+        // and asked by the whole word's forms: a title saying "כחולה" holds it ("חולצה כחו": 9, then 10)
+        if (colour) { forms = withFamily(wordForms(E.normalize(done)).concat(forms)); }
+      }
       var says = all.filter(function (r) { return colour ? holdsColour(r, colour, forms) : saysWord(r, forms); }).length;
       // part typed and no product says it whole: the word it starts ("לוג": "לוגו"), named as the store says it
       var whole = !says && !not && i === words.length - 1 ? completed(all, n) : null;
