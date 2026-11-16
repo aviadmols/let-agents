@@ -26,4 +26,10 @@ interface ProductsNamed
      * @return list<string> external ids; empty when none
      */
     public function all(string $shopId, string $question): array;
+
+    /**
+     * Whether some product holds every word of these, as the store's search reads them, nothing left out: "סנדלים" does in
+     * a shoe store; "מתנה לבן שלי, משהו מגניב" names no product, it asks for a choice.
+     */
+    public function holds(string $shopId, string $words): bool;
 }

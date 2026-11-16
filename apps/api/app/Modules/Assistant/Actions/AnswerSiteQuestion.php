@@ -3696,6 +3696,16 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($asks === 'in_range' && preg_match('/הכי|ביותר|\b(?:most|best|biggest|largest|smallest|nicest)\b/iu', $question) === 1) {
             return null;
         }
+        // ...nor a price with a wish: code answers a price alone for a product search with a price ("sandals under $150"),
+        // what the words left hold whole in the store. "מתנה לבן שלי ליום הולדת, משהו מגניב עד 300 שקל" was answered "the
+        // cheapest in the price" with two toddler's shoes (Vans; Rocks QA, 16.11: one ring for an anniversary gift): the
+        // writer chooses among what is inside it (withinPrice())
+        if ($asks === 'in_range' && app()->bound(ProductsNamed::class) && app()->bound(PriceRange::class)) {
+            $left = trim((string) (app(PriceRange::class)->read($question)['words'] ?? ''));
+            if ($left !== '' && ! app(ProductsNamed::class)->holds($this->tenant->require(), $left)) {
+                return null;
+            }
+        }
         $named = self::named($question);
         $wholeStore = ! $followUp && $named === [] && in_array($asks, ['cheapest', 'most_expensive'], true);
         // A question that names a product is answered from every product of the store the words name, as the

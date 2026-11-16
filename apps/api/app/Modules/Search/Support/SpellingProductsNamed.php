@@ -20,6 +20,17 @@ final class SpellingProductsNamed implements ProductsNamed
         return array_values(array_filter(array_map('strval', $externalIds), fn (string $id): bool => isset($named[$id])));
     }
 
+    public function holds(string $shopId, string $words): bool
+    {
+        if (trim($words) === '') {
+            return false;
+        }
+        $found = $this->search->handle($shopId, $words, ['product'], count: false, perGroup: 1, meaning: false);
+
+        // held whole, never by a looser search that left a word out
+        return (int) ($found['held'] ?? 0) > 0 && ! isset($found['loosened']);
+    }
+
     public function all(string $shopId, string $question): array
     {
         $found = $this->search->handle($shopId, $question, ['product'], count: false, perGroup: self::ALL, meaning: false);

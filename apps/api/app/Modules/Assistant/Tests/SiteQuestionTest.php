@@ -623,6 +623,11 @@ final class SiteQuestionTest extends TestCase
                 return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
             }
 
+            public function holds(string $shopId, string $words): bool
+            {
+                return $this->all($shopId, $words) !== [];
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return str_contains($question, 'עגילים') ? ['801', '802', '804', '805'] : [];
@@ -651,6 +656,11 @@ final class SiteQuestionTest extends TestCase
                 return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
             }
 
+            public function holds(string $shopId, string $words): bool
+            {
+                return $this->all($shopId, $words) !== [];
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return ['801', '802', '804', '805', '806', '807', '808'];
@@ -664,6 +674,33 @@ final class SiteQuestionTest extends TestCase
         // "cheaper than" is the price, not "the cheapest": every one in the range too; "the cheapest" stays three picks
         $this->assertSame(['805', '807', '806', '801', '802'], $this->askWith('any earrings cheaper than 500 dollars?', ['801'])->json('data.set.ids'));
         $this->assertSame(['805', '807', '806'], array_column($this->askWith('the cheapest earrings under 500 dollars', ['801'])->json('data.picks'), 'external_id'));
+
+        // A wish with a price is no product search: no product holds "מתנה לאשתי ליום נישואין, משהו עדין", and the writer
+        // chooses among what is within the price, never code's "the cheapest" (Rocks QA, 16.11: one ring, "the cheapest")
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return str_contains($words, 'עגילים');
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return ['801', '802', '804', '805', '806', '807'];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'למתנה עדינה, עגילי פרח זהב או עגילי טיפה זהב.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'עדינים']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->assertSame('model', $this->askWith('מתנה לאשתי ליום נישואין, משהו עדין עד 2000 שקל', ['806', '807'])->json('data.from'));
+        // and a product search with a price is still code's
+        $this->assertSame('code', $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data.from'));
     }
 
     public function test_a_pick_whose_reason_is_marks_alone_shows_no_reason(): void
@@ -715,6 +752,11 @@ final class SiteQuestionTest extends TestCase
                 return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
             }
 
+            public function holds(string $shopId, string $words): bool
+            {
+                return $this->all($shopId, $words) !== [];
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return str_contains($question, 'טבעת') ? ['951', '952', '953', '954', '955'] : [];
@@ -742,6 +784,11 @@ final class SiteQuestionTest extends TestCase
             public function among(string $shopId, string $question, array $externalIds): array
             {
                 return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return $this->all($shopId, $words) !== [];
             }
 
             public function all(string $shopId, string $question): array
