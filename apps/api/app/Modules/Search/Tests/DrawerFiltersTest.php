@@ -182,6 +182,11 @@ class DrawerFiltersTest extends TestCase
         // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"
         $note = self::drawer("(function () { S.records['p:60'] = { id: 'p:60', t: 'product', title: 'עגילי חישוק זהב', s: 1, kw: 'עגילים חישוק זהב' }; S.records['p:61'] = { id: 'p:61', t: 'product', title: 'עגילי חישוק זהב לבן', s: 1, kw: 'עגילים חישוק זהב' }; var x = turn('gold hoop earrings', [60, 61], {}); x.unknown = []; x.near = [{ word: 'hoop', term: 'חישוק' }, { word: 'gold', term: 'זהב' }, { word: 'earrings', term: 'עגילים' }]; return T.noteHtml(x); })()");
         $this->assertStringNotContainsString('hoop', $note);
+
+        // ...unless its reading is another word of the search already: "שעון רולקס", "רולקס" read as "שעון", is no Rolex
+        // (QA, 16.11: every watch was shown with nothing said)
+        $rolex = self::drawer("(function () { S.records['p:62'] = { id: 'p:62', t: 'product', title: 'שעון יד וינטג׳', s: 1, kw: 'שעון' }; S.records['p:63'] = { id: 'p:63', t: 'product', title: 'שעון כיס', s: 1, kw: 'שעון' }; var x = turn('שעון רולקס', [62, 63], {}); x.unknown = []; x.held = 2; x.near = [{ word: 'רולקס', term: 'שעון' }]; return T.noteHtml(x); })()");
+        $this->assertStringContainsString('רולקס', $rolex);
     }
 
     public function test_what_people_ask_here_is_only_in_the_sites_language(): void

@@ -670,7 +670,11 @@
       // a word in the other language, read as the store's ("hoop": "חישוק"), is said by what says that: "gold hoop earrings"
       // over the hoops was told "without hoop" (Rocks QA, 16.11)
       var term = (near || []).filter(function (x) { return x && x.word === n && x.term; })[0];
-      if (term && wordForms(E.normalize(String(term.term))).some(function (f) { return said[f]; })) { return false; }
+      // ...unless that is another word of the search already: "שעון רולקס", "רולקס" read as "שעון", says nothing of Rolex, and
+      // every watch was shown as if it were one (QA, 16.11: no "we have no Rolex")
+      var termForms = term ? wordForms(E.normalize(String(term.term))) : [];
+      var echoes = termForms.length && wordsOf(q).some(function (o) { var on = E.normalize(o); return on !== n && wordForms(on).some(function (f) { return termForms.indexOf(f) >= 0; }); });
+      if (term && !echoes && termForms.some(function (f) { return said[f]; })) { return false; }
       // and a word written as it sounds ("מחנסים" for "מכנסים": ח and כ, as the engine hears them) is said by what sounds
       // the same: the trousers were shown and "מחנסים is not on the site" was said (Miss Nori, 16.11)
       return !wordForms(n).some(function (f) { return said[f] || (f.length >= 4 && heard[hear(f)]); });
