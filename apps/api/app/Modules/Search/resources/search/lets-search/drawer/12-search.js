@@ -740,12 +740,14 @@
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
       html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku && turn.singleBy === 'sku' ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
-      // the product of the exact match once: not again in the grid under it ("1 product" twice: QA, 16.11); alone, no grid
+      // and the results under it as always, that product among them, as a card like any other (as Aviad asked, 16.11: shown
+      // twice is fine). A code typed is that product alone: the grid holds it and nothing else (Rocks QA, 16.11: two bracelets
+      // after the SKU's own ring)
       var one = String(pid(s.id));
-      list = list.filter(function (r) { return String(pid(r.id)) !== one; });
-      // a code typed is that product: nothing after it (Rocks QA, 16.11: two bracelets after the SKU's own ring); a name
-      // still shows what else holds it
-      if ((!list.length && total) || turn.singleBy === 'sku') { return html + (off('ask') || turn.askShown ? '' : askSmall(askFind(turn.q))); }
+      if (turn.singleBy === 'sku') {
+        var own = list.filter(function (r) { return String(pid(r.id)) === one; });
+        list = own.length ? own : [s];
+      }
     }
     // no product, and articles or pages found: those, with the quiet way to ask under them, never "nothing found" over
     // what was found (Profimex, 16.11: 49 posts for "השקעה בנדל״ן", the drawer showed only the card that asks the AI)

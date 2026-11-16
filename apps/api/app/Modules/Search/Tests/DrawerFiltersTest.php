@@ -130,12 +130,14 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame(['currency' => 'EUR', 'currency_sign' => '€', 'sign_after' => true], self::drawer("(function () { S.config = { currency: 'EUR' }; S.cur = { prefix: '', suffix: ' €' }; return T.priceLike(); })()"));
     }
 
-    public function test_the_exact_match_is_shown_once_and_a_word_chip_starts_with_a_capital(): void
+    public function test_the_exact_match_comes_first_with_the_results_under_it_and_a_word_chip_starts_with_a_capital(): void
     {
+        // as Aviad asked, 16.11: the exact match on top, and the results as always under it, that product a card among them
         $html = self::drawer("(function () { var x = turn('Gold Ring', [8], {}); x.single = '8'; return T.resultsHtml(x); })()");
         $this->assertSame(1, substr_count($html, 'ls-exact__tag'));
-        $this->assertSame(0, substr_count($html, 'class="ls-card'), 'the exact match, not again as a card in a grid under it');
-        $this->assertStringNotContainsString('ls-grid', $html);
+        $this->assertStringContainsString('ls-grid', $html);
+        $this->assertSame(1, preg_match_all('/class="ls-card[" ]/', $html), 'the exact match as a card too, under it');
+        $this->assertLessThan(strpos($html, 'ls-grid'), strpos($html, 'ls-exact__tag'), 'the exact match first');
         $this->assertSame(['Boots', 'נעליים', 'Old skool'], self::drawer("[T.capital('boots'), T.capital('נעליים'), T.capital('old skool')]"));
     }
 
@@ -163,8 +165,9 @@ class DrawerFiltersTest extends TestCase
         // Rocks QA, 16.11: the SKU's ring, then two bracelets
         $html = self::drawer("(function () { var x = turn('61574', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'sku'; return T.resultsHtml(x); })()");
         $this->assertSame(1, substr_count($html, 'ls-exact__tag'));
-        $this->assertSame(0, substr_count($html, 'class="ls-card'));
-        $this->assertGreaterThan(0, substr_count(self::drawer("(function () { var x = turn('Gold Ring', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'title'; return T.resultsHtml(x); })()"), 'class="ls-card'), 'a name still shows what else holds it');
+        $this->assertSame(1, preg_match_all('/class="ls-card[" ]/', $html), 'that product alone in the grid, not the bracelets after it');
+        $this->assertSame(2, substr_count($html, 'data-after="8"'), 'the code\x27s product, on top and as its card');
+        $this->assertGreaterThan(1, preg_match_all('/class="ls-card[" ]/', self::drawer("(function () { var x = turn('Gold Ring', [8, 9, 1], {}); x.single = '8'; x.singleBy = 'title'; return T.resultsHtml(x); })()")), 'a name still shows what else holds it');
     }
 
     public function test_a_word_written_as_it_sounds_is_said_by_what_sounds_the_same(): void
