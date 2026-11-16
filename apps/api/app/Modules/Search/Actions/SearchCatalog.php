@@ -912,7 +912,10 @@ final class SearchCatalog
                 // of its own, which taken off searches the rest ("שרשרת זהב עד 1000 שקל" showed no sign of its price: Rocks QA)
                 + ($minPrice === null && $maxPrice === null ? [] : ['price' => ['min' => $minPrice, 'max' => $maxPrice, 'rest' => trim($priced)]])
                 // the words read by meaning as the store writes them ("מפוספס": "פסים"), for the drawer to show as it reads them
-                + ($nearWords === [] ? [] : ['near' => array_map(fn (string $w, string $t): array => ['word' => $w, 'term' => $t], array_keys($nearWords), array_values($nearWords))]);
+                + ($nearWords === [] ? [] : ['near' => array_map(fn (string $w, string $t): array => ['word' => $w, 'term' => $t], array_keys($nearWords), array_values($nearWords))])
+                // a sentence no product holds as typed, searched by what it asks for: what "held" counts is of those words, not
+                // of the sentence ("מחפש מתנה לאשתי ליום נישואין, משהו עדין" held by no product, though "טבעת" is)
+                + ($scattered === null ? [] : ['sentence' => true]);
         });
     }
 

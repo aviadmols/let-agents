@@ -293,6 +293,12 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** @var list<string> the products the store's team linked the question being answered to (QuestionLinks), external ids */
     private array $linked = [];
 
+    /** @var list<string> a wish with a price that names no product: the store's range inside it, of every kind (wishedWithin()) */
+    private array $wish = [];
+
+    /** @var list<string> the kinds that range holds, the most chosen first, each as the store names it (wishedWithin()) */
+    private array $wishKinds = [];
+
     /** True in the second look: the question was already found to be the store's. */
     private bool $scoped = false;
 
@@ -1538,7 +1544,21 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($this->codeRules() && $viewing === null && ! $followUp && $named === [] && self::aboutProducts($question)) {
             $shown = array_values(array_unique([...$this->ownWordProducts($question), ...$shown]));
         }
+        // A wish with a price that names no product ("אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500"): the store's
+        // range inside the price, of every kind, what its customers choose first, for the writer to choose from. Its words
+        // found only the gift card, whose title alone says "מתנה", and it was the one answer (Rocks QA, 16.11).
+        // A reply in a conversation is about the conversation's products ("ומה עם עד 4000?"), never a new wish.
+        $this->wishKinds = [];
+        $wish = $viewing === null && ! $followUp && $this->conversation === [] && ! $this->onShown && self::aboutProducts($question) ? $this->wishedWithin($shopId, $question) : [];
+        $this->wish = $wish;
+        if ($wish !== []) {
+            $shown = array_values(array_unique([...$wish, ...$shown]));
+        }
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
+        if ($wish !== []) {
+            // a gift card is still there to offer, after what can be given itself
+            usort($candidates, fn (array $a, array $b): int => (int) self::giftCard($a['title']) <=> (int) self::giftCard($b['title']));
+        }
         // a reply naming no kind keeps the conversation's, whatever the prompt (code, every store; site_code_rules)
         if ($this->codeRules()) {
             $candidates = self::heldKind($this->asked !== '' ? $this->asked : $question, $this->conversation, $candidates);
@@ -2147,7 +2167,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 $result = $refusal === null
-                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored)
+                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored) + $this->wishRows($stored, $corrected ?? $question, $locale)
                         + ($choices === [] ? [] : ['choices' => $choices])
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
@@ -3701,7 +3721,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // cheapest in the price" with two toddler's shoes (Vans; Rocks QA, 16.11: one ring for an anniversary gift): the
         // writer chooses among what is inside it (withinPrice())
         if ($asks === 'in_range' && app()->bound(ProductsNamed::class) && app()->bound(PriceRange::class)) {
-            $left = trim((string) (app(PriceRange::class)->read($question)['words'] ?? ''));
+            $left = self::wishWords((string) (app(PriceRange::class)->read($question)['words'] ?? ''));
             if ($left !== '' && ! app(ProductsNamed::class)->holds($this->tenant->require(), $left)) {
                 return null;
             }
@@ -3791,8 +3811,140 @@ final class AnswerSiteQuestion implements TriesQuestions
         $query = $all > 0 && 2 * $typed(clone $base)->count() >= $all ? $typed(clone $base) : $base;
 
         return $query->orderBy('price', $asks === 'most_expensive' ? 'desc' : 'asc')->limit(self::MAX_COMPUTED * 5)->get(['external_id', 'title'])
-            ->reject(fn (CatalogProduct $p): bool => preg_match('/gift\s*card|כרטיס\s+מתנה|גיפט\s*קארד|שובר\s+מתנה|voucher/iu', (string) $p->title) === 1)
+            ->reject(fn (CatalogProduct $p): bool => self::giftCard((string) $p->title))
             ->take(self::MAX_COMPUTED)->map(fn (CatalogProduct $p): string => (string) $p->external_id)->values()->all();
+    }
+
+    /**
+     * The words left of a price, without those that only ask ("אני מחפש", "יש לכם", "תראו לי": NOT_NAMES, and words of
+     * fewer than three letters): what a product would have to hold. "אני מחפש מכנסיים" asks for trousers, which a product
+     * holds; "מתנה לחברה שלי ליום הולדת" asks for a choice.
+     */
+    private static function wishWords(string $words): string
+    {
+        $kept = array_filter(preg_split('/\s+/u', trim($words)) ?: [], function (string $w): bool {
+            $plain = (string) preg_replace('/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/u', '', mb_strtolower($w));
+
+            return mb_strlen($plain) >= 3 && ! in_array($plain, self::NOT_NAMES, true);
+        });
+
+        return implode(' ', $kept);
+    }
+
+    /** A gift card or a voucher by its name: money to spend in the store, not merchandise. */
+    private static function giftCard(string $title): bool
+    {
+        return preg_match('/gift\s*card|כרטיס\s+מתנה|גיפט\s*קארד|שובר\s+מתנה|voucher/iu', $title) === 1;
+    }
+
+    /** The most products a wish may draw from: those its price holds, what customers choose first. */
+    private const WISH_POOL = 400;
+
+    /** Where the products near the top of a wish's price are this many or more, those are its choice. */
+    private const WISH_NEAR_TOP = 0.4;
+
+    /** The kinds a wish's answer offers to choose by, as searches inside its price. */
+    private const WISH_KINDS = 5;
+
+    /**
+     * Under the answer to a wish: more of the range inside its price than the writer picked ("more options in your budget"),
+     * and its kinds to choose by, each a search inside the price ("טבעות עד 1,500"): a tap shows that kind, as asked
+     * (as Aviad asked, 16.11: Kimonix shows eight and asks earrings, rings or necklaces). Code, no model.
+     *
+     * @param  list<array<string, mixed>>  $picks
+     * @return array<string, mixed>
+     */
+    private function wishRows(array $picks, string $question, string $locale): array
+    {
+        if ($this->wish === []) {
+            return [];
+        }
+        $picked = array_map('strval', array_column($picks, 'external_id'));
+        $more = array_slice(array_values(array_diff($this->wish, $picked)), 0, self::NAMED_SHOWN);
+        ['min' => $min, 'max' => $max] = $this->priceRange($question);
+        $amount = fn (float $n): string => number_format($n, floor($n) === $n ? 0 : 2, '.', ',');
+        $key = match (true) {
+            $min !== null && $max !== null => 'between',
+            $max !== null => 'up_to',
+            default => 'from',
+        };
+        $kinds = array_map(fn (string $kind): array => ['name' => (string) __('assistant::answers.site.wish_kind_'.$key, ['kind' => $kind, 'min' => $min === null ? '' : $amount($min), 'max' => $max === null ? '' : $amount($max)], $locale)], $this->wishKinds);
+
+        return ($more === [] ? [] : ['named' => ['names' => [], 'ids' => $more, 'budget' => true]]) + ($kinds === [] ? [] : ['related' => $kinds]);
+    }
+
+    /**
+     * A wish with a price that names no product ("מתנה לחברה שלי ליום הולדת, תקציב עד 1500", "something cool up to 300"):
+     * the store's products in stock inside the price, nothing given as money (a gift card), the popular first (what its
+     * customers buy, open and add: ProductsPopular, never a model's taste) and taken in turn from each kind (its product type,
+     * else its first category), so the writer chooses among rings, necklaces and earrings, not twelve of one. A price
+     * "up to" is a budget: those from WISH_NEAR_TOP of it up, when there are enough of them. Empty for any other question.
+     *
+     * @return list<string> external ids, at most MAX_PRODUCTS
+     */
+    private function wishedWithin(string $shopId, string $question): array
+    {
+        if (! app()->bound(PriceRange::class) || ! app()->bound(ProductsNamed::class)) {
+            return [];
+        }
+        ['min' => $min, 'max' => $max] = $this->priceRange($question);
+        if ($min === null && $max === null) {
+            return [];
+        }
+        $left = self::wishWords((string) (app(PriceRange::class)->read($question)['words'] ?? ''));
+        if ($left === '' || ! app(ProductsNamed::class)->namesNothing($shopId, $left)) {
+            return [];
+        }
+
+        $inside = fn (?float $from) => CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)->where('price', '>', 0)
+            ->when($from !== null, fn ($q) => $q->where('price', '>=', $from))
+            ->when($max !== null, fn ($q) => $q->where('price', '<=', $max));
+        $near = $min === null && $max !== null ? $max * self::WISH_NEAR_TOP : $min;
+        $query = $near !== $min && (clone $inside($near))->count() >= self::MAX_PRODUCTS ? $inside($near) : $inside($min);
+        $products = $query->orderByDesc('price')->limit(self::WISH_POOL)->get(['id', 'external_id', 'title', 'price', 'payload'])
+            ->reject(fn (CatalogProduct $p): bool => self::giftCard((string) $p->title))->values();
+        if ($products->isEmpty()) {
+            return [];
+        }
+
+        $popular = app()->bound(ProductsPopular::class)
+            ? app(ProductsPopular::class)->scores($shopId, $products->map(fn (CatalogProduct $p): string => (string) $p->external_id)->all())
+            : [];
+        // each kind's products, the popular first, then the dearer: a gift is chosen near its budget
+        $kinds = [];
+        $names = [];
+        foreach ($products as $at => $product) {
+            $path = $product->categoryPaths()[0] ?? [];
+            $type = trim((string) ($product->payload['product_type'] ?? ''));
+            $kind = mb_strtolower($type) ?: mb_strtolower(implode('/', $path));
+            $kinds[$kind][] = [(float) ($popular[(string) $product->external_id] ?? 0), $at, (string) $product->external_id];
+            $names[$kind] ??= $type !== '' ? $type : trim((string) (end($path) ?: ''));
+        }
+        foreach ($kinds as &$ids) {
+            usort($ids, fn (array $a, array $b): int => [$b[0], $a[1]] <=> [$a[0], $b[1]]);
+        }
+        unset($ids);
+        // the kinds with the most popular first, then the larger
+        uksort($kinds, fn ($a, $b): int => [$kinds[$b][0][0], count($kinds[$b])] <=> [$kinds[$a][0][0], count($kinds[$a])]);
+        // the kinds to choose by, each as the store names it: only where there are two or more to choose between
+        $named = array_values(array_unique(array_filter(array_map(fn ($k): string => (string) ($names[$k] ?? ''), array_keys($kinds)), fn (string $n): bool => $n !== '' && mb_strlen($n) <= 40)));
+        $this->wishKinds = count($named) >= 2 ? array_slice($named, 0, self::WISH_KINDS) : [];
+
+        $out = [];
+        for ($round = 0; count($out) < self::MAX_PRODUCTS; $round++) {
+            $added = false;
+            foreach ($kinds as $ids) {
+                if (isset($ids[$round]) && count($out) < self::MAX_PRODUCTS) {
+                    $out[] = $ids[$round][2];
+                    $added = true;
+                }
+            }
+            if (! $added) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     /** Whether a question points at products already in front of the shopper: "מהם", "ביניהם", "these". */

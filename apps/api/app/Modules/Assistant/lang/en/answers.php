@@ -37,6 +37,10 @@ return [
         'no_info' => 'I could not find that on the site. The store team can help.',
         'limit' => 'You have reached today\'s questions. The store team can help.',
         'unavailable' => 'We could not answer right now. Please try again later.',
+        // under a wish's answer: its kinds to choose by, each a search inside its price
+        'wish_kind_up_to' => ':kind under :max',
+        'wish_kind_from' => ':kind over :min',
+        'wish_kind_between' => ':kind :min to :max',
         'computed' => [
             'cheapest' => 'The cheapest in stock of what we found: :title.',
             'cheapest_store' => 'The cheapest in stock in the store: :title.',

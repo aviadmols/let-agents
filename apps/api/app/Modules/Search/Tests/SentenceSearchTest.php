@@ -7,6 +7,7 @@ use App\Modules\Search\Actions\SearchCatalog;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
+use App\Modules\Search\Support\SpellingProductsNamed;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -53,6 +54,20 @@ final class SentenceSearchTest extends TestCase
         $this->assertContains('2', $found['ids']);
         $this->assertNotContains('3', $found['ids'], 'above the price written');
         $this->assertSame($found['ids'], $this->search('טבעת יהלום עד 2500')['ids'], 'the same as the words it asks for');
+    }
+
+    public function test_a_sentence_read_as_what_it_asks_for_is_not_held_as_typed(): void
+    {
+        // Rocks QA, 16.11: "מחפש מתנה לאשתי ליום נישואין, משהו עדין עד 2000 שקל" was read as held, and code answered "the
+        // cheapest in the price" with one ring; "מתנה לחברה שלי ליום הולדת" names no product, a choice from the range
+        $named = app(SpellingProductsNamed::class);
+
+        $this->assertFalse($named->holds($this->shop->id, 'מחפש מתנה לאשתי ליום נישואין, משהו עדין'));
+        $this->assertTrue($named->namesNothing($this->shop->id, 'אני רוצה לקנות לחברה שלי מתנה ליום הולדת'));
+        $this->assertFalse($named->holds($this->shop->id, 'אני רוצה לקנות מתנה לאשתי טבעת יהלום'), 'no ring says "מתנה לאשתי": not held as typed');
+        $this->assertFalse($named->namesNothing($this->shop->id, 'אני רוצה לקנות מתנה לאשתי טבעת יהלום'), 'but it names diamond rings');
+        $this->assertTrue($named->holds($this->shop->id, 'טבעת יהלום'));
+        $this->assertFalse($named->namesNothing($this->shop->id, 'טבעת יהלום'));
     }
 
     public function test_a_value_read_from_the_words_is_what_a_product_carries(): void

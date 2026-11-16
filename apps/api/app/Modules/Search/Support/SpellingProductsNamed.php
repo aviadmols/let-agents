@@ -27,8 +27,21 @@ final class SpellingProductsNamed implements ProductsNamed
         }
         $found = $this->search->handle($shopId, $words, ['product'], count: false, perGroup: 1, meaning: false);
 
-        // held whole, never by a looser search that left a word out
-        return (int) ($found['held'] ?? 0) > 0 && ! isset($found['loosened']);
+        // held whole, never by a looser search that left a word out, nor by what a sentence was read as asking for: a wish
+        // ("מחפש מתנה לאשתי ליום נישואין, משהו עדין עד 2000 שקל") was answered "the cheapest in the price" with one ring
+        // (Rocks QA, 16.11), its words held by none
+        return (int) ($found['held'] ?? 0) > 0 && ! isset($found['loosened']) && ! isset($found['sentence']);
+    }
+
+    public function namesNothing(string $shopId, string $words): bool
+    {
+        if (trim($words) === '') {
+            return true;
+        }
+        $found = $this->search->handle($shopId, $words, ['product'], count: false, perGroup: 1, meaning: false);
+
+        // none holds what was searched, the sentence read as what it asks for included, and no looser search found the kind
+        return (int) ($found['held'] ?? 0) === 0 && ! isset($found['loosened']);
     }
 
     public function all(string $shopId, string $question): array

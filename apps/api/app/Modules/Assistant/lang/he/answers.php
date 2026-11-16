@@ -37,6 +37,10 @@ return [
         'no_info' => 'לא מצאתי את זה באתר. הצוות של החנות יכול לעזור.',
         'limit' => 'הגעתם למספר השאלות להיום. הצוות של החנות יכול לעזור.',
         'unavailable' => 'לא הצלחנו לענות כרגע. נסו שוב מאוחר יותר.',
+        // under a wish's answer: its kinds to choose by, each a search inside its price
+        'wish_kind_up_to' => ':kind עד :max',
+        'wish_kind_from' => ':kind מעל :min',
+        'wish_kind_between' => ':kind :min עד :max',
         'computed' => [
             'cheapest' => 'הזול ביותר שבמלאי מבין מה שמצאנו: :title.',
             'cheapest_store' => 'הזול ביותר שבמלאי באתר: :title.',

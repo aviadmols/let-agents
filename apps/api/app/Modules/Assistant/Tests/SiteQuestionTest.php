@@ -628,6 +628,11 @@ final class SiteQuestionTest extends TestCase
                 return $this->all($shopId, $words) !== [];
             }
 
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return str_contains($question, 'עגילים') ? ['801', '802', '804', '805'] : [];
@@ -661,6 +666,11 @@ final class SiteQuestionTest extends TestCase
                 return $this->all($shopId, $words) !== [];
             }
 
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return ['801', '802', '804', '805', '806', '807', '808'];
@@ -689,6 +699,11 @@ final class SiteQuestionTest extends TestCase
                 return str_contains($words, 'עגילים');
             }
 
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return ['801', '802', '804', '805', '806', '807'];
@@ -701,6 +716,72 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('model', $this->askWith('מתנה לאשתי ליום נישואין, משהו עדין עד 2000 שקל', ['806', '807'])->json('data.from'));
         // and a product search with a price is still code's
         $this->assertSame('code', $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data.from'));
+    }
+
+    public function test_a_wish_with_a_price_that_names_no_product_is_chosen_from_every_kind_inside_it_a_gift_card_last(): void
+    {
+        // Rocks QA, 16.11: "אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500" was answered with the gift card at 250,
+        // the one product whose title says "מתנה"
+        $typed = fn (string $type, string $price): array => ['price' => $price, 'in_stock' => true, 'payload' => ['title' => '', 'description' => '', 'categories' => [], 'attributes' => [], 'meta' => [], 'product_type' => $type]];
+        $this->product('971', 'כרטיס מתנה - Gift Card', 'כרטיס.', [], $typed('', '250.00'));
+        $this->product('972', 'טבעת זהב עדינה', 'טבעת.', [], $typed('טבעות', '1200.00'));
+        $this->product('973', 'טבעת יהלום קטנה', 'טבעת.', [], $typed('טבעות', '1400.00'));
+        $this->product('974', 'שרשרת זהב צהוב', 'שרשרת.', [], $typed('שרשראות', '900.00'));
+        $this->product('975', 'עגילי פנינה', 'עגילים.', [], $typed('עגילים', '650.00'));
+        $this->product('976', 'צמיד טניס יהלומים', 'צמיד.', [], $typed('צמידים', '4800.00'));
+        $this->product('977', 'טבעת שאזלה', 'טבעת.', [], ['in_stock' => false] + $typed('טבעות', '1000.00'));
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return false;
+            }
+
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! str_contains($words, 'טבעת');
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'מתנה') ? ['971'] : [];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'ליום הולדת, טבעת זהב עדינה או עגילי פנינה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'עדינה'], ['ref' => 'p3', 'why' => 'קלאסיים']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $data = $this->askWith('אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500', ['971'])->json('data');
+
+        $this->assertSame('model', $data['from']);
+        $sent = array_column(json_decode($this->calls[0]['user'], true)['products'], 'title');
+        $this->assertSame('כרטיס מתנה - Gift Card', end($sent), 'the gift card is still offered, after what can be given itself');
+        $this->assertEqualsCanonicalizing(['טבעת', 'שרשרת', 'עגילי'], array_map(fn (string $t): string => explode(' ', $t)[0], array_slice($sent, 0, 3)), 'one of each kind first, not two rings before the necklace');
+        $this->assertNotContains('צמיד טניס יהלומים', $sent, 'nothing over the budget');
+        $this->assertNotContains('טבעת שאזלה', $sent, 'nothing out of stock');
+        // under the answer: more of the range inside the budget than the writer picked, and its kinds to choose by, each a
+        // search inside the price (as Aviad asked: "earrings, rings or necklaces?", a tap shows them)
+        $picked = array_column($data['picks'], 'external_id');
+        $this->assertTrue($data['named']['budget']);
+        $this->assertNotEmpty($data['named']['ids']);
+        $this->assertSame([], array_intersect($picked, $data['named']['ids']), 'what was picked is not shown twice');
+        $this->assertNotContains('971', $data['named']['ids'], 'no gift card among the range');
+        $this->assertEqualsCanonicalizing(['טבעות עד 1,500', 'שרשראות עד 1,500', 'עגילים עד 1,500'], array_column($data['related'], 'name'));
+
+        // a wish that names a kind ("טבעת עדינה ליום הולדת עד 1500") is chosen among what its words name, as before
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'טבעת זהב עדינה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'עדינה']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->askWith('טבעת עדינה ליום הולדת לחברה שלי עד 1500', ['972']);
+        $this->assertNotContains('שרשרת זהב צהוב', array_column(json_decode($this->calls[0]['user'], true)['products'], 'title'), 'no other kinds added to a named one');
     }
 
     public function test_a_pick_whose_reason_is_marks_alone_shows_no_reason(): void
@@ -757,6 +838,11 @@ final class SiteQuestionTest extends TestCase
                 return $this->all($shopId, $words) !== [];
             }
 
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
             public function all(string $shopId, string $question): array
             {
                 return str_contains($question, 'טבעת') ? ['951', '952', '953', '954', '955'] : [];
@@ -789,6 +875,11 @@ final class SiteQuestionTest extends TestCase
             public function holds(string $shopId, string $words): bool
             {
                 return $this->all($shopId, $words) !== [];
+            }
+
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
             }
 
             public function all(string $shopId, string $question): array

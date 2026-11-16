@@ -32,4 +32,10 @@ interface ProductsNamed
      * a shoe store; "מתנה לבן שלי, משהו מגניב" names no product, it asks for a choice.
      */
     public function holds(string $shopId, string $words): bool;
+
+    /**
+     * Whether these words name no product at all, not even by what a sentence asks for: "מתנה לחברה שלי ליום הולדת" names
+     * none (a choice from the store's range), "סנדלים נוחים לקיץ" names sandals though no sandal holds every word.
+     */
+    public function namesNothing(string $shopId, string $words): bool;
 }

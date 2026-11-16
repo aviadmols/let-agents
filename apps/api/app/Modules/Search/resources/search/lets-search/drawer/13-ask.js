@@ -1,4 +1,6 @@
   // ---------------------------------------------------------------- ask turn
+  // how long the same question is answered from what this browser kept, without asking again
+  var KEEP_ANSWER_MS = 10 * 60 * 1000;
   // about: a question on this product (asked from its page's row, or from its questions): page=1
   // "יש טבעות דומות?", "משהו כמו זה בצבע אחר", "similar ones in another colour": asked about the product on its page, it
   // asks for that product's like, which the similar items are (its picture and its words, no model): shown as they are.
@@ -92,15 +94,20 @@
     // was asked over ("מה הכי זול?" after another search is another question); a reply in a conversation is never kept.
     // (nor one written around what was already told: it is no answer to the question on its own)
     var keepKey = extra || body.said ? null : [body.page ? 'page' : '', (body.products || []).slice(0, 12).join(','), (body.previous || []).join(','), String(q).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?؟.!]+$/, '')].join('|');
-    var kept = keepKey ? (store('session', 'ls_answers') || {}) : {};
-    (keepKey && kept[keepKey] ? Promise.resolve({ ok: true, body: kept[keepKey] }) : again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
+    // Kept for a few minutes only, each with when it came: an answer kept for the whole visit outlived the fix to it (Rocks
+    // QA, 16.11: "the cheapest in the price" for an anniversary gift, asked again after the change, came from the browser).
+    // Those kept the old way, without a time, are no longer read.
+    var kept = keepKey ? (store('session', 'ls_answers_t') || {}) : {};
+    var fresh = keepKey && kept[keepKey] && kept[keepKey].b && Date.now() - (+kept[keepKey].t || 0) < KEEP_ANSWER_MS ? kept[keepKey].b : null;
+    (fresh ? Promise.resolve({ ok: true, body: fresh }) : again(function () { return json(API + '/search/' + SITE + '/ask', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign(body, extra || {})), wait: 90000 }); }).then(function (r) {
       var d0 = r.ok && r.body ? (r.body.data || r.body) : null;
-      if (keepKey && d0 && d0.outcome === 'answered') {
-        kept[keepKey] = r.body;
+      if (keepKey && !fresh && d0 && d0.outcome === 'answered') {
+        delete kept[keepKey];
+        kept[keepKey] = { t: Date.now(), b: r.body };
         // a visit keeps its last 20 answers, the oldest let go first
         var keys = Object.keys(kept);
         if (keys.length > 20) { delete kept[keys[0]]; }
-        store('session', 'ls_answers', kept);
+        store('session', 'ls_answers_t', kept);
       }
       return r;
     })).then(function (r) {
@@ -122,7 +129,7 @@
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,
-            alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null });
+            alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null, alsoBudget: !!(named && named.budget) });
           announce(t('announceReady') + ': ' + d.answer);
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
@@ -206,7 +213,8 @@
   function alsoHtml(turn) {
     var list = (turn.alsoIds || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    var title = turn.alsoNames && turn.alsoNames.length ? t('alsoWith', { w: turn.alsoNames.join(', ') }) : t('alsoRelated');
+    // a wish's more inside its budget (wishRows): said so
+    var title = turn.alsoBudget ? t('alsoBudget') : turn.alsoNames && turn.alsoNames.length ? t('alsoWith', { w: turn.alsoNames.join(', ') }) : t('alsoRelated');
     return '<div class="ls-block__title" style="margin-top:14px">' + esc(title) + '</div>' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; }), true) +
       '<button class="ls-btn ls-btn--link ls-btn--sm" data-q="' + esc(turn.q) + '">' + esc(t('alsoAll')) + '</button>';
   }
