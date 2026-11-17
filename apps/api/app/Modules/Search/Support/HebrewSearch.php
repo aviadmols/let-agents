@@ -1454,6 +1454,11 @@ final class HebrewSearch
                 if ($digits !== '' && $candidate !== $variant && ! str_starts_with($candidate, $variant) && (string) preg_replace('/\D+/u', '', $candidate) !== $digits) {
                     continue;
                 }
+                // a word of one or two Hebrew letters in the catalogue ("מל" for מ"ל, "סמ" for ס"מ) is found only as typed, never as
+                // a form, a sound or a part of a longer word: "שמלה" found every cream of 70 מ"ל (Take Me Home, 17.11)
+                if ($candidate !== $variant && preg_match('/^[א-ת]{1,2}$/u', $candidate) === 1) {
+                    continue;
+                }
                 // a number typed is a whole number: "14" may go on as "14k", never as "140" (8f, 17.11)
                 if (preg_match('/\d$/u', $variant) === 1 && $candidate !== $variant && str_starts_with($candidate, $variant) && preg_match('/^\d/u', mb_substr($candidate, mb_strlen($variant))) === 1) {
                     continue;

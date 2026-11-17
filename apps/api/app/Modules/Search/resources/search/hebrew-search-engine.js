@@ -268,6 +268,11 @@
         if (digits !== '' && candidate !== variant && candidate.indexOf(variant) !== 0 && String(candidate).replace(/\D+/g, '') !== digits) {
           continue;
         }
+        // a word of one or two Hebrew letters in the catalogue ("מל" for מ"ל) is found only as typed, never as a form, a sound or
+        // a part of a longer word: "שמלה" found every cream of 70 מ"ל (Take Me Home, 17.11; the server's closeWords)
+        if (candidate !== variant && /^[א-ת]{1,2}$/.test(candidate)) {
+          continue;
+        }
         // a number typed is a whole number: "14" may go on as "14k", never as "140" (8f, 17.11; the server's closeWords)
         if (/\d$/.test(variant) && candidate !== variant && candidate.indexOf(variant) === 0 && /^\d/.test(candidate.slice(variant.length))) {
           continue;
