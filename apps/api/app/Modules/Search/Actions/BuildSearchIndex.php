@@ -28,6 +28,7 @@ use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\Colours;
+use App\Modules\Search\Support\Evidence;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
@@ -430,6 +431,9 @@ final class BuildSearchIndex
                 // For the actions and filters beside the results: on sale, its facets, its size, when it was added.
                 'sl' => $product->on_sale ? 1 : null,
                 'f' => $read['f'] ?? null,
+                // how weakly some of them were read, and the values a check found wrong for it (search.evidence_index)
+                'ev' => $read['ev'] ?? null,
+                'no' => $read['no'] ?? null,
                 // Its variants, each as the colour and size codes it has and whether it is in stock: "black,
                 // M, in stock" is asked of one variant, not of a product with black somewhere and M somewhere.
                 'v' => $read['v'] ?? null,
@@ -740,10 +744,14 @@ final class BuildSearchIndex
 
         $products = [];
         if ($facets !== [] || $size !== null) {
-            EnrichmentFact::query()->where('status', FactStatus::Approved)->whereNotNull('product_id')
+            // where the shop asks it (search.evidence_index): how each value was read is kept for those read weakly (ev), and the
+            // values a check found wrong for a product are kept too (no), so its words never hold it in that filter (Evidence)
+            $evidence = (bool) Settings::get('search.evidence_index', $shopId);
+            $refused = [];
+            EnrichmentFact::query()->whereIn('status', $evidence ? [FactStatus::Approved, FactStatus::Rejected] : [FactStatus::Approved])->whereNotNull('product_id')
                 ->whereIn('kind', [FactKind::Type, FactKind::Choice, FactKind::Flag, FactKind::Spec])
-                ->select(['id', 'product_id', 'kind', 'key', 'value_text', 'value_number'])
-                ->lazyById(2000)->each(function (EnrichmentFact $fact) use (&$products, $where, $sizeKey): void {
+                ->select(['id', 'product_id', 'kind', 'key', 'value_text', 'value_number', 'status', 'status_reason', 'origin'])
+                ->lazyById(2000)->each(function (EnrichmentFact $fact) use (&$products, &$refused, $where, $sizeKey, $evidence): void {
                     if ($fact->kind === FactKind::Spec) {
                         if ($fact->key === $sizeKey && $fact->value_number !== null) {
                             $products[$fact->product_id]['z'] = round((float) $fact->value_number, 6);
@@ -754,9 +762,37 @@ final class BuildSearchIndex
                     $key = $fact->kind === FactKind::Type ? 'type' : $fact->key;
                     $value = $fact->kind === FactKind::Flag ? 'true' : (string) $fact->value_text;
                     if (isset($where[$key]['values'][$value])) {
-                        $products[$fact->product_id]['f'][] = $where[$key]['at'] * 1000 + $where[$key]['values'][$value];
+                        $code = $where[$key]['at'] * 1000 + $where[$key]['values'][$value];
+                        if ($fact->status === FactStatus::Rejected) {
+                            $refused[$fact->product_id][$code] = true;
+
+                            return;
+                        }
+                        $products[$fact->product_id]['f'][] = $code;
+                        $score = $evidence ? Evidence::ofFact((string) $fact->status_reason, (string) $fact->origin->value, $key) : Evidence::STRONG;
+                        if ($score < Evidence::STRONG) {
+                            $products[$fact->product_id]['ev'][$code] = max($score, $products[$fact->product_id]['ev'][$code] ?? 0);
+                        } elseif ($evidence) {
+                            $products[$fact->product_id]['sure'][$code] = true;
+                        }
                     }
                 });
+            // a value stated strongly by another reading is no weak one; one approved is never refused
+            foreach ($products as $id => &$kept) {
+                $kept['ev'] = array_diff_key($kept['ev'] ?? [], $kept['sure'] ?? []);
+                unset($kept['sure']);
+                if ($kept['ev'] === []) {
+                    unset($kept['ev']);
+                }
+            }
+            unset($kept);
+            foreach ($refused as $id => $codes) {
+                $no = array_values(array_diff(array_keys($codes), $products[$id]['f'] ?? []));
+                if ($no !== []) {
+                    sort($no);
+                    $products[$id]['no'] = $no;
+                }
+            }
             foreach ($products as &$read) {
                 if (isset($read['f'])) {
                     $read['f'] = array_values(array_unique($read['f']));

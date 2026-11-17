@@ -23,6 +23,7 @@ use App\Modules\Search\Models\SearchResolution;
 use App\Modules\Search\Support\AlikeScore;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\DescribedProducts;
+use App\Modules\Search\Support\Evidence;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\Looks;
@@ -1111,7 +1112,13 @@ final class SearchCatalog
             $before = array_column($groups['product'], 'id');
             if ($read !== []) {
                 // only what holds every value read: nothing else is shown as if it were asked for (the drawer then offers the AI)
-                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values, int $at): bool => self::holdsRead($r, $at, $values, (array) ($index['facets'] ?? [])))));
+                // where the shop asks it (search.evidence_filter): a value a check found wrong for a product is not held by its words,
+                // and within the filter those the store itself says it of come first (Evidence; Rocks QA, 17.11: studs first for hoops)
+                $byEvidence = (bool) Settings::get('search.evidence_filter', $shopId);
+                $groups['product'] = array_values(array_filter($groups['product'], fn (array $r): bool => array_all($read, fn (array $values, int $at): bool => self::holdsRead($r, $at, $byEvidence ? self::notRefused($r, $values) : $values, (array) ($index['facets'] ?? [])))));
+                if ($byEvidence) {
+                    $groups['product'] = self::surestFirst($groups['product'], $read);
+                }
                 $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'facet');
             }
 
@@ -3539,8 +3546,58 @@ final class SearchCatalog
         return $part === $b;
     }
 
+    /**
+     * Of a filter's values read from the words, those a check did not find wrong for this product; one its own title says
+     * stays whatever a check said.
+     *
+     * @param  array<int, string>  $values  code => label
+     * @return array<int, string>
+     */
+    private static function notRefused(array $r, array $values): array
+    {
+        $no = array_flip(array_map('intval', (array) ($r['no'] ?? [])));
+
+        return $no === [] ? $values : array_filter($values, fn (string $label, int $code): bool => ! isset($no[$code]) || HebrewSearch::says((string) ($r['title'] ?? ''), $label), ARRAY_FILTER_USE_BOTH);
+    }
+
+    /**
+     * The products held in the filters read, those held surely first: by a value the store says or a check agreed to, then by
+     * its description or what kind its picture shows, then by a picture's detail or its words alone. In stock stays first,
+     * and within each the order they came in.
+     *
+     * @param  list<array<string, mixed>>  $products
+     * @param  array<int, array<int, string>>  $read  facet => [code => label]
+     * @return list<array<string, mixed>>
+     */
+    private static function surestFirst(array $products, array $read): array
+    {
+        $tier = function (array $r) use ($read): int {
+            $least = 100;
+            foreach ($read as $values) {
+                $best = 0;
+                foreach ($values as $code => $label) {
+                    $best = max($best, Evidence::of($r, (int) $code, HebrewSearch::says((string) ($r['title'] ?? ''), (string) $label)));
+                }
+                $least = min($least, $best);
+            }
+
+            return $least >= Evidence::STRONG ? 2 : ($least >= 50 ? 1 : 0);
+        };
+        $keyed = [];
+        foreach ($products as $at => $r) {
+            $keyed[] = [(int) ($r['s'] ?? 0), $tier($r), -$at, $r];
+        }
+        usort($keyed, fn (array $a, array $b): int => [$b[0], $b[1], $b[2]] <=> [$a[0], $a[1], $a[2]]);
+
+        return array_map(fn (array $k): array => $k[3], $keyed);
+    }
+
     private static function holdsRead(array $r, int $at, array $values, array $facets): bool
     {
+        if ($values === []) {
+            return false;
+        }
+
         $carried = array_map('intval', (array) ($r['f'] ?? []));
 
         if (array_intersect(array_keys($values), $carried) !== []) {

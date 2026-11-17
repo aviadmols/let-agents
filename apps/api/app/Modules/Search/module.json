@@ -929,6 +929,18 @@
             "scope": "shop"
         },
         {
+            "name": "evidence_index",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
+            "name": "evidence_filter",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "similar_seen_kind",
             "type": "bool",
             "default": false,

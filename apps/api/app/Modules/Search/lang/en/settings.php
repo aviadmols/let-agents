@@ -331,6 +331,14 @@ return [
         'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
         'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
     ],
+    'evidence_index' => [
+        'label' => 'The index keeps how strongly each value was read',
+        'description' => 'For each product: which filter values were read from weak evidence (a description, a picture) and which a check found wrong. Without the next setting this changes no results.',
+    ],
+    'evidence_filter' => [
+        'label' => 'Filter and order by the strength of the evidence',
+        'description' => 'A product a check found a value wrong for is not shown under that filter, and within a filter the products the store itself says the value of come first. Needs the setting before it and the index built again.',
+    ],
     'similar_seen_kind' => [
         'label' => '"Similar items" of the kind their picture shows',
         'description' => 'A product is similar only if its picture shows the same kind of item (a shirt for a shirt, not a tank top or a cardigan), even where the store files them under one type. The rest show under "You may also like".',
