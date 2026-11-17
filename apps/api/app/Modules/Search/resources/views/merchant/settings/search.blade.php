@@ -44,6 +44,7 @@
         <x-lp::row :title="$t('cart')" :sub="$t('cart_sub')"><x-lp::toggle model="data.cart" :label="$t('cart')" /></x-lp::row>
         <x-lp::row :title="$t('per_group')" :tip="$t('per_group_tip')"><x-lp::num model="data.per_group" :min="$bounds['min']" :max="$bounds['max']" :label="$t('per_group')" /></x-lp::row>
         <x-lp::row :title="$t('wishlist')" :sub="$t('wishlist_sub')"><x-lp::toggle model="data.wishlist" :label="$t('wishlist')" /></x-lp::row>
+        <x-lp::row :title="$t('header_heart')" :sub="$t('header_heart_sub')" x-data x-show="$wire.data.wishlist"><x-lp::toggle model="data.header_heart" :label="$t('header_heart')" /></x-lp::row>
         <x-lp::row :title="$t('compare')"><x-lp::toggle model="data.compare" :label="$t('compare')" /></x-lp::row>
         <x-lp::row :title="$t('rate')" :sub="$t('rate_sub')" :tip="$t('rate_tip')"><x-lp::toggle model="data.rate" :label="$t('rate')" /></x-lp::row>
         <x-lp::row :title="$t('oos')" :sub="$t('oos_sub')"><x-lp::toggle model="data.out_of_stock" :label="$t('oos')" /></x-lp::row>

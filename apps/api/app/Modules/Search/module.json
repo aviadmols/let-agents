@@ -169,6 +169,12 @@
             "scope": "shop"
         },
         {
+            "name": "header_heart",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "float_side",
             "type": "enum",
             "options": [

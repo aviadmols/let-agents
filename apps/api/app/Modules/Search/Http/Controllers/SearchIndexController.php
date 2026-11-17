@@ -174,7 +174,7 @@ final class SearchIndexController
     /**
      * The shop's choices on its "how it looks" and "search window" settings, as the drawer reads them.
      *
-     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool, nudge: bool, nudgeAt: string, float: bool, floatSide: string, floatBottom: int}
+     * @return array{theme: string, lang: string|null, assistant: string, takeOver: bool, rate: bool, oosSimilar: bool, nudge: bool, nudgeAt: string, float: bool, floatSide: string, floatBottom: int, heart: bool}
      */
     public static function lookFor(TenantContext $tenant, string $shopId): array
     {
@@ -203,6 +203,8 @@ final class SearchIndexController
             'float' => (bool) Settings::get('search.float_button', $shopId),
             'floatSide' => (string) Settings::get('search.float_side', $shopId),
             'floatBottom' => (int) Settings::get('search.float_bottom', $shopId),
+            // the saved list's heart in the site's header, beside the search (off unless the shop turns it on)
+            'heart' => (bool) Settings::get('search.header_heart', $shopId),
         ];
     }
 

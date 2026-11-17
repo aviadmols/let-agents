@@ -42,7 +42,9 @@
   function refreshLauncher() {
     var n = savedCount(), label = n ? t('launcherSaved', { n: n }) : t('open');
     LAUNCHERS.forEach(function (b) { var badge = b.querySelector('.ls-launch__badge'); if (badge) { badge.hidden = n === 0; } b.classList.toggle('has-saved', n > 0); b.setAttribute('aria-label', label); b.setAttribute('title', label); });
+    paintHeart(n !== LAST_SAVED && LAST_SAVED !== null && n > LAST_SAVED); LAST_SAVED = n;
   }
+  var LAST_SAVED = null;
   function receiveOnLauncher(b) {
     if (!b || REDUCED) { return; }
     b.classList.remove('is-settle', 'is-catch'); void b.offsetWidth;

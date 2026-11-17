@@ -61,6 +61,8 @@ return [
         'per_group_tip' => 'How many products show in each group (products, categories, guides) before "show all".',
         'wishlist' => 'Wishlist',
         'wishlist_sub' => 'A heart on every product, a list that can be shared',
+        'header_heart' => 'Heart beside the site search',
+        'header_heart_sub' => 'A heart icon in the site header, beside the search. It fills in once products are saved, and opens the list when pressed',
         'compare' => 'Compare products',
         'rate' => 'Ask to rate an answer',
         'rate_sub' => '"Helpful?" after an assistant answer',

@@ -204,6 +204,28 @@ final class SearchSettingsPagesTest extends TestCase
         $this->assertFalse($this->look()['enabled']);
     }
 
+    /** The saved list's heart beside the site's search: off until the shop turns it on, and the drawer is told (Aviad, 17.11). */
+    public function test_the_heart_beside_the_sites_search_is_off_until_the_shop_turns_it_on(): void
+    {
+        $this->product('1', 'טבעת סוליטר');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $page = Livewire::test(SearchWindowSettings::class)
+            ->assertOk()
+            ->assertSee('לב ליד החיפוש באתר')
+            ->assertSee('מתמלא כשיש מוצרים שמורים')
+            ->assertSet('data.header_heart', false);
+        $this->assertFalse($this->look()['heart']);
+        $this->assertFalse($this->config()['heart'], 'the index carries it too');
+
+        $page->set('data.header_heart', true)->call('save');
+        $this->assertTrue(Settings::get('search.header_heart', $this->shop->id));
+        $this->assertTrue($this->look()['heart']);
+
+        $page->set('data.header_heart', false)->call('save');
+        $this->assertNull(Settings::overrideFor('search.header_heart', $this->shop->id));
+    }
+
     public function test_the_floating_button_is_shown_placed_and_raised_as_the_shop_sets_it(): void
     {
         $this->product('1', 'טבעת סוליטר');

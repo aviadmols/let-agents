@@ -13,6 +13,10 @@ return [
         'label' => 'Floating search button',
         'description' => 'The round Lets button at the bottom of the screen, on pages where Lets did not place its button in the header. Off: shoppers open the search from the site\'s own search icon or box; on a page with neither, the button still shows, so the search can always be opened.',
     ],
+    'header_heart' => [
+        'label' => 'Heart beside the site search',
+        'description' => 'A heart icon in the site header, beside the search icon: it fills in once the shopper saved products, and opens the saved list when pressed. Off by default.',
+    ],
     'float_side' => [
         'label' => 'Floating button side',
         'description' => 'Left or right of the screen, whatever the site\'s language. Automatic: the end of the page, left on a Hebrew site and right on an English one.',

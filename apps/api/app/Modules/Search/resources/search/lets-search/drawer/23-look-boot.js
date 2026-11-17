@@ -135,6 +135,7 @@
         SHORT = r.ok ? r.body || {} : {};
         R.classList.toggle('no-wish', SHORT.wishlist === false); R.classList.toggle('no-compare', SHORT.compare === false);
         saveHearts();
+        placeHeart();
         var synced = false;
         try { synced = win.sessionStorage.getItem(WISH_KEY + '_synced') === '1'; win.sessionStorage.setItem(WISH_KEY + '_synced', '1'); } catch (e) { synced = false; }
         if (SHORT.wishlist !== false && !synced && (WISH.wish.length || WISH.phone || CFG.customer || CFG.loggedIn)) { wishSync(); }

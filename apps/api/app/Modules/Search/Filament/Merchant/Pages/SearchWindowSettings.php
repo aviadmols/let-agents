@@ -75,6 +75,7 @@ class SearchWindowSettings extends Page
             'cart' => 'setting:search.show_cart',
             'per_group' => 'setting:search.results_per_group',
             'wishlist' => 'feature:shortlist.wishlist',
+            'header_heart' => 'setting:search.header_heart',
             'compare' => 'feature:shortlist.compare',
             'rate' => 'feature:search.rate_answers',
             'out_of_stock' => 'feature:search.out_of_stock_similar',
