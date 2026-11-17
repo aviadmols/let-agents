@@ -1658,8 +1658,14 @@ final class AnswerSiteQuestion implements TriesQuestions
                 [$this->anchors, $viewing] = [$anchors, null];
             }
         }
+        // nothing on the shopper's screen: asked in the box, no search before it
+        $nothingShown = $shown === [];
         $named = $viewing === null && $this->anchors === [] ? $this->namedProducts($question) : [];
-        $shown = $named === [] || array_diff($named, $shown) === [] ? $shown : $named;
+        // A question that asks for products ("מתנה לאמא עד 1,500") and happens to say a product's name (the gift card, by the
+        // word "מתנה") is still about the products found: that one first, the rest kept. Alone, it was all the writer had, and
+        // every gift question was answered with the gift card (Rocks QA, 17.11).
+        $asksForProducts = in_array(AnswerContext::type($question), ['recommendation', 'price_range', 'superlative'], true);
+        $shown = $named === [] || array_diff($named, $shown) === [] ? $shown : ($asksForProducts ? array_values(array_unique([...$named, ...array_map('strval', $shown)])) : $named);
         // What the store's words and pages bring is then about those products, not about every one sharing a word.
         $this->namedTitles = $named === [] ? [] : CatalogProduct::query()->whereIn('external_id', $named)->pluck('title')->map(fn ($t): string => self::titleCore((string) $t))->filter()->values()->all();
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
@@ -1702,12 +1708,14 @@ final class AnswerSiteQuestion implements TriesQuestions
             $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
             // and what the store's own search finds for the question, by its words and by meaning (assistant.products_by_search):
             // the products on the screen were those the words found while it was typed, "מתאמים" for "מה מתאים…" (Gueta, 17.11)
-            // Nothing on the screen (asked in the box of a product page, no search before it) and the question asks for products
-            // ("איזו מתנה מתאימה לאשתי עד 1500 ש"ח, משהו עדין עם יהלום"): what the store's own search finds for it, in its budget,
-            // is what the shopper would have had in front of them. Without it the writer had three product pages as passages,
-            // with no price, named them without their cards and said "their prices are not here" (Rocks, 17.11).
-            $forIt = $shown === [] && in_array(AnswerContext::type($question), ['recommendation', 'price_range', 'superlative'], true) ? $this->searchedFor($shopId, $question) : [];
-            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown, ...$forIt]));
+            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown]));
+        }
+        // Nothing on the screen and the question asks for products ("איזו מתנה מתאימה לאשתי עד 1500 ש"ח, משהו עדין עם יהלום"):
+        // what the store's own search finds for it, in its budget, is what the shopper would have had in front of them, after
+        // any product the question names. Without it the writer had the gift card alone, named by the word "מתנה", or three
+        // product pages as passages with no price, and said "their prices are not here" (Rocks, 17.11).
+        if ($viewing === null && ! $followUp && $nothingShown && $asksForProducts) {
+            $shown = array_values(array_unique([...$shown, ...$this->searchedFor($shopId, $question)]));
         }
         // "What is recommended most": the store's most popular, before the rest, and kept through the choice below. What
         // its customers buy, open and add to the cart, never a model's taste (as Aviad asked, 26.10).
