@@ -32,7 +32,8 @@ final class ShownQuestion
         $text = (string) preg_replace('/[?؟][!?؟]+|[!][?؟]+/u', '?', $text);
         $text = (string) preg_replace('/\s+([?؟!.,:;])/u', '$1', $text);
 
-        return trim($text, " \t-–—");
+        // by letters, never trim(): "–" and "—" share bytes with "ד" and "ה", and a question ending in one lost half of it
+        return (string) preg_replace('/^[\s\-–—]+|[\s\-–—]+$/u', '', $text);
     }
 
     public static function fit(string $text): bool

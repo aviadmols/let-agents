@@ -88,7 +88,10 @@ final class SearchCatalog
     private const LOOSE_TRIES = 3;
 
     /** Words that only join or point at a filter: never what a loosened search left out. */
-    private const LOOSE_WORDS = '/^(?:עמ|ו?בצבע|צבע|ו?בגוונ|with|in|colou?r|for|and)$/u';
+    private const LOOSE_WORDS = '/^(?:עמ|ו?בצבע|צבע|ו?בגוונ|ו?במיד(?:ה|ת|ות)|מיד(?:ה|ת|ות)|בגודל|with|in|colou?r|size|for|and)$/u';
+
+    /** Words that only ask for a filter ("במידה", "בצבע", "size"): left in a query without their value, not searched for. */
+    private const ASKS_FILTER_ONLY = '/^(?:ו?ב?(?:מיד(?:ה|ת|ות)|צבע|גוונ?|גודל)|sizes?|colou?rs?)$/u';
 
     /** A colour asked for: the pictures of this many products read for the colour they show most (byPictureColour). */
     private const PICTURE_COLOUR_READ = 120;
@@ -744,6 +747,11 @@ final class SearchCatalog
             // "שטיח כחול 80 על 150": a colour or a size the shop filters by is a filter, not a word (the page shows it as one).
             $worded = $query;
             $query = $index === null ? $query : HebrewSearch::withoutFacetWords($index, $query);
+            // and a word that only asks for a filter, with no value after it ("חולצה שחורה במידה", typed before the size): never a
+            // word a product must say. Miss Nori, 17.11: 1 of 21 black shirts, the one whose text said "במידה". Never the whole query.
+            // Only last: one with a word after it ("בצבע שחור") is read with that word.
+            $typed = explode(' ', trim($query));
+            $query = count($typed) > 1 && preg_match(self::ASKS_FILTER_ONLY, (string) end($typed)) === 1 ? implode(' ', array_slice($typed, 0, -1)) : $query;
             // The filter read from the words is applied here too, as the drawer applies it: "ספר של תומס סואל" is his
             // book, not every book with the author's name taken off. Within one filter any value; across filters all.
             $read = [];
