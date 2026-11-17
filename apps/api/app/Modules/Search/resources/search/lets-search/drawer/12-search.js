@@ -303,7 +303,10 @@
       var left = taken.length ? wordsOf(turn.q || '').filter(function (w, i) { return taken.indexOf(i) < 0; }).join(' ') : '';
       var pure = onlyColour(c), kind = seenAs(c), shade = shadeOf(c), says = left ? namesSearch({ words: left }) : function () { return 0; };
       if (!out.some(function (r) { return says(r); })) { says = function () { return 0; }; }
-      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || says(b) - says(a) || pure(b) - pure(a) || shade(b) - shade(a) || kind(b) - kind(a); });
+      // ...then what its picture was read as: a high-top named only "UY SK8-Hi" is a shoe by its picture, a flip-flop is not,
+      // and comes after it (VANS QA, 17.11)
+      var shows = function (r) { return says({ title: tgWords(r) }); };
+      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || says(b) - says(a) || shows(b) - shows(a) || pure(b) - pure(a) || shade(b) - shade(a) || kind(b) - kind(a); });
     }
     // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
     // apart (Naot QA, 15.11). Under names of their own ("Julius - BA6 Soft Black") each keeps its card.
