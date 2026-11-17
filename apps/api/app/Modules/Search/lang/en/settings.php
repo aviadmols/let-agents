@@ -331,6 +331,10 @@ return [
         'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
         'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
     ],
+    'similar_look_blend' => [
+        'label' => '"Similar items" by the whole look',
+        'description' => 'Ordered by the whole look: the cut and fabric in the picture, the colour, the print and whom it is for, never by the colour in its name alone. For clothing and shoe stores.',
+    ],
     'similar_near_looks' => [
         'label' => '"Similar items" only from the nearest pictures',
         'description' => 'A product is similar only if it is of the same kind and among this many nearest pictures. The rest of its kind show below, under "You may also like". 0: any product of its kind the pictures found.',

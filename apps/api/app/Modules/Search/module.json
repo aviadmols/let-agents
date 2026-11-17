@@ -929,6 +929,12 @@
             "scope": "shop"
         },
         {
+            "name": "similar_look_blend",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "similar_near_looks",
             "type": "int",
             "default": 0,

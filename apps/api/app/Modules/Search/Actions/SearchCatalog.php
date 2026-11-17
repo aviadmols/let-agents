@@ -2195,7 +2195,10 @@ final class SearchCatalog
 
             // by its picture (a model's name for a title): weighed as a shopper sees it, its shape before its colour, even where
             // its title names one: a black two-strap slide's alike were black sandals of any shape (Naot, 15.11)
-            $filedLead = ($parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index)) || ($byPicture && $own !== null);
+            // and in any store where looks lead, where the shop asks it (search.similar_look_blend): its titles' colour first put a
+            // pink tank top and an orange cardigan before the knit tees beside a pink striped knit tee (Miss Nori, 17.11)
+            $blend = $looksLead && $own !== null && ! $otherColour && (bool) Settings::get('search.similar_look_blend', $shopId);
+            $filedLead = ($parts === [] && $looksLead && $own !== null && self::titlesNameNoColour($shopId, $index)) || ($byPicture && $own !== null) || $blend;
             $records = $own === null || ! $colours || $filedLead ? $records : self::byColour($records, $parts);
             // covered in a print (checks over most of it): its alike covered in it first, those with it on a logo only last
             $records = $own === null || ! $looksLead || $otherColour ? $records : Patterns::tiered($records, Patterns::covered($own), own: true);
@@ -2210,11 +2213,11 @@ final class SearchCatalog
                 // its shape: its picture's words but its colours ("two-strap", "slide", "cork footbed", "buckle"), the colours
                 // the code reads and those the store's own colour filter names ("Silver", "Beige": English ones it does not)
                 $shape = self::shapeOf($facets);
-                $ownShape = $byPicture ? $shape($pictures[$externalId] ?? []) : [];
+                $ownShape = $byPicture || $blend ? $shape($pictures[$externalId] ?? []) : [];
                 // what its picture says it is, in its first words, besides the noun: "wedge" of "wedge sandal", "chukka" of
                 // "chukka boot": weighed most (Naot QA, 16.11: a wedge sandal's alike were flat sandals in its light shades)
                 $mods = self::kindModifiers($facets);
-                $ownMods = $byPicture ? $mods($pictures[$externalId] ?? []) : [];
+                $ownMods = $byPicture || $blend ? $mods($pictures[$externalId] ?? []) : [];
                 // only what sets it apart among them: "cork footbed" and "leather" are every sandal's, "two-strap" is its own
                 if ($ownShape !== []) {
                     $held = array_count_values(array_merge(...array_map(fn (array $r): array => array_values(array_unique($shape($pictures[substr((string) $r['id'], 2)] ?? []))), $records)));
