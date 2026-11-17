@@ -189,6 +189,11 @@ final class AnswerCheckTest extends TestCase
 
         $this->assertTrue(AnswerSiteQuestion::hasMeasureNotIn('יהלום של 2.5 קראט', $known), '2.5 is grams there, not carats: like with like only');
         $this->assertFalse(AnswerSiteQuestion::hasMeasureNotIn('משקל 2.5 גרם', $known));
+        // the store writes "קארט", the answer "קראט": one measure (Rocks, 17.11: the sentence about the earrings was taken out)
+        $earrings = 'עגילים זהב לבן 10 קארט, בשיבוץ 36 יהלומים, ששוקלים בסך הכל 1 קארט - FG I1, יהלום מרכזי במשקל 0.25 קארט';
+        $this->assertFalse(AnswerSiteQuestion::hasMeasureNotIn('בעגילים האלה יש יהלום מרכזי במשקל 0.25 קראט ועוד 36 יהלומים, ובסך הכול 1 קראט יהלומים.', $earrings));
+        $this->assertFalse(AnswerSiteQuestion::hasMeasureNotIn('36 יהלומים במשקל כולל של 1 קאראט', $earrings));
+        $this->assertTrue(AnswerSiteQuestion::hasMeasureNotIn('יהלום מרכזי של 0.5 קראט', $earrings), 'a weight the page does not give still goes');
 
         [$none, $why] = AnswerSiteQuestion::gate('המחיר 3.1 גרם.', $known, '');
         $this->assertSame(['', 'number_not_in_the_pages'], [$none, $why], 'nothing worth showing left: refused whole, as before');

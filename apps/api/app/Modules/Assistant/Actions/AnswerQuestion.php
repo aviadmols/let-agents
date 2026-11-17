@@ -51,7 +51,11 @@ final class AnswerQuestion
 
     public const ACTION = 'assistant.answer';
 
-    public const PROMPT_VERSION = 8;
+    // v9 (17.11, as Aviad asked): a term of the trade asked on a product's page ("מה זה FG I1?") is explained from the store's
+    // bank of terms (`terms`): in plain words, where it stands on its scale, this piece's details, and one closing sentence.
+    // Compared on 16 term questions and 6 others from Rocks, Gueta, Naot and Vans, twice each: every term answer explained
+    // and placed, shown 31 of 32 against 30; the others the same (docs/eval/answers-product-v9-vs-v8.json in Let Agents).
+    public const PROMPT_VERSION = 9;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;
@@ -206,7 +210,11 @@ final class AnswerQuestion
                 // what the store's team wrote about the store and all its products holds for this one too
                 $store = $subject->kind === Subject::PRODUCT ? $this->storeLines($shopId) : '';
                 $withStore = $store === '' ? [] : ['store' => $store];
-                $contextJson = (string) json_encode($subject->context, JSON_UNESCAPED_UNICODE).' '.$store;
+                // the store's checked explanations of the terms the question names (BuildTradeGlossary), for a prompt that reads
+                // them (v9): "מה זה FG I1?" on earrings was told the letters alone (Rocks, 17.11). Their numbers are known too.
+                $terms = $subject->kind === Subject::PRODUCT && self::PROMPT_VERSION >= 9 ? $this->termLines($shopId, $question) : '';
+                $withTerms = $terms === '' ? [] : ['terms' => $terms];
+                $contextJson = (string) json_encode($subject->context, JSON_UNESCAPED_UNICODE).' '.$store.' '.$terms;
                 $estimatedInput = (int) ceil(mb_strlen($contextJson) / 2) + 800;
                 /** @var list<array{0: ModelReply, 1: string}> $replies */
                 $replies = [];
@@ -243,7 +251,7 @@ final class AnswerQuestion
                     // the language to answer in, as code read it from the question; an answer in another is no answer (the
                     // site's assistant is asked next, AskController), never Hebrew to an English question (lets-review-test-4, 15.11)
                     $language = AnswerLanguage::of($question, $locale);
-                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, ...(($tone = AnswerSiteQuestion::tone($shopId)) === null ? [] : ['tone' => $tone]), 'question' => $question, 'language' => AnswerLanguage::name($language)], $maxOutput, $effort, 'answer');
+                    $reply = $this->call($run, $answerModel, $subject->prompt('answer'), [$subject->kind => $subject->context, ...$withStore, ...$withTerms, ...(($tone = AnswerSiteQuestion::tone($shopId)) === null ? [] : ['tone' => $tone]), 'question' => $question, 'language' => AnswerLanguage::name($language)], $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
 
                     $answer = mb_substr(trim((string) ($reply->data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS);
@@ -258,7 +266,7 @@ final class AnswerQuestion
                     };
 
                     if ($refusal === null) {
-                        $check = $this->call($run, $checkModel, $subject->prompt('verify'), [$subject->kind => $subject->context, ...$withStore, 'question' => $question, 'answer' => $answer], self::CHECK_OUTPUT_TOKENS, $effort);
+                        $check = $this->call($run, $checkModel, $subject->prompt('verify'), [$subject->kind => $subject->context, ...$withStore, ...$withTerms, 'question' => $question, 'answer' => $answer], self::CHECK_OUTPUT_TOKENS, $effort);
                         $replies[] = [$check, 'scope'];
 
                         $refusal = match (false) {
@@ -406,6 +414,23 @@ final class AnswerQuestion
         }
 
         return mb_substr(trim((string) $this->ownEntry()?->body), 0, self::STORE_CHARS);
+    }
+
+    /** Lines of the bank of terms, of those whose term the question names. */
+    private const TERM_LINES = 6;
+
+    /**
+     * The lines of the store's bank of terms whose term the question names ("- FG: ..."), when the bank is on for the store
+     * (or tried in a quality run's own process, assistant.try_terms); empty otherwise.
+     */
+    private function termLines(string $shopId, string $question): string
+    {
+        if (! Features::enabled('assistant.trade_terms', $shopId) && config('assistant.try_terms') !== true) {
+            return '';
+        }
+        $body = (string) CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', BuildShopKnowledge::TERMS)->value('body');
+
+        return $body === '' ? '' : implode("\n", array_slice(BuildTradeGlossary::named($question, explode("\n", $body)), 0, self::TERM_LINES));
     }
 
     /** Whether the team changed its own lines after the answer was written. */

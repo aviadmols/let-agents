@@ -44,7 +44,8 @@ final class BuildTradeGlossary
     public const ACTION = 'assistant.write_terms';
 
     // v2: what is measured and agreed only, never which is harder or better (Rocks, 16.11: the checker dropped 9K for it)
-    public const PROMPT_VERSION = 2;
+    // v3 (17.11): in plain words, what the eye sees, and where it stands on its scale, honestly both ways; written by the stronger model
+    public const PROMPT_VERSION = 3;
 
     /** Words sent to the writer in one run, at most, and of one source. */
     private const CANDIDATES = 160;
@@ -63,7 +64,7 @@ final class BuildTradeGlossary
 
     private const MIN_TEXT = 20;
 
-    private const MAX_TEXT = 320;
+    private const MAX_TEXT = 450;
 
     private const EXAMPLE = 70;
 

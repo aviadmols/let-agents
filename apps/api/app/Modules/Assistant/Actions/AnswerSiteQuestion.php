@@ -138,8 +138,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * (docs/eval/answers-v33-vs-v32-howto.json in Let Agents): a question of how to do something to a thing picks what is
      * used for it, never the thing itself ("איך מנקים דק סינטטי אחרי החורף?" offered two decks in both v32 runs, a cleaner
      * in both of v33's); the other answers the same.
+     *
+     * v34 (answer_site and verify_site) released 17.11, as Aviad asked, with the store's bank of terms read (assistant.trade_terms)
+     * and a carat spelled "קארט" known to code: a term is said in plain words, where it stands on its scale, and the answer
+     * ends on the piece; its last sentence, about the piece, had been taken out by code in every answer on a term. Compared on
+     * 14 real term questions and 8 others from 6 stores, twice each (docs/eval/answers-v34-vs-v33.json in Let Agents).
      */
-    public const PROMPT_VERSION = 33;
+    public const PROMPT_VERSION = 34;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -3395,7 +3400,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     public static function hasMeasureNotIn(string $answer, string $known): bool
     {
         $units = [
-            'carat' => 'קראט|קרט|ct|k(?![a-z])',
+            // every way a store spells it: "0.25 קארט" on Rocks' earrings and "0.25 קראט" in the answer are one measure; the
+            // sentence about the piece itself was taken out for it, in every answer on a term (17.11)
+            'carat' => 'קראט(?:ים)?|קארט(?:ים)?|קאראט(?:ים)?|קרט(?:ים)?|ct|k(?![a-z])',
             'gram' => 'גרם|גר[\'׳]|gr?(?![a-z])',
             'kilo' => 'ק"ג|ק״ג|קילוגרם|קילו|kg',
             'cm' => 'ס"מ|ס״מ|סנטימטר(?:ים)?|cm',

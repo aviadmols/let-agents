@@ -23,7 +23,7 @@
         },
         {
             "name": "trade_terms",
-            "default": false
+            "default": true
         },
         {
             "name": "prepare_answers",
@@ -797,13 +797,13 @@
                 "anthropic",
                 "gemini"
             ],
-            "default": "openai",
+            "default": "anthropic",
             "scope": "global"
         },
         {
             "name": "terms_writer_model",
             "type": "string",
-            "default": "gpt-5.4-mini",
+            "default": "claude-sonnet-5-5",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -811,7 +811,7 @@
         {
             "name": "terms_writer_input_usd_per_million",
             "type": "float",
-            "default": 1,
+            "default": 2,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -820,7 +820,7 @@
         {
             "name": "terms_writer_output_usd_per_million",
             "type": "float",
-            "default": 8,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -829,7 +829,7 @@
         {
             "name": "terms_writer_max_output_tokens",
             "type": "int",
-            "default": 4000,
+            "default": 8000,
             "min": 200,
             "max": 8000,
             "scope": "global",
@@ -843,13 +843,13 @@
                 "anthropic",
                 "gemini"
             ],
-            "default": "anthropic",
+            "default": "openai",
             "scope": "global"
         },
         {
             "name": "terms_check_model",
             "type": "string",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-5.4-mini",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -866,7 +866,7 @@
         {
             "name": "terms_check_output_usd_per_million",
             "type": "float",
-            "default": 5,
+            "default": 8,
             "min": 0,
             "max": 400,
             "scope": "global",

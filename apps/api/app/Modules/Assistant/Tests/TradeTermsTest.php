@@ -125,7 +125,8 @@ final class TradeTermsTest extends TestCase
         $run = app(BuildTradeGlossary::class)->handle($this->shop->id);
 
         $this->assertSame('succeeded', $run->status->value);
-        $this->assertSame([AiProviderName::OpenAi, AiProviderName::Anthropic], array_column($this->calls, 'provider'), 'the other family checks');
+        // the stronger model writes, the other family checks (v3, 17.11)
+        $this->assertSame([AiProviderName::Anthropic, AiProviderName::OpenAi], array_column($this->calls, 'provider'), 'the other family checks');
         $this->assertSame(file_get_contents(__DIR__.'/../Prompts/trade_terms.v'.BuildTradeGlossary::PROMPT_VERSION.'.md'), $this->calls[0]['system']);
         $checked = array_column(json_decode($this->calls[1]['user'], true)['terms'], 'term');
         $this->assertNotContains('GH', $checked, 'code drops a line with a sum before the checker sees it');
@@ -197,11 +198,11 @@ final class TradeTermsTest extends TestCase
     public function test_a_checker_of_the_same_family_fails_the_run_and_off_asks_nothing(): void
     {
         $this->catalog();
-        Settings::set('assistant.terms_check_provider', 'openai');
+        Settings::set('assistant.terms_check_provider', 'anthropic');
         $this->assertSame('failed', app(BuildTradeGlossary::class)->handle($this->shop->id)->status->value);
         $this->assertSame([], $this->calls);
 
-        Settings::set('assistant.terms_check_provider', 'anthropic');
+        Settings::set('assistant.terms_check_provider', 'openai');
         Features::override('assistant.trade_terms', false, $this->shop->id);
         $this->assertSame('succeeded', app(BuildTradeGlossary::class)->handle($this->shop->id)->status->value);
         $this->assertSame([], $this->calls);
