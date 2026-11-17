@@ -1039,7 +1039,8 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-onb-scan-head h2 { margin-bottom: 4px; }
 .fi-panel-merchant .lp-onb-sand { width: 48px; height: 48px; border-radius: 50%; background: var(--la-accent); color: var(--la-paper); display: grid; place-items: center; flex: none; }
 .fi-panel-merchant .lp-onb-sand .lp-onb-mark { --s: 22px; }
-.fi-panel-merchant .lp-onb-split { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+/* the try card under the scan, the width of the page: beside it, in a third of the width, its words stood one or two to a line */
+.fi-panel-merchant .lp-onb-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .fi-panel-merchant .lp-onb-scan { display: flex; flex-direction: column; gap: 10px; }
 .fi-panel-merchant .lp-onb-scan-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 100px; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--la-sunk); transition: opacity 240ms ease; }
 .fi-panel-merchant .lp-onb-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--la-paper); display: grid; place-items: center; color: var(--la-ink-2); }
@@ -1054,7 +1055,7 @@ html.dark .fi-panel-merchant {
 .fi-panel-merchant .lp-onb-fact { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: var(--la-sunk); font-size: 14px; color: var(--la-ink-2); animation: lp-focus-in 360ms cubic-bezier(.23, 1, .32, 1) backwards; }
 .fi-panel-merchant .lp-onb-fact > svg { width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: var(--lp-lime); color: var(--lp-ink); flex: none; }
 .fi-panel-merchant .lp-onb-fact b { display: block; font-weight: 600; margin-bottom: 2px; color: var(--la-ink); }
-.fi-panel-merchant .lp-onb-try { box-shadow: inset 0 0 0 1px var(--la-line); position: sticky; top: 16px; }
+.fi-panel-merchant .lp-onb-try { box-shadow: inset 0 0 0 1px var(--la-line); }
 .fi-panel-merchant .lp-onb-help { margin: 0 0 12px; font-size: 13.5px; color: var(--la-muted); line-height: 1.55; }
 .fi-panel-merchant .lp-onb-try-field { min-height: 44px; }
 .fi-panel-merchant .lp-onb-try-field .lp-ico { color: var(--la-muted); }
