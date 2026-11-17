@@ -1427,6 +1427,11 @@ final class HebrewSearch
         }
 
         foreach ($variants as $position => $variant) {
+            // the word less its first letter only when the word as typed has no form in the catalogue: "כחול" is blue, never כ+"חול"
+            // found in "חוליה" (a chain's link), nor "מחוטא" מ+"חוטא" in "חוט" (word-audit 17.11)
+            if ($position > 0 && array_filter($found, fn (float $score): bool => $score >= 0.85) !== []) {
+                break;
+            }
             $scores = [];
             $base = self::stem($variant);
             $length = mb_strlen($variant);
@@ -1481,7 +1486,8 @@ final class HebrewSearch
                 }
                 // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never
                 // a word the store has as typed ("ראש" is a head), the nearer in length first ("ריישי" before "ראש" for "ראישי")
-                if ($length >= 3 && $candidate !== $variant && abs(mb_strlen($candidate) - $length) <= 2 && ! isset($index['holders'][$variant])
+                // of three letters, only one written with a vowel letter more ("צגה" for "צאגה"): "חמה", warm, is never "חום", brown
+                if ($length >= 3 && ($length >= 4 || mb_strlen($candidate) > $length) && $candidate !== $variant && abs(mb_strlen($candidate) - $length) <= 2 && ! isset($index['holders'][$variant])
                     && mb_strlen(self::skeleton($variant)) >= 2 && self::skeleton($candidate) === self::skeleton($variant)) {
                     $score = max($score, 0.87 - 0.02 * abs(mb_strlen($candidate) - $length));
                 }
@@ -1519,7 +1525,9 @@ final class HebrewSearch
         // only looks like it with its ו and י dropped is not ("עגול": Rocks, 25.10, "עגילי זהב" found rings cut round). A slip
         // nothing plainly holds ("לבין") is still read as the word it is close to.
         if (array_any(array_keys($found), fn ($candidate): bool => self::formOf((string) $candidate, $variants))) {
-            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || ! self::vowelsApart((string) $candidate, $variants), ARRAY_FILTER_USE_BOTH);
+            // ...and of the words merely spelled like it, only a slip (.8 and up): "מבצעים", with "מבצע" in the catalogue, is never
+            // "מצעים", bed sheets (word-audit 17.11)
+            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || (! self::vowelsApart((string) $candidate, $variants) && $score >= 0.8), ARRAY_FILTER_USE_BOTH);
         }
 
         $floor = $found ? max(self::FLOOR, max($found) * self::RELATIVE_FLOOR) : self::FLOOR;

@@ -62,10 +62,11 @@ final class WordAuditCommand extends Command
         }
         $engine = $index['engine'];
         $words = [];
-        foreach (SearchTerm::query()->orderByDesc('searches')->limit($top)->get(['term', 'searches']) as $term) {
-            foreach (explode(' ', HebrewSearch::normalize((string) $term->term)) as $word) {
+        // its searches by day (search_terms): each query's days added up
+        foreach (SearchTerm::query()->selectRaw('query, sum(searches) as n')->groupBy('query')->orderByDesc('n')->limit($top)->get() as $term) {
+            foreach (explode(' ', HebrewSearch::normalize((string) $term->query)) as $word) {
                 if (mb_strlen($word) >= 2) {
-                    $words[$word] = ($words[$word] ?? 0) + (int) $term->searches;
+                    $words[$word] = ($words[$word] ?? 0) + (int) $term->n;
                 }
             }
         }
@@ -100,6 +101,18 @@ final class WordAuditCommand extends Command
      */
     public static function related(string $typed, string $candidate): bool
     {
+        // the same word with or without its prefix letters ("להודו", "הודו"), two names of one colour ("כחול", "תכלת")
+        foreach ([[$typed, $candidate], [$candidate, $typed]] as [$long, $short]) {
+            if (mb_strlen($short) >= 3 && preg_match('/^[והבלמשכ]{1,2}'.preg_quote($short, '/').'$/u', $long) === 1) {
+                return true;
+            }
+        }
+        if (HebrewSearch::colorOf($typed) !== null && HebrewSearch::colorOf($typed) === HebrewSearch::colorOf($candidate)) {
+            return true;
+        }
+        if (HebrewSearch::numberOf($typed) !== null && HebrewSearch::numberOf($typed) === (HebrewSearch::numberOf($candidate) ?? $candidate)) {
+            return true;
+        }
         if (HebrewSearch::stem($typed) === HebrewSearch::stem($candidate) && mb_strlen($candidate) >= 3) {
             return true;
         }

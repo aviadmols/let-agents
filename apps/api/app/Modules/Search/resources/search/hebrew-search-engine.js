@@ -236,6 +236,9 @@
     }
 
     for (var position = 0; position < variants.length; position++) {
+      // the word less its first letter only when the word as typed has no form in the catalogue: "כחול" is blue, never כ+"חול"
+      // found in "חוליה" (a chain's link), nor "מחוטא" מ+"חוטא" in "חוט" (word-audit 17.11; the server's closeWords)
+      if (position > 0 && order.some(function (w) { return found[w] >= 0.85; })) { break; }
       var variant = variants[position];
       var scores = {};
       var base = stem(variant);
@@ -294,7 +297,9 @@
         }
         // the letters of its sounds the same, its vowel letters typed otherwise: "ראישי" is "ריישי", "צגה" is "צאגה"; never a
         // word the store has as typed ("ראש" is a head), the nearer in length first ("ריישי" before "ראש" for "ראישי")
-        if (length >= 3 && candidate !== variant && Math.abs(candidate.length - length) <= 2 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && skeleton(variant).length >= 2 && skeleton(candidate) === skeleton(variant)) {
+        // of three letters, only one written with a vowel letter more ("צגה" for "צאגה"): two words of three with the same letters
+        // are two words, not a typo ("חמה", warm, is never "חום", brown; word-audit 17.11)
+        if ((length >= 4 || candidate.length > length) && length >= 3 && candidate !== variant && Math.abs(candidate.length - length) <= 2 && !Object.prototype.hasOwnProperty.call(index.holders, variant) && skeleton(variant).length >= 2 && skeleton(candidate) === skeleton(variant)) {
           score = Math.max(score, 0.87 - 0.02 * Math.abs(candidate.length - length));
         }
         // an English word a letter off one the store writes ("blak" for "black", "brwn" for "brown"): that word; never a word the
@@ -326,7 +331,9 @@
     // ו and י dropped is not ("עגול"). A slip nothing plainly holds ("לבין") is still read as the word it is close to.
     // As on the server (HebrewSearch::closeWords).
     if (order.some(function (c) { return formOf(c, variants); })) {
-      order = order.filter(function (c) { return formOf(c, variants) || !vowelsApart(c, variants); });
+      // ...and of the words merely spelled like it, only a slip (.8 and up): "מבצעים", with "מבצע" in the catalogue, is never
+      // "מצעים", bed sheets (word-audit 17.11; the server's closeWords)
+      order = order.filter(function (c) { return formOf(c, variants) || (!vowelsApart(c, variants) && found[c] >= 0.8); });
     }
 
     var best = 0;

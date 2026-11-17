@@ -45,4 +45,20 @@ final class ShortWordsTest extends TestCase
             $this->assertSame($ids, $browser[(string) $query], "\"{$query}\" in the drawer");
         }
     }
+
+    public function test_a_word_the_catalogue_has_is_never_another_by_its_letters(): void
+    {
+        // word-audit 17.11: "כחול" was כ+"חול" in "חוליה" (Rocks), "מחוטא" מ+"חוטא" in "חוט" (Gueta), "חמה" sounded as "חום" and
+        // "מבצעים" was spelled like "מצעים" (Take Me Home)
+        $index = HebrewSearch::build([
+            ['id' => 'p:blue', 'title' => 'טבעת ספיר כחול', 'keywords' => ''], ['id' => 'p:link', 'title' => 'שרשרת חוליות עבה', 'keywords' => 'חוליה'],
+            ['id' => 'p:pine', 'title' => 'קורת אורן מחוטא', 'keywords' => ''], ['id' => 'p:wire', 'title' => 'חוט ברזל', 'keywords' => ''],
+            ['id' => 'p:brown', 'title' => 'שמיכה בצבע חום', 'keywords' => ''], ['id' => 'p:warm', 'title' => 'שמיכה חמה לחורף', 'keywords' => 'מבצע'],
+            ['id' => 'p:sheets', 'title' => 'סט מצעים', 'keywords' => ''], ['id' => 'p:oct', 'title' => 'ספר על אוקטובר', 'keywords' => ''],
+            ['id' => 'p:tsaga', 'title' => 'כיסא צאגה', 'keywords' => ''],
+        ]);
+        foreach (['כחול' => ['p:blue'], 'כחולה' => ['p:blue'], 'מחוטא' => ['p:pine'], 'חמה' => ['p:warm'], 'מבצעים' => ['p:warm'], 'באוקטובר' => ['p:oct'], 'צגה' => ['p:tsaga']] as $query => $ids) {
+            $this->assertSame($ids, array_column(HebrewSearch::search($index, $query), 'id'), "\"{$query}\"");
+        }
+    }
 }
