@@ -4497,8 +4497,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         // the size each one's own page says it is, and the sizes it is made in, where the store keeps them outside its variants
         $pages = CatalogProductChoice::query()->whereIn('product_id', $products->pluck('id'))->whereNotNull('size')->get(['product_id', 'size', 'sizes', 'size_note'])->keyBy('product_id');
         // A question about one product or two (from its page, a comparison) reads their descriptions
-        // whole enough to say what is special; a list of results needs a line each.
-        $aboutChars = count($shown) <= 2 ? 1500 : 300;
+        // whole, the short and the full, to the questions and answers at their end; a list of results needs a line each.
+        // "איך לשמור על המוצר הזה?" under a ladder whose page answers "איך מאחסנים את הסולם?" was told "no instructions":
+        // the writer had its one-line short description only (Gueta, 17.11).
+        $whole = count($shown) <= 2;
+        $aboutChars = $whole ? self::WHOLE_ABOUT_CHARS : 300;
         $out = [];
 
         foreach ($shown as $id) {
@@ -4513,7 +4516,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 'title' => (string) $product->title,
                 // what its page says of changing its size, in its words, first: "לא ניתן לשנות את המידה" under a ring of 59 was
                 // not read, and the answer said it can be enlarged, from a guide on rings in general (Rocks, 17.11)
-                'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product)), 0, $aboutChars),
+                'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product, $whole)), 0, $aboutChars),
                 'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
                 'brand' => $product->brand,
                 'in_stock' => (bool) $product->in_stock,
@@ -4527,20 +4530,25 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $out;
     }
 
+    /** How much of its own words a product asked about alone, or beside one other, is given. */
+    private const WHOLE_ABOUT_CHARS = 3000;
+
     /**
      * What the product says about itself: its short description where the store writes one (WooCommerce),
-     * else its description (Shopify has no short one).
+     * else its description (Shopify has no short one). Whole: the short one, then the full one, neither said twice.
      */
-    private static function about(CatalogProduct $product): string
+    private static function about(CatalogProduct $product, bool $whole = false): string
     {
-        foreach ([$product->shortDescription(), $product->description()] as $text) {
-            $text = trim((string) preg_replace('/\s+/u', ' ', strip_tags($text)));
-            if ($text !== '') {
-                return $text;
-            }
+        [$short, $full] = array_map(fn (string $text): string => trim((string) preg_replace('/\s+/u', ' ', strip_tags($text))), [$product->shortDescription(), $product->description()]);
+
+        if (! $whole) {
+            return $short !== '' ? $short : $full;
+        }
+        if (str_contains($full, $short)) {
+            return $full;
         }
 
-        return '';
+        return $full === '' || str_contains($short, $full) ? $short : $short."\n".$full;
     }
 
     /** Choices a price depends on, at most this many, each with its price ("18 מ\"מ: ₪350"). */

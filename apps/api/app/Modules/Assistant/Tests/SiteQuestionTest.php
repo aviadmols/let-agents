@@ -1356,6 +1356,41 @@ final class SiteQuestionTest extends TestCase
     }
 
     /**
+     * A WooCommerce product has a short description and a full one, with its questions and answers at the end. Asked on
+     * its page, the writer reads both: with the short one alone, "איך לשמור על המוצר הזה?" under a ladder whose page says
+     * "איך מאחסנים את הסולם? פשוט לקפל ולשמור במקום יבש ומוגן" was answered "no instructions here" (Gueta, 17.11).
+     * A list of results still reads a line each.
+     */
+    public function test_a_product_asked_about_on_its_page_is_read_from_its_full_description_to_its_questions(): void
+    {
+        $full = "### סולם אלומיניום רב־תכליתי מתקפל\nעשוי אלומיניום חזק.\n".str_repeat('מפרט טכני ויתרונות. ', 60)."\n### שאלות נפוצות\nשאלה: איך מאחסנים את הסולם?\nתשובה: פשוט לקפל ולשמור במקום יבש ומוגן.";
+        $payload = fn (string $short): array => ['title' => 'סולם', 'short_description' => $short, 'description' => $full, 'categories' => [], 'attributes' => [], 'meta' => []];
+        $this->product('801', 'סולם אלומיניום רב־תכליתי', $full, [], ['payload' => $payload('סולם אלומיניום קל משקל ומתקפל.')]);
+        $this->product('802', 'סולם שלושה שלבים', $full, [], ['payload' => $payload('סולם ביתי.')]);
+        $this->product('803', 'סולם ארבעה שלבים', $full, [], ['payload' => $payload('סולם ביתי גבוה.')]);
+        $this->replies = [
+            ['found' => true, 'answer' => 'פשוט לקפל את הסולם ולשמור אותו במקום יבש ומוגן.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הסולם שבעמוד']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $this->askWith('איך לשמור על המוצר הזה?', ['801'], page: true)->assertOk();
+
+        $about = (string) (json_decode($this->calls[0]['user'], true)['products'][0]['about'] ?? '');
+        $this->assertStringStartsWith('סולם אלומיניום קל משקל ומתקפל.', $about, 'the short description first');
+        $this->assertStringContainsString('פשוט לקפל ולשמור במקום יבש ומוגן', $about, 'and the full one, to the answer at its end');
+
+        $this->calls = [];
+        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
+        $this->askWith('איזה סולם הכי מתאים?', ['801', '802', '803']);
+
+        $products = json_decode($this->calls[0]['user'], true)['products'] ?? [];
+        $this->assertNotEmpty($products);
+        foreach ($products as $product) {
+            $this->assertStringNotContainsString('שאלות נפוצות', (string) ($product['about'] ?? ''), 'a list of results reads the short line of each');
+        }
+    }
+
+    /**
      * A ring of one size whose page offers it a resize away ("מידה נוכחית: 48", "הגדלה ל 50"), kept outside its
      * variants and read off its page: asked "can it be made 59?" there, the writer and the checker have its sizes, in
      * either mode, and the sizes it names stand (Rocks, 15.11: the answer was the store's general one). "להגדיל" reads as
