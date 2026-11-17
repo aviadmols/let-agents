@@ -1727,6 +1727,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($wish !== []) {
             $shown = array_values(array_unique([...$wish, ...$shown]));
         }
+        // a gift ("מתנה לאמא"): the store's gift card too, last, for one not sure what to choose (as Aviad asked, 17.11); the
+        // writer offers it after the picks, never instead of them (answer_site v31)
+        if ($viewing === null && ! $followUp && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 31
+            && preg_match(self::ASKS_GIFT, $question) === 1 && ($card = $this->giftCardOf()) !== null) {
+            $shown = [...array_slice(array_values(array_diff($shown, [$card])), 0, self::MAX_PRODUCTS - 1), $card];
+        }
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         // what the others are measured by is never one of them, whatever brought it back (its own page found by meaning)
         $candidates = array_values(array_filter($candidates, fn (array $c): bool => ! in_array((string) ($c['external_id'] ?? ''), $this->anchors, true)));
@@ -4108,6 +4114,20 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return array_slice($picks, 0, self::MAX_PICKS);
+    }
+
+    /** Asks for a gift: "מתנה לאמא", "a birthday present", "gift ideas". */
+    private const ASKS_GIFT = '/(?:^|[^\p{L}])(?:[להבו]?מתנ(?:ה|ות|ת)|gifts?|presents?)(?:[^\p{L}]|$)/iu';
+
+    /** The store's gift card in stock, its external id, or null when it sells none. */
+    private function giftCardOf(): ?string
+    {
+        $cards = CatalogProduct::query()->whereNull('removed_at')->where('in_stock', true)
+            ->where(fn ($q) => $q->whereRaw('lower(title) like ?', ['%gift%'])->orWhere('title', 'like', '%מתנה%')->orWhere('title', 'like', '%גיפט%')->orWhereRaw('lower(title) like ?', ['%voucher%']))
+            ->orderBy('id')->limit(20)->get(['external_id', 'title']);
+        $card = $cards->first(fn (CatalogProduct $p): bool => self::giftCard((string) $p->title));
+
+        return $card === null ? null : (string) $card->external_id;
     }
 
     /** A gift card or a voucher by its name: money to spend in the store, not merchandise. */
