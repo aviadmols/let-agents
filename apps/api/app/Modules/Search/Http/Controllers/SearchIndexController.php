@@ -75,6 +75,8 @@ final class SearchIndexController
                 'days' => array_map(fn (string $day): string => self::answeringDay($day, $shopId, $zone), ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'])],
             // Without a WhatsApp, or after hours: the chat asks for a name and a way back, kept as a callback.
             'callbacks' => Features::enabled('shoppers.callbacks', $shopId),
+            // the filters read from the words go by how each value was read (Evidence), where the shop asks it
+            'evidence' => (bool) Settings::get('search.evidence_filter', $shopId),
             // What a question with no answer is offered (assistant.no_answer as far as the shop can keep it):
             // team (WhatsApp in the hours, details outside them), details (the form), none ("not found" only).
             'noAnswer' => self::noAnswer($shopId),

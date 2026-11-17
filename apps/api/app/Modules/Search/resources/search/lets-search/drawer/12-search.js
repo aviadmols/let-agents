@@ -179,6 +179,31 @@
     if (!asked.length) { return function () { return 0; }; }
     return function (r) { return wordsOf(decode(r.title || '')).some(function (w) { return wordForms(w).some(function (f) { return asked.indexOf(st(f)) >= 0; }); }) ? 1 : 0; };
   }
+  // search.evidence_filter, as the index says it: the filters read from the words go by how each value was read
+  function byEvidence() { return !!(S.config && S.config.evidence); }
+  // how sure a product holds a filter's value (the server's Evidence::of): its title says it, or it is filed with no weak
+  // reading kept: 85; a weak reading: its kept score; a check found it wrong: 0; its words alone: 30
+  function evidenceOf(r, code) {
+    var v = valueOf(code);
+    if (v && v.value && plainlySays(decode(r.title || ''), v.value.l)) { return 85; }
+    if ((r.no || []).indexOf(code) >= 0) { return 0; }
+    if (r.ev && r.ev[code] != null) { return Number(r.ev[code]); }
+    return (r.f || []).indexOf(code) >= 0 ? 85 : 30;
+  }
+  // the products held in the filters read from the words, those held surely first; in stock stays first, and within each
+  // the order they came in. One word read as a value of two filters is sure when either is.
+  function surestFirst(list, codes) {
+    if (!codes.length) { return list; }
+    var asked = {};
+    codes.forEach(function (code) { var v = valueOf(code), k = v && v.value ? String(v.value.l).toLowerCase() : String(code); (asked[k] = asked[k] || []).push(code); });
+    var tier = function (r) {
+      var least = 100;
+      Object.keys(asked).forEach(function (k) { var best = 0; asked[k].forEach(function (code) { best = Math.max(best, evidenceOf(r, code)); }); least = Math.min(least, best); });
+      return least >= 80 ? 2 : least >= 50 ? 1 : 0;
+    };
+    return list.map(function (r, at) { return { r: r, s: r.s === 1 ? 1 : 0, t: tier(r), at: at }; })
+      .sort(function (a, b) { return (b.s - a.s) || (b.t - a.t) || (a.at - b.at); }).map(function (x) { return x.r; });
+  }
   function filtered(turn) {
     var c = C(turn), out = (turn.ids || []).map(rec).filter(Boolean);
     var fcodes = codesOn(c);
@@ -195,6 +220,9 @@
       var holds = function (r, code) {
         var f = r.f || [], g = Math.floor(code / 1000);
         if (f.indexOf(code) >= 0) { return true; }
+        // where the shop asks it (search.evidence_filter): a value a check found wrong for it is held only by its own title,
+        // never by its other words (the server's notRefused; Rocks QA, 17.11: studs under "חישוקים" by their picture's words)
+        if (byEvidence() && (r.no || []).indexOf(code) >= 0) { var refused = valueOf(code); if (!(refused && refused.value && plainlySays(decode(r.title || ''), refused.value.l))) { return false; } }
         // a kind of the value is the value, chosen or read: "זהב" holds a ring in "זהב צהוב" (under)
         var me = valueOf(code);
         if (me && me.value && f.some(function (o) { var v = o !== code && Math.floor(o / 1000) === g && valueOf(o); return !!(v && v.value && under(v.value.l, me.value.l)); })) { return true; }
@@ -229,6 +257,7 @@
       };
       var strict = together.length ? pass(true) : [];
       out = strict.length ? strict : pass(false);
+      if (byEvidence()) { out = surestFirst(out, fcodes.filter(function (code) { return c.auto[code] && !c.f[code]; })); }
     }
     // the words read as chips: what says each of them
     // a typed word's chip gives way to the store's word chosen in its place

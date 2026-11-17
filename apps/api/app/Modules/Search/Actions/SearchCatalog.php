@@ -638,12 +638,41 @@ final class SearchCatalog
      * @param  list<string>|null  $only
      * @return array<string, mixed>
      */
-    private function ofLength(string $shopId, array $index, ?int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit): array
+    /**
+     * The codes of whom a search asks for when it asks for nothing else: every word that means something is read as a value of
+     * the store's filter of whom its products are for. [] when a word says more, or the store has no such filter.
+     *
+     * @param  array<string, mixed>  $index
+     * @return list<int>
+     */
+    private static function whomAlone(string $query, array $index): array
+    {
+        $facets = (array) ($index['facets'] ?? []);
+        $words = array_values(array_filter(explode(' ', HebrewSearch::normalize($query)), fn (string $w): bool => mb_strlen($w) >= 2 && ! HebrewSearch::isFiller($w)));
+        if ($words === [] || count($words) > 3) {
+            return [];
+        }
+        $codes = [];
+        $said = [];
+        foreach (HebrewSearch::facets($query, $facets, $index) as $named) {
+            if (! in_array((string) ($facets[intdiv((int) $named['code'], 1000)]['k'] ?? ''), self::WHOM_FACETS, true)) {
+                return [];
+            }
+            $codes[] = (int) $named['code'];
+            $said = [...$said, ...explode(' ', HebrewSearch::normalize((string) $named['said']))];
+        }
+
+        return $codes !== [] && array_diff($words, $said) === [] ? array_values(array_unique($codes)) : [];
+    }
+
+    private function ofLength(string $shopId, array $index, ?int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit, array $codes = []): array
     {
         // no length: every product (a search of actions alone, "מבצעים"); a price only when one was asked
         $products = array_values(array_filter((array) $index['records'], fn (array $r): bool => ($r['t'] ?? null) === 'product'
             && ($days === null || (isset($r['dy']) && abs((int) $r['dy'] - $days) <= self::DAYS_EITHER_WAY))
-            && ($minPrice === null && $maxPrice === null || HebrewSearch::inRange($r['pr'] ?? null, $minPrice, $maxPrice))));
+            && ($minPrice === null && $maxPrice === null || HebrewSearch::inRange($r['pr'] ?? null, $minPrice, $maxPrice))
+            // whom alone: those the store files for them
+            && ($codes === [] || array_intersect($codes, array_map('intval', (array) ($r['f'] ?? []))) !== [])));
         $products = [...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) === 1)), ...array_values(array_filter($products, fn (array $r): bool => ($r['s'] ?? 0) !== 1))];
         $products = HebrewSearch::applyActions($products, $actions);
         $total = count($products);
@@ -730,6 +759,11 @@ final class SearchCatalog
             // "מבצעים", "הכי זול": nothing but what to do asked, every product as asked (Take Me Home, 9.11: "מבצעים" found none)
             if ($index !== null && trim($query) === '' && ($actions['ids'] !== [] || $priceOnly)) {
                 return $this->ofLength($shopId, $index, null, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit);
+            }
+            // whom alone ("נשים", "לילדים"): every product the store files for them, never the few whose text says the word (Miss
+            // Nori, 17.11: 3 of 262; the drawer showed them all, the assistant and every other caller of the search did not)
+            if ($index !== null && ($whom = self::whomAlone($query, $index)) !== []) {
+                return $this->ofLength($shopId, $index, null, $minPrice, $maxPrice, $actions, $only, $count, $perGroup, $visit, $whom);
             }
             // "אני רוצה לקנות מתנה לאשתי טבעת יהלום": a sentence no product holds is searched by what it asks for ("טבעת
             // יהלומ"), then read for filters like any search. Words a product holds together are searched as typed. The
