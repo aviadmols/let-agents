@@ -127,8 +127,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * runs each of v29 and v30: no offer to tell more of the answer's own subject (none in either run, one or two in
      * every v29 run: "תרצו שנפרט מה צריך לצרף להחזרה?" led to "check with our team", Sella), the same facts in the
      * answers; the team's lines the check reads as instructions come as `rules`, never as passages (8a).
+     *
+     * v32 (answer_site and verify_site; v31 was a candidate, its gift rule is in v32) released 17.11, as Aviad asked, on 92
+     * asks from 9 stores (docs/eval/answers-v32-vs-v30*.json in Let Agents): a term of the trade asked about a piece
+     * ("מה זה GH VS?") was explained in 12 runs of 12, against 8 of 12 where the checker took the explanation out as
+     * unsupported or as a repeat and left "not written, our team will help". The checker reads which sentences are the
+     * trade's (`general`). Everything else the same within the difference between two runs.
      */
-    public const PROMPT_VERSION = 30;
+    public const PROMPT_VERSION = 32;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
