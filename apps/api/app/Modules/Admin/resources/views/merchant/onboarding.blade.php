@@ -206,7 +206,6 @@
                     @php($rows = $this->scanRows())
                     @php($learned = $this->learned())
                     @php($tryUrl = $this->tryUrl())
-                    @php($searchable = $this->searchable())
                     <section class="lp-onb-pane" data-pane="scan" data-scanning="{{ $scanning ? '1' : '0' }}">
                         <div class="lp-onb-scan-head">
                             <span @class(['lp-onb-sand', 'is-done' => ! $scanning])><span @class(['lp-onb-mark', 'is-think' => $scanning]) aria-hidden="true"><i></i><i></i></span></span>
@@ -236,33 +235,18 @@
                                 @endif
                             </div>
 
-                            @if ($tryUrl)
-                                {{-- the real drawer on the real store, in the team's preview: a try opens it there with the words typed --}}
-                                <div class="lp-card lp-onb-try" data-try x-data="{ q: '', url: @js($tryUrl), go(words) { words = String(words || '').trim(); const at = this.url + (this.url.includes('?') ? '&' : '?') + (words ? 'la_q=' + encodeURIComponent(words) : 'lsOpen=1'); window.open(at, '_blank', 'noopener'); @if ($edit) $wire.looked(); @endif } }">
+                            {{-- The search box to try the drawer is off for now (as Aviad asked, 17.11). On Shopify the search is in the
+                                 store once the app embed is on: the button that switches it on stays. --}}
+                            @php($embed = $tryUrl ? $this->embedUrl() : null)
+                            @if ($embed !== null)
+                                <div class="lp-card lp-onb-try" data-embed>
                                     <div class="lp-card-t">
-                                        <h2>{{ $t('try.title') }}</h2>
-                                        @if ($searchable !== null)<span class="lp-sample" data-searchable>{{ trans_choice('admin::onboarding.try.knows', $searchable, ['count' => number_format($searchable)]) }}</span>@endif
+                                        <h2>{{ $t('try.embed_title') }}</h2>
                                     </div>
-                                    @php($embed = $this->embedUrl())
-                                    <p class="lp-onb-help">{{ $t($this->live() ? 'try.help_live' : ($embed !== null ? 'try.help_shopify' : 'try.help')) }}</p>
-                                    @if ($embed !== null)
-                                        {{-- on Shopify the search is in the store once the app embed is on: that first, then the try --}}
-                                        <div class="lp-fact" style="align-items: center; margin-block-end: 12px" data-embed>
-                                            <span style="flex: 1">{{ $t('try.embed') }}</span>
-                                            <a href="{{ $embed }}" class="lp-btn lp-btn-sm lp-btn-primary" style="flex: none" target="_blank" rel="noopener" data-embed-link>{{ $t('try.embed_button') }}</a>
-                                        </div>
-                                    @endif
-                                    <form class="lp-set-field lp-set-wide lp-onb-try-field" x-on:submit.prevent="go(q)">
-                                        <svg class="lp-ico" aria-hidden="true"><use href="#lp-i-search"/></svg>
-                                        <input type="search" x-model="q" placeholder="{{ $t('try.placeholder') }}" aria-label="{{ $t('try.label') }}" enterkeyhint="search">
-                                    </form>
-                                    @if ($this->tries() !== [])
-                                        <div class="lp-chips lp-onb-tries">
-                                            @foreach ($this->tries() as $try)
-                                                <button type="button" class="lp-chip lp-chip-sm" x-on:click="go(@js($try))">{{ $try }}</button>
-                                            @endforeach
-                                        </div>
-                                    @endif
+                                    <div class="lp-fact" style="align-items: center">
+                                        <span style="flex: 1">{{ $t('try.embed') }}</span>
+                                        <a href="{{ $embed }}" class="lp-btn lp-btn-sm lp-btn-primary" style="flex: none" target="_blank" rel="noopener" data-embed-link>{{ $t('try.embed_button') }}</a>
+                                    </div>
                                 </div>
                             @endif
                         </div>

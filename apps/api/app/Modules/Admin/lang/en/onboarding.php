@@ -122,6 +122,7 @@ return [
         'help' => 'This is the real search shoppers will get, on the products already scanned. Type anything: the store opens in a new tab, in a preview only you can see.',
         'help_shopify' => 'This is the real search shoppers will get, on the products already scanned. Type anything: the store opens with it in a new tab.',
         'embed' => 'Lets appears in your store once it is on in your theme. Not on yet? The button opens your Shopify theme editor with Lets switched on: just press Save.',
+        'embed_title' => 'Turn Lets on in your store',
         'embed_button' => 'Turn on in your theme',
         'help_live' => 'This is the search shoppers already get in the store. Type anything, and the store opens with it in a new tab.',
         'placeholder' => 'Search for a product, or ask anything',

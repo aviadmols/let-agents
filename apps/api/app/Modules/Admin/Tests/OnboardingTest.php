@@ -168,27 +168,27 @@ final class OnboardingTest extends TestCase
         $this->actingAs($owner)->get("/merchant/{$shop->slug}/overview")->assertOk()->assertSee('data-home', false);
     }
 
-    public function test_on_shopify_the_try_asks_for_lets_to_be_on_in_the_theme_first(): void
+    public function test_on_shopify_the_scan_asks_for_lets_to_be_on_in_the_theme_and_no_store_has_a_try_box(): void
     {
         $this->app->tag([OnboardingTestSteps::class], FirstSteps::STEPS_TAG);
         $this->as(Shop::factory()->onboarding()->create(['platform' => ShopPlatform::Shopify]));
 
-        // the search is in a Shopify store only once the app embed is on: that comes before the try
+        // the search is in a Shopify store only once the app embed is on: the button that switches it on stays; the box to
+        // try the search is off for now (as Aviad asked, 17.11)
         Livewire::test(Onboarding::class)->set('step', 3)
-            ->assertSee('data-try', false)
             ->assertSee('להפעיל בתבנית')
             ->assertSee(OnboardingTestSteps::EMBED, false)
-            ->assertDontSee('בתצוגה מקדימה שרק אתם רואים')
-            ->assertSeeHtmlInOrder(['data-embed-link', 'lp-onb-try-field']);
+            ->assertDontSee('data-try', false)
+            ->assertDontSee('lp-onb-try-field', false);
 
         // once Lets is live there is nothing to switch on
         OnboardingTestSteps::$live = true;
-        Livewire::test(Onboarding::class)->set('step', 3)->assertSee('data-try', false)->assertDontSee('data-embed-link', false);
+        Livewire::test(Onboarding::class)->set('step', 3)->assertDontSee('data-embed-link', false)->assertDontSee('lp-onb-try-field', false);
 
-        // a WooCommerce store has no app embed: its try is as it was
+        // a WooCommerce store has no app embed
         OnboardingTestSteps::$live = false;
         $this->as(Shop::factory()->onboarding()->create());
-        Livewire::test(Onboarding::class)->set('step', 3)->assertSee('data-try', false)->assertDontSee('data-embed-link', false);
+        Livewire::test(Onboarding::class)->set('step', 3)->assertDontSee('data-embed-link', false)->assertDontSee('lp-onb-try-field', false);
     }
 
     public function test_a_viewer_is_not_sent_here_and_changes_nothing_on_it(): void
