@@ -304,7 +304,25 @@ final class SearchFlowTest extends TestCase
         $this->assertNotContains('814', $ids, 'far from the bottles, by meaning or by its picture');
 
         Settings::set('search.meaning_near_words', 0, $this->shop->id);
+        Settings::set('search.meaning_beside_words_min_similarity', 0, $this->shop->id);
         $this->assertContains('814', array_column($this->search('בקבוק')->json('groups.product'), 'external_id'), 'off: as before');
+    }
+
+    public function test_beside_one_product_the_words_found_what_meaning_adds_must_be_near_the_question_itself(): void
+    {
+        // Take Me Home, 17.11: "שמלה" found its one set with a dress (.35 by meaning), and the blankets, "שמיכה" (.37 by meaning,
+        // nearer than the dress), came before it
+        $this->product('821', 'סט בייבי תות שמלה וכובע');
+        $this->product('822', 'שמיכת בייבי');
+        $this->product('823', 'שמיכת פוינטל פרחים');
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->meaning = [
+            ['source' => 'product', 'source_id' => 'a', 'external_id' => '822', 'title' => 'שמיכת בייבי', 'similarity' => 0.378],
+            ['source' => 'product', 'source_id' => 'b', 'external_id' => '823', 'title' => 'שמיכת פוינטל פרחים', 'similarity' => 0.367],
+            ['source' => 'product', 'source_id' => 'c', 'external_id' => '821', 'title' => 'סט בייבי תות', 'similarity' => 0.353],
+        ];
+
+        $this->assertSame(['821'], array_column($this->search('שמלה')->json('groups.product'), 'external_id'));
     }
 
     public function test_a_sentence_no_product_holds_whole_shows_what_says_most_of_it_first(): void

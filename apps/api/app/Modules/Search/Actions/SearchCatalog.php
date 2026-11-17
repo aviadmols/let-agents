@@ -3208,7 +3208,10 @@ final class SearchCatalog
             }
         }
         $near = $share > 0 ? min($strict, $wordsBest * $share) : 0.0;
-        $floor = fn (string $id): float => isset($found[$id]) ? $usual : (count($found) >= self::SPELLED_ENOUGH ? $strict : max($usual, $near));
+        // and beside what the words found, never what is merely as near as the store's nearest: "שמלה" found its one set with a
+        // dress, and the blankets ("שמיכה", .37 by meaning, nearer than the dress) came before it (Take Me Home, 17.11)
+        $beside = $found === [] ? 0.0 : (float) Settings::get('search.meaning_beside_words_min_similarity', $shopId);
+        $floor = fn (string $id): float => isset($found[$id]) ? $usual : (count($found) >= self::SPELLED_ENOUGH ? $strict : max($usual, $near, $beside));
         // best: how near the nearest product is, whatever the floor
         $out = ['products' => [], 'content' => [], 'best' => 0.0];
         // the nearest that stayed under the floor, for the check screen: what a lower floor would have let in
