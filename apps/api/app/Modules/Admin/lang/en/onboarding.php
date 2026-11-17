@@ -137,7 +137,7 @@ return [
         'tags' => '{1} one tag|[2,*] :count tags',
         'answers' => '{1} one ready answer|[2,*] :count ready answers',
         'and' => ' and ',
-        'lead' => '{1} One short step, and you are live. It will wait for you on the home page too.|[2,*] :count short steps, and you are live. They will wait for you on the home page too.',
+        'lead' => '{1} One short step left, and you are live. It will wait for you on the home page too.|[2,*] :count short steps left, and you are live. They will wait for you on the home page too.',
         'home' => 'Go to the home page',
     ],
 ];

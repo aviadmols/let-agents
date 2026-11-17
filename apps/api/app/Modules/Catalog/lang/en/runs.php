@@ -15,7 +15,7 @@ return [
     // A storefront closed to visitors (StorefrontLock): what each reading of its pages did instead.
     'locked' => [
         'sample' => 'Product pages: the store is closed to visitors (a password, maintenance or coming-soon page), so none were read. The products come from :platform; their pages are read once the store opens.',
-        'site' => 'Site pages: the store is closed to visitors (a password, maintenance or coming-soon page), so its pages come from :platform for now. Cleared, having shown only the closed page: :cleared.',
+        'site' => 'Site pages: the store is closed to visitors (a password, maintenance or coming-soon page), so its pages come from :platform for now.',
         'choices' => 'Product pages: the store is closed to visitors, so the choices on them (a length, a size) are read once it opens.',
     ],
 ];
