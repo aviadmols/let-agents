@@ -133,8 +133,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * ("מה זה GH VS?") was explained in 12 runs of 12, against 8 of 12 where the checker took the explanation out as
      * unsupported or as a repeat and left "not written, our team will help". The checker reads which sentences are the
      * trade's (`general`). Everything else the same within the difference between two runs.
+     *
+     * v33 (answer_site; verify_site stays v32) released 17.11 on 11 asks from 6 stores, each by v32 and by v33
+     * (docs/eval/answers-v33-vs-v32-howto.json in Let Agents): a question of how to do something to a thing picks what is
+     * used for it, never the thing itself ("איך מנקים דק סינטטי אחרי החורף?" offered two decks in both v32 runs, a cleaner
+     * in both of v33's); the other answers the same.
      */
-    public const PROMPT_VERSION = 32;
+    public const PROMPT_VERSION = 33;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
