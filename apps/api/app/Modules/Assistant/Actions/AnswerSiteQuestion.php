@@ -2252,7 +2252,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $started = hrtime(true);
 
                         try {
-                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared), $checkOutput, $checkEffort, 'site_check');
+                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared, (array) ($screened['general'] ?? [])), $checkOutput, $checkEffort, 'site_check');
                         } catch (ModelCallFailed $e) {
                             // The check could not be made (its provider refused, a key, an outage): the writer's
                             // words are never shown unchecked. What the store's own pages say, quoted as they
@@ -3425,8 +3425,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array{ref: string, title: string, why: string}>  $picks
      * @param  array{byRef: array<string, array<string, mixed>>, productsByRef: array<string, array<string, mixed>>, analysis: array<string, mixed>}  $prepared
      */
-    public function checkInput(string $question, string $answer, array $cited, array $picks, array $prepared): string
+    public function checkInput(string $question, string $answer, array $cited, array $picks, array $prepared, array $general = []): string
     {
+        // the sentences written from what the trade knows, for a checker that reads them (verify_site v32): without them it took
+        // the explanation of a grade out as unsupported and left "it is not written, our team will help" (Rocks, 17.11: GH VS)
+        $trade = $general !== [] && self::promptReads('verify_site', $this->promptVersions['verify_site'] ?? self::releasedVersion('verify_site'), 'general')
+            ? ['general' => array_values($general)] : [];
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'analysis' => $analysis] = $prepared;
         // An answer about the product whose page it is, picking none, rests on that product as much as on the pages it
         // cites: the checker reads it as a pick, with what code measured. Without it "46–50" for the ring of the page was
@@ -3444,7 +3448,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         return (string) json_encode([
             'question' => $question,
             'answer' => $answer,
-        ] + $conversation + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + [
+        ] + $conversation + (isset($prepared['now']) ? ['now' => $prepared['now']] : []) + $trade + [
             'passages' => array_map(fn (string $ref): array => ['title' => $byRef[$ref]['title'], 'text' => $byRef[$ref]['text']] + (in_array($byRef[$ref]['from'] ?? null, self::OWN_WORD, true) ? ['from' => $byRef[$ref]['from']] : []), $cited),
             'picks' => array_map(fn (array $pick): array => ['ref' => $pick['ref'], 'title' => $pick['title'], 'about' => $productsByRef[$pick['ref']]['about'], 'why' => $pick['why']] + array_intersect_key($this->forModel([$pick['ref'] => $productsByRef[$pick['ref']]], $analysis)[0], array_flip(['brand', 'in_stock', 'on_sale', 'price', 'option_prices', 'price_rank']))
                 // the sizes it is made in and the one it is, as the writer had them: code's measures, not a claim to refuse
