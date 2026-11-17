@@ -750,7 +750,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             $saved = null;
         }
 
-        $answered = $saved !== null && $saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED;
+        // (and one with words: an empty one kept before 17.11 is asked afresh)
+        $answered = $saved !== null && $saved->status === AssistantAnswer::SHOWN && $saved->outcome === AssistantAnswer::ANSWERED && ($saved->source === 'team' || trim((string) $saved->answer) !== '');
 
         // A written answer is everyone's once it is shared (enough different visitors got it clean,
         // or the team approved it). Before that, only a visitor who already got it gets it again,
@@ -2283,6 +2284,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                         if (($applied['revised'] ?? false) && $answer !== '') {
                             [$answer, $fixRefusal] = self::gate($answer, $screened['known'], $screened['pages']);
                             $refusal = $answer === '' && $picks === [] ? ($fixRefusal ?? 'check_unfixed') : null;
+                        }
+                        // an answer the check left no words of is no answer, whatever cards it kept: Rocks, 17.11, "מחפשת מתנה לאמא"
+                        // was a gift card's card with nothing to read, saved and served again. The shopper is offered the team.
+                        if (trim($answer) === '' && $refusal === null) {
+                            $refusal = 'check_unfixed';
                         }
                         // An attempt to instruct the assistant counts against the visitor.
                         $flags['safe'] = $applied['safe'];
@@ -5117,6 +5123,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         $saved = self::siteAnswers()->where('question_key', Question::key($question))->first();
+
+        // never an answer of no words kept as answered
+        if ($outcome === AssistantAnswer::ANSWERED && trim((string) $answer) === '') {
+            return $saved;
+        }
 
         if ($saved !== null && $saved->outcome === AssistantAnswer::ANSWERED && $outcome !== AssistantAnswer::ANSWERED) {
             return $saved;

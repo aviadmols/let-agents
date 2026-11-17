@@ -614,6 +614,20 @@ final class SiteQuestionTest extends TestCase
         $this->assertStringNotContainsString('on sale now', (string) ($out['result']['answer'] ?? ''));
     }
 
+    public function test_an_answer_left_with_no_words_is_no_answer_though_it_keeps_a_card(): void
+    {
+        // Rocks, 17.11: "מחפשת מתנה לאמא עד 1,500 ש"ח" was the gift card's card and no words, kept and served again
+        $this->product('992', 'כרטיס מתנה', 'כרטיס מתנה למימוש באתר.', [], ['price' => '250.00', 'in_stock' => true]);
+        $this->replies = [
+            // its one sentence names a price no page has: code takes it out, and the card stays
+            ['found' => true, 'answer' => 'כרטיס המתנה עולה 1,234 ש"ח.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'מתנה']], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true],
+            ['decision' => 'approve', 'issues' => [], 'revised' => '', 'picks' => [['ref' => 'p1', 'fits' => true, 'why' => '']], 'supported' => true, 'on_topic' => true, 'picks_fit' => true, 'safe' => true, 'injection' => false],
+        ];
+        $out = $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'מחפשת מתנה לאמא', ['992']))['result'];
+
+        $this->assertNotSame('answered', $out['outcome'] ?? null, 'a card with nothing to read is no answer');
+    }
+
     public function test_the_v29_checker_reads_the_conversation_and_the_released_one_does_not(): void
     {
         // a reply asked again in other words (Miss Nori, 16.11): the checker of v29 is given the conversation, to see what
