@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\FirstStep;
@@ -14,6 +15,7 @@ use App\Modules\Search\Models\SearchLog;
 use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Two of the shop's first steps, the search's own:
@@ -35,10 +37,16 @@ final class SearchFirstSteps implements FirstSteps
 
     public function steps(Shop $shop): array
     {
-        $live = $this->live();
+        $live = $this->live() || $this->embedded($shop);
         $connection = app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $shop->id)->first());
         $site = $connection?->site_url ?: ($shop->domain ? 'https://'.$shop->domain : null);
         $preview = $site === null ? null : rtrim($site, '/').'/'.($connection !== null && ! $live ? '?let_agents_preview='.$connection->previewKey() : '');
+        // a Shopify store still behind its password: its front door shows the password page, not the search. The search
+        // check here shows the store's own search on its own products instead (App Store review, 17.11)
+        $locked = $preview !== null && app(StorefrontLock::class)->locked($shop) && Route::has('filament.merchant.pages.search.check');
+        if ($locked) {
+            $preview = route('filament.merchant.pages.search.check', ['tenant' => $shop]);
+        }
         $looked = DB::table('shop_notices_done')->where('shop_id', $shop->id)->where('key', self::LOOK_DONE)->exists();
         // a Shopify store switches Lets on in its theme: the theme editor opens with the app embed on, one Save away
         $embed = $shop->platform === ShopPlatform::Shopify ? $this->embedUrl($shop) : null;
@@ -62,7 +70,8 @@ final class SearchFirstSteps implements FirstSteps
                 button: __('search::home.step.look.button'),
                 url: $preview,
                 done: $looked || $live,
-                external: true,
+                // the search check opens here, in the same window: a new tab out of the Shopify admin is signed out
+                external: ! $locked,
             ),
         ];
     }
@@ -78,6 +87,17 @@ final class SearchFirstSteps implements FirstSteps
         }
 
         return null;
+    }
+
+    /**
+     * A Shopify store loads Lets only through its app embed: any page of it that loaded Lets, the team's own look in
+     * preview too, means the embed is on. "Turn Lets on in the store" stayed open after it was switched on and saved,
+     * a store behind its password having no shopper to visit it (App Store review, 17.11). Paused, it is not on.
+     */
+    private function embedded(Shop $shop): bool
+    {
+        return $shop->platform === ShopPlatform::Shopify && Features::enabled('search.storefront', $shop->id)
+            && AnalyticsVisit::query()->where('created_at', '>=', now()->subDays(14))->exists();
     }
 
     private function live(): bool
