@@ -148,6 +148,12 @@ final class HebrewSearch
     /** A word is known to the catalogue when one of its words is at least this close to it. */
     public const KNOWN = 0.75;
 
+    /** A word that names nothing to look for: a question or filler word, or "something", "products" (as the engine writes it). */
+    public static function saysNothing(string $word): bool
+    {
+        return in_array($word, self::FILLER, true) || in_array($word, self::DESCRIBES, true) || in_array($word, self::GENERIC, true);
+    }
+
     /**
      * The words of a query the catalogue has nothing close to: "חולצה" in a jewellery store (its nearest,
      * "חוליה", at .47). Not a question or filler word, not a number, three letters or more.

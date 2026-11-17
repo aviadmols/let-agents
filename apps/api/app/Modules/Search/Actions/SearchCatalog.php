@@ -3593,7 +3593,7 @@ final class SearchCatalog
     private function answeredWith(string $query, array $unknown, array $records): array
     {
         // the search's other words: each said by the question or by the product itself ("כלוב ציפורים" is neither's)
-        $rest = array_values(array_filter(array_diff(explode(' ', HebrewSearch::normalize($query)), array_map('strval', $unknown)), fn (string $word): bool => mb_strlen($word) >= 3));
+        $rest = array_values(array_filter(array_diff(explode(' ', HebrewSearch::normalize($query)), array_map('strval', $unknown)), fn (string $word): bool => mb_strlen($word) >= 3 && ! HebrewSearch::saysNothing($word)));
         $words = array_map(fn (string $word): string => HebrewSearch::withFinals($word), array_map('strval', $unknown));
         if ($words === [] || array_filter($words, fn (string $word): bool => mb_strlen($word) < 3) !== []) {
             return [];

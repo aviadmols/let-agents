@@ -128,6 +128,11 @@
   // places are turned into the words this drawer counts (wordsOf); where those differ in number ("80 על 150", one size),
   // the words are read as this drawer counts them. A value the shopper took off, or one this store's shoppers keep taking
   // off, is never read, and its words are free for another.
+  // whether a word is one of the store's search's orders (its index's actions: "גדול", "זול", "חדש"), as the server reads them
+  function ordered(word) {
+    var E = S.engine;
+    try { return !!(E && E.readActions && E.readActions(word, (S.index && S.index.actions) || []).actions.ids.length); } catch (e) { return false; }
+  }
   function readValues(c, q) {
     var E = S.engine;
     if (!E || !E.readFacets || !E.facetWords) { return []; }
@@ -307,6 +312,9 @@
       // "בלי כפתורים": a chip that keeps away what says it
       var not = WITHOUT_WORD.test(w) && words[i + 1] && taken.indexOf(i + 1) < 0;
       var word = not ? words[i + 1] : w;
+      // a word the store's search reads as an order, never a thing a product must say ("שרשרת עם אבן אדומה גדולה": the server
+      // puts the biggest first among all of them; here "גדולה" was asked of every product and left one: Rocks, 17.11)
+      if (!not && ordered(word)) { return; }
       if (word.length < 3 || STOP.test(word) || ASKS_ONLY.test(word) || /\d/.test(word)) { return; }
       var n = E.normalize(word), key = (not ? '-' : '') + n;
       if (!n || c.no['w:' + key] || c.words[key] || noChip(word)) { return; }

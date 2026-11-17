@@ -41,6 +41,7 @@ final class AnsweredWithTest extends TestCase
 
         $this->assertSame('1', $ids('נגד ציפורים')[0] ?? null, 'the answered question says the word no product does');
         $this->assertSame('1', $ids('ציפורים')[0] ?? null);
+        $this->assertSame('1', $ids('משהו נגד ציפורים')[0] ?? null, 'a word that names nothing asks for nothing');
         $this->assertSame('1', $ids('הרחקת ציפורים')[0] ?? null, 'a word the product itself says');
         $this->assertNotContains('1', $ids('כלוב ציפורים'), 'a word neither the question nor the product says');
         $this->assertNotContains('4', $ids('ערסל'), 'not in stock');
