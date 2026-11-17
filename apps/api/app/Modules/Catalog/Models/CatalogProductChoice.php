@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property float|null $size the size the page says the product itself is ("מידה נוכחית: 54")
  * @property string|null $size_label how the page names it
  * @property list<float>|null $sizes every size the page offers it in, its own among them, when it offers others ("הגדלה ל 54")
+ * @property string|null $size_note what the page says of changing its size, as it writes it ("לא ניתן לשנות את המידה")
  * @property string|null $form_hash
  * @property string|null $product_hash the product's hash when its page was read
  * @property Carbon|null $checked_at

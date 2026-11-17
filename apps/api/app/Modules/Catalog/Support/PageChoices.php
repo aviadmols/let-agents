@@ -148,6 +148,25 @@ final class PageChoices
         return null;
     }
 
+    /**
+     * What the page says of changing the product's size, as it writes it: "לא ניתן לשנות את המידה", "ניתן להגדיל עד 2 מידות",
+     * "This ring cannot be resized". The sentence that says it, at most 200 characters, or null when the page says nothing
+     * of it. Read only where the page says the product is of one size (size()).
+     */
+    public static function sizeNote(string $html): ?string
+    {
+        // every tag a sentence's end: "59</div><p>לא ניתן" is two sentences, never "59לא ניתן"
+        $text = html_entity_decode((string) preg_replace('~<[^>]+>~u', ' . ', (string) preg_replace('~<(script|style)\b.*?</\1>~siu', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = (string) preg_replace('/\s+/u', ' ', $text);
+        $change = '(?:(?:לא\s+)?(?:ניתן|אפשר|ניתנת|ניתנות)|אין\s+אפשרות|ללא\s+אפשרות)\s+(?:ל)?(?:שנות|שינוי|הגדיל|הגדלת|הקטין|הקטנת|התאים|התאמת|הרחיב)[^.]{0,40}?מיד(?:ה|ת|ות)';
+        $english = '(?:can(?:not|\x27t)?|could|may|not)\s+(?:be\s+)?resiz(?:ed|able)|resiz(?:ing|able)\s+(?:is\s+)?(?:not\s+)?(?:possible|available)|non[- ]resizable|no\s+resizing';
+        if (preg_match('/[^.!?]{0,60}(?:'.$change.'|'.$english.')[^.!?]{0,60}/iu', $text, $m) !== 1) {
+            return null;
+        }
+
+        return mb_substr((string) preg_replace('/^[\s\-–:]+|[\s\-–:]+$/u', '', $m[0]), 0, 200);
+    }
+
     /** The other sizes are within this many of the one it is: a resize, not a size table's whole range. */
     private const RESIZE_REACH = 15;
 

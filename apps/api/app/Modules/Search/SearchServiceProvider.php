@@ -92,6 +92,10 @@ final class SearchServiceProvider extends ModuleServiceProvider
         RateLimiter::for('search', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search:'.$request->ip().'|'.$request->route('site')));
 
+        // what every page reads and each search's count, three times the searches' own: many visitors share one address
+        RateLimiter::for('search-page', fn (Request $request): Limit => Limit::perMinute(3 * (int) Settings::get('search.requests_per_minute'))
+            ->by('search-page:'.$request->ip().'|'.$request->route('site')));
+
         // A shared search is opened by a shopper and by their AI, a few times each.
         RateLimiter::for('search-share', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search.requests_per_minute'))
             ->by('search-share:'.$request->ip()));

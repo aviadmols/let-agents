@@ -24,14 +24,19 @@ Route::get('search/lets-search.js', LetsSearchScriptController::class)->name('ap
 // it serves the same drawer, which reads their LetAgentsSearchContext as its settings.
 Route::get('search/let-agents-search.js', LetsSearchScriptController::class)->name('api.search.script');
 
-Route::middleware('throttle:search')->group(function (): void {
+// Read on every page a shopper opens, and the count of each search: a limit of their own, so a shop's visitors behind one
+// network never use up the searches' and similar items' (Rocks, 17.11: "0 similar items" was a 429).
+Route::middleware('throttle:search-page')->group(function (): void {
     Route::get('search/{site}/index', SearchIndexController::class)->name('api.search.index');
     // How the drawer looks and where it takes over: read on every page, small and cached.
     Route::get('search/{site}/look', [SearchIndexController::class, 'look'])->name('api.search.look');
+    Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
+});
+
+Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/similar', SimilarController::class)->name('api.search.similar');
     Route::get('search/{site}/sizes', SizeHelpController::class)->name('api.search.sizes');
     Route::get('search/{site}', SearchController::class)->name('api.search.query');
-    Route::post('search/{site}/events', SearchEventsController::class)->name('api.search.events');
     Route::post('search/{site}/share', ShareController::class)->name('api.search.share');
     // A shared link, opened on the store: what the drawer showed, as it was.
     Route::get('search/{site}/shared/{token}', SharedViewController::class)->name('api.search.shared');

@@ -4429,7 +4429,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $shown)->get()->keyBy('external_id');
         // the size each one's own page says it is, and the sizes it is made in, where the store keeps them outside its variants
-        $pages = CatalogProductChoice::query()->whereIn('product_id', $products->pluck('id'))->whereNotNull('size')->get(['product_id', 'size', 'sizes'])->keyBy('product_id');
+        $pages = CatalogProductChoice::query()->whereIn('product_id', $products->pluck('id'))->whereNotNull('size')->get(['product_id', 'size', 'sizes', 'size_note'])->keyBy('product_id');
         // A question about one product or two (from its page, a comparison) reads their descriptions
         // whole enough to say what is special; a list of results needs a line each.
         $aboutChars = count($shown) <= 2 ? 1500 : 300;
@@ -4445,7 +4445,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             $out[] = [
                 'external_id' => (string) $product->external_id,
                 'title' => (string) $product->title,
-                'about' => mb_substr(self::about($product), 0, $aboutChars),
+                // what its page says of changing its size, in its words, first: "לא ניתן לשנות את המידה" under a ring of 59 was
+                // not read, and the answer said it can be enlarged, from a guide on rings in general (Rocks, 17.11)
+                'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product)), 0, $aboutChars),
                 'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
                 'brand' => $product->brand,
                 'in_stock' => (bool) $product->in_stock,

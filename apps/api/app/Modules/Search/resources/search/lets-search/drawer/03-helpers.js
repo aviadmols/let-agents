@@ -92,6 +92,13 @@
     delete opts.wait;
     if (ctl) { opts.signal = ctl.signal; timer = setTimeout(function () { ctl.abort(); }, wait); }
     return win.fetch(url, opts).then(function (r) {
+      // too many requests from this address (a shop's visitors behind one network, a busy minute): once more a moment later,
+      // never shown as "nothing found" (Rocks, 17.11: "0 similar items" was a refusal)
+      if (r.status === 429 && !opts._again && (!opts.method || opts.method === 'GET')) {
+        clearTimeout(timer);
+        var after = Math.min(5, Math.max(1, parseInt(r.headers.get('Retry-After') || '2', 10) || 2));
+        return new Promise(function (go) { setTimeout(go, after * 1000); }).then(function () { return json(url, Object.assign({}, opts, { _again: true, signal: undefined, wait: wait })); });
+      }
       return r.json().catch(function () { return {}; }).then(function (body) { clearTimeout(timer); return { ok: r.ok, status: r.status, body: body }; });
     }, function (e) { clearTimeout(timer); throw e; });
   }

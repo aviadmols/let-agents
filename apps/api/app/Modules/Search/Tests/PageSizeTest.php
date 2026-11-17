@@ -32,6 +32,12 @@ final class PageSizeTest extends TestCase
         $this->assertSame(7.0, PageChoices::size('<p>Ring size: 7</p>')['size']);
         $this->assertNull(PageChoices::size('<p>משקל: 2.5 גרם</p><p>מידה: 30 ס"מ</p>'), 'a length is not a ring size');
         $this->assertNull(PageChoices::size('<table><tr><td>מידה: 48</td></tr></table>'), 'a size table says no one size');
+
+        // what the page says of changing it, in its words (Rocks, 17.11: "לא ניתן לשנות את המידה" under a ring of 59, unread)
+        $this->assertSame('לא ניתן לשנות את המידה', PageChoices::sizeNote('<div>מידה נוכחית : 59</div><p>לא ניתן לשנות את המידה</p>'));
+        $this->assertSame('This ring cannot be resized', PageChoices::sizeNote('<p>This ring cannot be resized.</p>'));
+        $this->assertSame('ניתן להגדיל עד 2 מידות בתיאום', PageChoices::sizeNote('<p>מידה: 52. ניתן להגדיל עד 2 מידות בתיאום</p>'));
+        $this->assertNull(PageChoices::sizeNote('<p>מידה: 54</p><p>משלוח חינם</p>'));
     }
 
     public function test_a_product_whose_page_asks_a_choice_opens_its_choices_not_an_add_the_store_refuses(): void
