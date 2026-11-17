@@ -204,6 +204,19 @@
     return list.map(function (r, at) { return { r: r, s: r.s === 1 ? 1 : 0, t: tier(r), at: at }; })
       .sort(function (a, b) { return (b.s - a.s) || (b.t - a.t) || (a.at - b.at); }).map(function (x) { return x.r; });
   }
+  // how wholly a product is of the colour asked, by its picture's main colours (mc): that colour alone 2, first of two 1. A
+  // variant filed "black" whose picture is burgundy (Authentic, "Black/Red") passes the filter, and comes after the black
+  // shoes (VANS QA, 17.11)
+  function shadeOf(c) {
+    var E = S.engine, norm = function (w) { return E && E.normalize ? E.normalize(String(w)) : String(w).toLowerCase(); };
+    var colours = codesOn(c).filter(function (code) { var f = S.facets[Math.floor(code / 1000)]; return f && /colou?r/.test(String(f.k)); })
+      .map(function (code) { var v = valueOf(code); return v && v.value ? norm(v.value.l) : null; }).filter(Boolean);
+    if (!colours.length) { return function () { return 0; }; }
+    return function (r) {
+      var mc = (r.mc || []).map(norm);
+      return !mc.length ? 0 : mc.every(function (m) { return colours.indexOf(m) >= 0; }) ? 2 : colours.indexOf(mc[0]) >= 0 ? 1 : 0;
+    };
+  }
   function filtered(turn) {
     var c = C(turn), out = (turn.ids || []).map(rec).filter(Boolean);
     var fcodes = codesOn(c);
@@ -282,8 +295,11 @@
       // ("Oily Coal Combo", black and grey: Naot QA, 16.11), each in the search's order
       // and a tag read from the words ("Sandals") first on what its own name or picture says it is: a clog the store files
       // under "Men > Sandals" after the sandals (Naot QA, 16.11: "Fiord")
-      var pure = onlyColour(c), kind = seenAs(c);
-      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || pure(b) - pure(a) || kind(b) - kind(a); });
+      // ...and before both, what its own name says the search is: black flip-flops after the black shoes (VANS QA, 17.11), where
+      // some names say it
+      var pure = onlyColour(c), kind = seenAs(c), shade = shadeOf(c), says = namesSearch(turn);
+      if (!out.some(function (r) { return says(r); })) { says = function () { return 0; }; }
+      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || says(b) - says(a) || pure(b) - pure(a) || shade(b) - shade(a) || kind(b) - kind(a); });
     }
     // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
     // apart (Naot QA, 15.11). Under names of their own ("Julius - BA6 Soft Black") each keeps its card.
