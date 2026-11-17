@@ -35,8 +35,11 @@
             <x-lp::kv-row :label="$t('selector')" :tip="$t('selector_tip')" :error="$this->problem('selector')">
                 <x-lp::field model="data.selector" :ltr="true" placeholder="input.header__search-input, #search-field" />
             </x-lp::kv-row>
-            <x-lp::kv-row :label="$t('own')"><code class="lp-snip">{{ $t('own_snip') }}</code></x-lp::kv-row>
-            <x-lp::kv-row :label="$t('button')"><code class="lp-snip">{{ $t('button_snip') }}</code></x-lp::kv-row>
+            {{-- A Shopify store is never asked to put code in its theme: the app embed is its way in (App Store review) --}}
+            @unless ($shopify)
+                <x-lp::kv-row :label="$t('own')"><code class="lp-snip" data-snip="own">{{ $t('own_snip') }}</code></x-lp::kv-row>
+                <x-lp::kv-row :label="$t('button')"><code class="lp-snip" data-snip="button">{{ $t('button_snip') }}</code></x-lp::kv-row>
+            @endunless
         </x-lp::kv>
     </x-lp::card>
 

@@ -22,6 +22,7 @@ use App\Modules\Search\Filament\Merchant\Pages\ShopSearches;
 use App\Modules\Search\Models\SearchAnswerRating;
 use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Search\Support\SearchHome;
+use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -281,6 +282,14 @@ final class SearchSettingsPagesTest extends TestCase
         $page->set('data.selector', '')->call('save');
         $this->assertNull(Settings::overrideFor('search.input_selector', $this->shop->id));
         $this->assertSame('input[name="s"], input[type="search"]', Settings::get('search.input_selector', $this->shop->id));
+
+        // a Shopify store is never asked to put code in its theme: the app embed is its way in (App Store review)
+        $this->shop->forceFill(['platform' => ShopPlatform::Shopify])->save();
+        Livewire::test(ManualConnectSettings::class)->assertOk()
+            ->assertSee('Shopify')
+            ->assertDontSee('data-lets-search', false)
+            ->assertDontSee('data-lets-open', false)
+            ->assertDontSee('data-snip', false);
     }
 
     public function test_the_old_search_pages_leave_the_settings_menu_and_still_open(): void
