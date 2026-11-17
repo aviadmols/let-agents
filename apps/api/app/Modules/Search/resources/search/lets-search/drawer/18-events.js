@@ -302,6 +302,7 @@
       if (rt.kind === 'answer') { askTurn(rt.q, null, !!rt.ctx); } else if (rt.kind === 'results') { searchTurn(rt.q); } else if (rt.kind === 'similar') { similarTurn(rt.of, rt.oos ? null : rt.size, rt.oos ? { whole: rt.oos.whole, want: rt.oos.want, size: rt.size } : null, rt.other, rt.asked); }
       return;
     }
+    if (d.leadOpen) { var lo = turnById(d.leadOpen); if (lo && lo.leadFlow && lo.leadFlow.state === 'offer') { lo.leadFlow.state = null; lo.leadFlow.busy = true; learn('lead_start', null, null, {}); leadStep(lo, {}); } return; }
     if (d.leadFlowNo) { var ln = turnById(d.leadFlowNo); if (ln && ln.leadFlow && !ln.leadFlow.busy) { leadStep(ln, { declined: true }); } return; }
     if (d.leadCodeSkip) { var cs = turnById(d.leadCodeSkip); if (cs) { update(cs, { lead: 'done', codeErr: '' }); } return; }
     if (d.partialOpen) { var po = turnById(d.partialOpen); if (po) { update(po, { partialOpen: true }); } return; }

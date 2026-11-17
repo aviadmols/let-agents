@@ -54,11 +54,12 @@
         learn('chat_question', null, null, { length: Math.min(2000, Math.max(1, q.length)), answered_from: d.from === 'bank' ? 'bank' : d.outcome === 'answered' ? 'rag' : 'none' });
         if (d.outcome === 'answered') {
           // a shopper who got an answer is worth asking, once a page, and only where the shop set it up
-          var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: null, busy: true } : null;
+          // ...as a button under the answer: its form opens only when pressed. Opened at once, its field stood under the
+          // reply box, two boxes to type in one under the other (Gueta, 17.11)
+          var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: 'offer', busy: false } : null;
           if (lead) { LEARN.offered = true; }
           update(turn, { loading: false, answer: d.answer, picks: [], sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead, team: !!d.team, noAnswer: d.no_answer || null });
           announce(t('announceReady') + ': ' + d.answer);
-          if (lead) { learn('lead_start', null, null, {}); leadStep(turn, {}); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
@@ -186,6 +187,8 @@
   function leadFlowHtml(turn) {
     var lf = turn.leadFlow;
     if (!lf) { return ''; }
+    // not opened yet: the one button that opens it
+    if (lf.state === 'offer') { return '<div style="margin-top:14px"><button type="button" class="ls-btn ls-btn--secondary ls-btn--sm" data-lead-open="' + turn.id + '">' + esc(bankLabel('lead_open', t('leadOpen'))) + '</button></div>'; }
     if (lf.state === 'declined') { return '<p class="ls-noanswer__text" style="margin-top:14px">' + esc(bankLabel('lead_declined', t('leadDeclined'))) + '</p>'; }
     if (lf.state === 'done') { return '<div class="ls-done ls-focus-in" style="margin-top:14px"><span class="ls-done__icon"><svg class="ls-icon ls-check ls-check--draw" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5 10 17l8.5-9.5"/></svg></span><div style="font-weight:500">' + esc(lf.promise || bankLabel('lead_thanks', t('leadDone', { name: '', when: '' }))) + '</div></div>'; }
     if (!lf.state) { return '<div style="margin-top:14px">' + thinking() + '</div>'; }
@@ -332,7 +335,9 @@
     // the team offered under a partial answer, right under it and above the reply box (as Aviad asked, 11.11)
     html += partialHtml(turn);
     // the newest answer can be replied to ("לאיזו מטרה?" "לחיזוק חיסון"): the reply is asked with this conversation
-    if (newestAnswer() === turn && turn.answer) {
+    // ...but not while the shopper fills in their details: one box to type in at a time
+    var leaving = turn.leadFlow && ['offer', 'declined', 'done'].indexOf(turn.leadFlow.state) < 0;
+    if (newestAnswer() === turn && turn.answer && !leaving) {
       html += '<form class="ls-askabout__form ls-reply" data-reply="' + esc(turn.id) + '"><label class="ls-field ls-field--sm">' +
         '<input type="text" enterkeyhint="send" maxlength="300" dir="' + DIR + '" placeholder="' + esc(t('replyPh')) + '" aria-label="' + esc(t('replyPh')) + '">' +
         '<button class="ls-ibtn ls-ibtn--solid ls-ibtn--sm" aria-label="' + esc(t('send')) + '">' + icon('send', 'ls-icon--sm') + '</button></label></form>';

@@ -191,6 +191,7 @@ return [
         'lead_ask_field' => 'מה :field שלכם?',
         'lead_next' => 'הבא',
         'lead_finish' => 'שליחה',
+        'lead_open' => 'להשארת פרטים לנציג',
         'lead_no' => 'לא תודה, רק רציתי לשאול',
         'lead_declined' => 'בסדר גמור. אפשר להמשיך לשאול אותי כל דבר.',
         'lead_consent_ask' => 'עוד דבר אחד לפני שנשמור:',

@@ -191,6 +191,7 @@ return [
         'lead_ask_field' => 'What is your :field?',
         'lead_next' => 'Next',
         'lead_finish' => 'Send',
+        'lead_open' => 'Leave your details for our team',
         'lead_no' => 'No thanks, I just wanted to ask',
         'lead_declined' => 'Of course. Ask me anything else.',
         'lead_consent_ask' => 'One more thing before we keep it:',
