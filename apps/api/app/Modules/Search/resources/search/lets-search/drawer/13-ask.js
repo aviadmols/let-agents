@@ -72,6 +72,10 @@
     // as SiteAskController reads it: the visitor (a daily limit), the products shown with the question (the
     // assistant picks from them), the turn before's (for "מה הכי זול?"), and page=1 when it is about this product
     var shown = prev ? filtered(prev).slice(0, 12).map(function (r) { return pid(r.id); }) : [];
+    // A question of how, why or when that points at nothing on the screen: what the words found is what it is asked about,
+    // not what answers it. "איך מנקים דק סינטטי אחרי החורף?" went with four synthetic decks, and the answer offered the
+    // decks, where asked with none it offered the cleaner (Gueta, 17.11). The assistant finds its own products for it.
+    if (ASKS_HOW.test(q) && !/(^|\s)(זה|זו|זאת|הזה|הזו|הזאת|אותו|אותה|אותם|אלה|אלו|מהם|ביניהם|it|this|these|them|those)(\s|[?.!,]|$)/i.test(q)) { shown = []; }
     // on a product's page, a question in the search box that points at it ("האם אפשר לשריין את המוצר הזה?", Rocks 9.11:
     // answered for no product) is about that product, as one asked from its page
     var onPage = S.ctx && (turn.ctx || (!shown.length && (POINTS_AT_IT.test(q) || RESIZES_IT.test(q))));

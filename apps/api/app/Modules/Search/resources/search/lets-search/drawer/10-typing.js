@@ -269,10 +269,16 @@
   // the Lets mark in a small white circle, at the start of a list row
   function markDot() { return '<span class="ls-markdot" aria-hidden="true">' + mark() + '</span>'; }
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
+  // the words a question of how, why or when opens with, in the drawer's languages: a question for an answer, not a search
+  var ASKS_HOW = /^(איך|כיצד|למה|מדוע|מתי|כל כמה|how|why|when)(\s|$)/i;
   function liveHtml(lv) {
     // a question gets its "ask" row here, above the results: the results then say what they say without a second one
     lv.askShown = isQuestion(lv.q);
     var html = lv.askShown ? askRow(lv.q, true) : '';
+    // A question of how, why or when asks for an answer, not for the products that hold its words: "איך מנקים דק סינטטי
+    // אחרי החורף?" showed four synthetic decks under it, none a cleaner (Gueta, 17.11). Its answer brings the products that
+    // answer it; until then the ask card stands alone.
+    if (lv.askShown && ASKS_HOW.test(String(lv.q || '').trim())) { lv.loading = false; return html; }
     lv.loading = (!lv.server || !!lv.pending) && !(lv.ids || []).length;
     // no bubble repeating what is being typed: the search line above already says it
     return html + '<section class="ls-turn ls-turn--live">' + resultsHtml(lv) + '</section>';
