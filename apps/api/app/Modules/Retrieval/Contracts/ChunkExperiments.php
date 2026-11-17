@@ -15,9 +15,10 @@ interface ChunkExperiments
 {
     /**
      * @param  list<string>  $sources  product, content
+     * @param  string  $cut  size: as the index cuts today (Chunker::split); sections: at the headings, each piece under its path (Chunker::sections)
      * @return list<array{source: string, source_id: string, external_id: string|null, title: string, text: string, similarity: float}> nearest first, at most two pieces per document
      */
-    public function near(string $shopId, string $text, int $chunkChars, array $sources, int $limit): array;
+    public function near(string $shopId, string $text, int $chunkChars, array $sources, int $limit, string $cut = 'size'): array;
 
     /** What cutting and embedding the pages again cost so far, in USD. */
     public function spent(): float;

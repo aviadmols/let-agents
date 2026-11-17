@@ -40,7 +40,7 @@ final class InMemoryChunkExperiments implements ChunkExperiments
         private readonly RecordsRuns $runs,
     ) {}
 
-    public function near(string $shopId, string $text, int $chunkChars, array $sources, int $limit): array
+    public function near(string $shopId, string $text, int $chunkChars, array $sources, int $limit, string $cut = 'size'): array
     {
         $vector = app(QueryVectors::class)->for($shopId, $text);
 
@@ -57,7 +57,7 @@ final class InMemoryChunkExperiments implements ChunkExperiments
 
         if (in_array('content', $sources, true)) {
             $seed = VectorSearch::normalize($vector);
-            foreach ($this->pieces($shopId, $chunkChars) as $piece) {
+            foreach ($this->pieces($shopId, $chunkChars, $cut) as $piece) {
                 if (count($piece['vector']) !== count($seed)) {
                     continue;
                 }
@@ -97,16 +97,16 @@ final class InMemoryChunkExperiments implements ChunkExperiments
      *
      * @return list<array{source: string, source_id: string, external_id: string|null, title: string, text: string, vector: list<float>}>
      */
-    private function pieces(string $shopId, int $chunkChars): array
+    private function pieces(string $shopId, int $chunkChars, string $cut = 'size'): array
     {
-        $key = $shopId.'|'.$chunkChars;
+        $key = $shopId.'|'.$chunkChars.'|'.$cut.(config('retrieval.notes_once') === true ? '|once' : '');
         if (isset($this->pieces[$key])) {
             return $this->pieces[$key];
         }
 
         $pieces = [];
         foreach ($this->content->documents($shopId) as $document) {
-            foreach (Chunker::split($document->title, $document->text, $chunkChars) as $text) {
+            foreach ($cut === 'sections' ? Chunker::sections($document->title, $document->text, $chunkChars) : Chunker::split($document->title, $document->text, $chunkChars) as $text) {
                 $pieces[] = ['source' => 'content', 'source_id' => (string) $document->sourceId, 'external_id' => $document->externalId, 'title' => $document->title, 'text' => $text, 'vector' => []];
             }
         }

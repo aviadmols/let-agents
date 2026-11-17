@@ -1284,11 +1284,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         $order = array_flip(array_keys(self::WRITTEN_BY));
         // the team's long texts are not read whole: their pieces near the question came with the pages (addText)
         $entries = CatalogContent::query()->active()->where('type', CatalogContent::KNOWLEDGE)->where('external_id', 'not like', BuildShopKnowledge::TEXT_PREFIX.'%')
-            ->orderBy('external_id')->get(['id', 'external_id', 'title', 'body'])
+            ->orderBy('external_id')->get(['id', 'external_id', 'title', 'body', 'terms'])
             ->sortBy(fn (CatalogContent $entry): int => $order[(string) $entry->external_id] ?? count($order));
         // About a named product: what names it, not every line sharing a word with the question ("מדינה" in
         // "המדינה הזאת" when "המדינה שבדרך" is asked about).
         $words = $this->namedTitles !== [] ? $this->namedTitles : $words;
+        $folded = [];
         $speaks = function (string $piece) use ($words): bool {
             foreach ($words as $word) {
                 if (mb_stripos($piece, $word) !== false) {
@@ -1313,8 +1314,16 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $text = implode("\n\n", array_slice([...$meant, ...$worded], 0, self::TEAM_PAIRS));
             }
 
-            if ($entry->external_id === BuildShopKnowledge::POSTS) {
+            // what the posts say: a passage for each page it came from, under that page's title (postPassages); its pieces
+            // the meaning search found are read into it, never sent again as they were
+            // (tried in a quality run's own process before it is on: assistant.post_sources)
+            if ($entry->external_id === BuildShopKnowledge::POSTS && config('assistant.post_sources') !== true) {
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
+            } elseif ($entry->external_id === BuildShopKnowledge::POSTS) {
+                array_push($first, ...$this->postPassages($entry, $text, $found, $speaks));
+                $folded[] = (string) $entry->id;
+
+                continue;
             }
 
             // the bank of terms: only the lines whose term the question names ("מה זה 14K?"), never one a word of its
@@ -1381,9 +1390,77 @@ final class AnswerSiteQuestion implements TriesQuestions
             $first[] = $sells;
         }
 
-        $ids = array_map(fn (array $p): string => $p['source_id'], $first);
+        $ids = [...array_map(fn (array $p): string => $p['source_id'], $first), ...$folded];
 
-        return [...$first, ...array_values(array_filter($found, fn (array $p): bool => $p['source'] !== 'content' || ! in_array($p['source_id'], $ids, true)))];
+        return [...$first, ...array_values(array_filter($found, fn (array $p): bool => $p['source'] !== 'content' || ! in_array((string) $p['source_id'], $ids, true)))];
+    }
+
+    /**
+     * What the posts say, a passage for each page it came from, under that page's own title and id: the answer cites the
+     * page and its link, never "what the posts say" (8d, Aviad 16.11: where a passage came from matters). A line whose
+     * page already came with the pages is left out, the page says it whole. The lines the meaning search found in it
+     * first, then those that share a word with the question; a page none of whose lines shares a word with it keeps the
+     * score it was found by, so a question about a product drops it as it dropped the piece it came in. A line whose page
+     * is gone or unknown stays under the entry's own title, as before.
+     *
+     * @param  list<array<string, mixed>>  $found
+     * @return list<array<string, mixed>>
+     */
+    private function postPassages(CatalogContent $entry, string $text, array $found, callable $speaks): array
+    {
+        $all = array_values(array_filter(array_map(fn (string $line): string => trim($line), explode("\n", $text)), fn (string $line): bool => $line !== ''));
+        $near = [];
+        foreach ($found as $p) {
+            if ($p['source'] === 'content' && (string) $p['source_id'] === (string) $entry->id) {
+                foreach (explode("\n", (string) $p['text']) as $line) {
+                    if (in_array(trim($line), $all, true)) {
+                        $near[trim($line)] = max($near[trim($line)] ?? 0.0, (float) ($p['similarity'] ?? 0.0));
+                    }
+                }
+            }
+        }
+        $lines = array_values(array_unique([...array_keys($near), ...array_slice(array_values(array_filter($all, $speaks)), 0, self::POST_LINES)]));
+        if ($lines === []) {
+            return [];
+        }
+
+        $sources = BuildShopKnowledge::postSources((array) $entry->terms);
+        $ids = array_values(array_unique(array_filter(array_map(fn (string $line): ?string => $sources[$line]['id'] ?? null, $lines))));
+        $titles = $ids === [] ? [] : CatalogContent::query()->active()->whereIn('id', $ids)->whereIn('type', [CatalogContent::PAGE, CatalogContent::POST])
+            ->get(['id', 'title'])->mapWithKeys(fn (CatalogContent $c): array => [(string) $c->id => trim((string) $c->title)])->all();
+        $came = array_map(fn (array $p): string => (string) $p['source_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'content'));
+
+        $pages = [];
+        $rest = [];
+        foreach ($lines as $line) {
+            $id = $sources[$line]['id'] ?? null;
+            if ($id !== null && in_array($id, $came, true)) {
+                continue;
+            }
+            if ($id !== null && ($titles[$id] ?? '') !== '') {
+                $pages[$id][] = $line;
+            } else {
+                $rest[] = $line;
+            }
+        }
+
+        $passage = function (string $id, string $title, array $lines, array $facts) use ($speaks, $near): array {
+            $said = array_filter($lines, $speaks) !== [];
+
+            return ['source' => 'content', 'source_id' => $id, 'external_id' => null, 'title' => $title,
+                'text' => mb_substr(implode("\n", $facts), 0, self::KNOWLEDGE_CHARS), 'from' => null]
+                + ($said ? ['similarity' => 1.0, 'kind' => 'knowledge', 'speaks' => true]
+                    : ['similarity' => max(array_map(fn (string $line): float => $near[$line] ?? 0.0, $lines)), 'kind' => 'meaning']);
+        };
+        $out = [];
+        foreach ($pages as $id => $mine) {
+            $out[] = $passage((string) $id, $titles[$id], $mine, array_map(fn (string $line): string => '- '.$sources[$line]['fact'], $mine));
+        }
+        if ($rest !== []) {
+            $out[] = $passage((string) $entry->id, (string) $entry->title, $rest, $rest);
+        }
+
+        return $out;
     }
 
     private function stale(AssistantAnswer $saved, string $shopId): bool

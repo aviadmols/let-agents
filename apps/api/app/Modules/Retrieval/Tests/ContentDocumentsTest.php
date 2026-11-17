@@ -27,6 +27,14 @@ final class ContentDocumentsTest extends TestCase
         $this->assertFalse(ContentDocuments::repeatsBody('Everything about choosing an engagement ring, in five steps.', $body), 'an excerpt of its own stays');
     }
 
+    public function test_a_takeaway_that_is_a_sentence_of_the_body_is_seen_as_one(): void
+    {
+        $body = '<p>3. החזר כספי בגין ביטול עסקה יינתן לכרטיס האשראי בו בוצעה ההזמנה.</p><p>4. שובר מתנה מזכה בקרדיט.</p>';
+        $this->assertTrue(ContentDocuments::inBody('Highlight: החזר כספי בגין ביטול עסקה יינתן לכרטיס האשראי בו בוצעה ההזמנה.', $body));
+        $this->assertFalse(ContentDocuments::inBody('Highlight: החזר כספי ניתן תוך 14 ימים לכרטיס האשראי.', $body), 'a takeaway in words of its own stays');
+        $this->assertFalse(ContentDocuments::inBody('Topic: שובר', $body), 'too short to tell');
+    }
+
     public function test_a_document_holds_its_categories_but_never_a_readings_own_state(): void
     {
         $shop = Shop::factory()->create();

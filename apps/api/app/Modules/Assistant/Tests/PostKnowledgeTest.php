@@ -97,6 +97,24 @@ final class PostKnowledgeTest extends TestCase
         $this->assertCount(1, $passages);
         $this->assertStringContainsString('מתחת לכפתור ההוספה לסל', $passages[0]['text']);
         $this->assertTrue($passages[0]['speaks']);
+        // under the page it came from (8d): its title and id, so the answer cites the page and its link; the fact alone
+        $this->assertSame((string) $this->entry()->id, $passages[0]['source_id'], 'as it is today, until the quality run');
+        config(['assistant.post_sources' => true]);
+        $passages = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), 'יש לכם מחשבון חיתוך?', $this->shop->id, []));
+        $this->assertSame((string) $cutting->id, $passages[0]['source_id']);
+        $this->assertSame('מחשבון חיתוך: איך מזמינים פלטות חתוכות', $passages[0]['title']);
+        $this->assertStringNotContainsString('(מחשבון חיתוך', $passages[0]['text']);
+        // the page itself already came with the pages: the line is not said twice
+        $page = ['source' => 'content', 'source_id' => (string) $cutting->id, 'external_id' => $cutting->external_id, 'title' => $cutting->title, 'text' => 'באתר שלנו יש מחשבון חיתוך ייחודי.', 'similarity' => 0.7, 'kind' => 'meaning'];
+        $this->assertSame([$page], $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), 'יש לכם מחשבון חיתוך?', $this->shop->id, [$page])));
+        // a piece of it the meaning search found is read into it, under its page, with the score it was found by
+        $piece = ['source' => 'content', 'source_id' => (string) $this->entry()->id, 'external_id' => null, 'title' => (string) $this->entry()->title, 'text' => (string) $this->entry()->body, 'similarity' => 0.55, 'kind' => 'meaning'];
+        $meant = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), 'אפשר לקבל לוחות במידה?', $this->shop->id, [$piece]));
+        $this->assertCount(1, $meant, 'the piece is not sent again as it was');
+        $this->assertSame([(string) $cutting->id, 'meaning', 0.55], [$meant[0]['source_id'], $meant[0]['kind'], $meant[0]['similarity']]);
         $this->assertSame([], $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
             ->invoke(app(AnswerSiteQuestion::class), 'מה שעות הפתיחה?', $this->shop->id, [])), 'nothing from the posts speaks of it');
 

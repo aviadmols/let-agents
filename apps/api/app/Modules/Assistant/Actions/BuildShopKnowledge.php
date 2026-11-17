@@ -427,6 +427,25 @@ final class BuildShopKnowledge
     }
 
     /**
+     * The page each line of what the posts say came from, by the line as posts() writes it: the page's id and the fact
+     * alone, without the title it ends with (8d). Made from what was read, so every store's lines have it, old ones too.
+     *
+     * @param  array<string, mixed>  $terms  the entry's terms
+     * @return array<string, array{id: string, fact: string}>
+     */
+    public static function postSources(array $terms): array
+    {
+        $out = [];
+        foreach ((array) ($terms['read'] ?? []) as $contentId => $post) {
+            foreach ((array) ($post['facts'] ?? []) as $fact) {
+                $out['- '.$fact.' ('.($post['title'] ?? '').')'] ??= ['id' => (string) $contentId, 'fact' => (string) $fact];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * A page or post of the store's site the team stopped (the "why" of an answer, Sella 12.11: a 2024 post on the book
      * week's offers): never a passage again, and the facts read from it leave what the posts say. Kept until brought back.
      */

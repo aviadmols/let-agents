@@ -42,6 +42,73 @@ final class Chunker
     }
 
     /**
+     * Cut at the text's own joints (8b): a heading ("## …", as HtmlText writes one) starts a new piece, and every piece
+     * begins with its path, the title and the headings above it ("מדיניות משלוחים > אספקה ומשלוחים"), so a piece read
+     * alone says where it stands, for its vector and for the writer alike. Within a section, its paragraphs and list
+     * items as split() packs them; never inside a table, and a sentence is cut only when it alone is longer than a piece.
+     * A heading keeps its number as written ("3. מסירת מידע"), and a list item's number is never cut from its text.
+     *
+     * @return list<string> at least one piece for a document with any text
+     */
+    public static function sections(string $title, string $text, int $maxChars): array
+    {
+        $title = self::clean($title);
+        $text = self::clean($text, keepLines: true);
+
+        if ($text === '') {
+            return $title === '' ? [] : [$title];
+        }
+
+        $sections = [];
+        $path = [];
+        $blocks = [];
+        foreach (self::blocks($text) as $block) {
+            if (preg_match('/^(#{1,6})\s+(.+)$/u', $block, $m) === 1) {
+                if ($blocks !== []) {
+                    $sections[] = [$path, $blocks];
+                    $blocks = [];
+                }
+                $level = strlen($m[1]);
+                $path = array_filter($path, fn (int $at): bool => $at < $level, ARRAY_FILTER_USE_KEY);
+                $path[$level] = trim($m[2]);
+
+                continue;
+            }
+            $blocks[] = $block;
+        }
+        if ($blocks !== []) {
+            $sections[] = [$path, $blocks];
+        }
+
+        $plain = fn (string $name): string => mb_strtolower(trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $name)));
+        $out = [];
+        foreach ($sections as [$headings, $blocks]) {
+            // the title and the headings under it, each once (a page whose first heading is its own title)
+            $names = [];
+            foreach ([$title, ...array_values($headings)] as $name) {
+                if ($plain($name) !== '' && ! in_array($plain($name), array_map($plain, $names), true)) {
+                    $names[] = $name;
+                }
+            }
+            $head = implode(' > ', $names);
+            $budget = max(100, $maxChars - mb_strlen($head) - 1);
+            $current = '';
+            foreach (self::unitsOf($blocks, $budget, true) as $unit) {
+                if ($current !== '' && mb_strlen($current) + 1 + mb_strlen($unit) > $budget) {
+                    $out[] = $head === '' ? $current : $head."\n".$current;
+                    $current = '';
+                }
+                $current = $current === '' ? $unit : $current."\n".$unit;
+            }
+            if ($current !== '') {
+                $out[] = $head === '' ? $current : $head."\n".$current;
+            }
+        }
+
+        return $out === [] ? ($title === '' ? [] : [$title]) : $out;
+    }
+
+    /**
      * Paragraphs, or the sentences of a paragraph too long to keep whole, or the words of a
      * sentence too long to keep whole.
      *
@@ -49,9 +116,20 @@ final class Chunker
      */
     private static function units(string $text, int $budget): array
     {
-        $units = [];
+        return self::unitsOf(self::blocks($text), $budget);
+    }
 
-        foreach (self::blocks($text) as $paragraph) {
+    /**
+     * @param  list<string>  $blocks
+     * @return list<string>
+     */
+    private static function unitsOf(array $blocks, int $budget, bool $keepNumbers = false): array
+    {
+        $units = [];
+        // a list item's number ("1.", "12.") is no sentence's end
+        $sentences = $keepNumbers ? '/(?<=[.!?…:;])(?<!\s\d\.)(?<!^\d\.)(?<!\s\d\d\.)(?<!^\d\d\.)\s+/u' : '/(?<=[.!?…:;])\s+/u';
+
+        foreach ($blocks as $paragraph) {
             if (str_starts_with($paragraph, '|') && mb_strlen($paragraph) > $budget) {
                 array_push($units, ...self::tableParts($paragraph, $budget));
 
@@ -64,7 +142,7 @@ final class Chunker
                 continue;
             }
 
-            foreach (preg_split('/(?<=[.!?…:;])\s+/u', $paragraph) ?: [] as $sentence) {
+            foreach (preg_split($sentences, $paragraph) ?: [] as $sentence) {
                 if (mb_strlen($sentence) <= $budget) {
                     $units[] = $sentence;
 

@@ -50,7 +50,9 @@ final class ContentDocuments implements DocumentSource
             $lines[] = (string) $content->excerpt;
         }
         $lines[] = (string) $content->body;
-        array_push($lines, ...$notes);
+        // a takeaway that is a sentence of the body word for word ("Highlight: …") says nothing the body does not, and
+        // stood twice in the same piece (Miss Nori, 16.11: four of its returns page's six). Tried in a quality run first.
+        array_push($lines, ...(config('retrieval.notes_once') === true ? array_values(array_filter($notes, fn (string $note): bool => ! self::inBody($note, (string) $content->body))) : $notes));
 
         return new SourceDocument(
             $content->id,
@@ -58,6 +60,15 @@ final class ContentDocuments implements DocumentSource
             $content->title,
             implode("\n", array_filter(array_map('trim', $lines), fn (string $line): bool => $line !== '')),
         );
+    }
+
+    /** Whether a takeaway ("Label: text") is, less its label, a sentence the body already holds whole. */
+    public static function inBody(string $note, string $body): bool
+    {
+        $plain = fn (string $s): string => trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($s), ENT_QUOTES | ENT_HTML5)));
+        $text = $plain((string) preg_replace('/^[\p{L} ]{1,30}:\s*/u', '', $note));
+
+        return mb_strlen($text) >= 20 && mb_strpos($plain($body), $text) !== false;
     }
 
     /** Whether an excerpt is only the body's opening words: its text, less a closing "…" or "[…]", is in the body. */
