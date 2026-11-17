@@ -117,10 +117,30 @@ function letAgentsEnterAgain() {
         go(null);
     }
 }
+// At most three times a minute, counted in this tab: a page that is truly not there shows its error as before,
+// never an endless going in again. Where the tab keeps nothing, it is not tried.
+function letAgentsMayEnterAgain() {
+    try {
+        var now = Date.now();
+        var times = JSON.parse(sessionStorage.getItem('la_enter_again') || '[]').filter(function (t) { return now - t < 60000; });
+        if (times.length >= 3) { return false; }
+        times.push(now);
+        sessionStorage.setItem('la_enter_again', JSON.stringify(times));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 document.addEventListener('livewire:init', function () {
     Livewire.hook('request', function (request) {
         request.fail(function (failed) {
             if (failed.status === 419 || failed.status === 401) {
+                failed.preventDefault();
+                letAgentsEnterAgain();
+            } else if ((failed.status === 404 || failed.status === 403) && letAgentsMayEnterAgain()) {
+                // Another store's app was opened in this browser and took the sign-in (one session for every store inside
+                // the admin): this store's request is then refused, and a white "404" covered the screen with no way on
+                // (App Store review, 17.11). In again with this store's own token, as for an expired page.
                 failed.preventDefault();
                 letAgentsEnterAgain();
             }
