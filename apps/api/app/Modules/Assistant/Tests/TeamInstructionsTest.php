@@ -5,6 +5,7 @@ namespace App\Modules\Assistant\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\BuildShopKnowledge;
+use App\Modules\Assistant\Actions\CheckOwnKnowledge;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use ReflectionMethod;
@@ -49,5 +50,13 @@ final class TeamInstructionsTest extends TestCase
         [$text, $rules] = $read(29);
         $this->assertStringContainsString('קוד קופון', $text, 'a writer that reads no rules: as before');
         $this->assertSame([], $rules);
+    }
+
+    public function test_another_line_of_the_team_contradicts_one_only_when_it_speaks_of_the_same_thing(): void
+    {
+        // Rocks, 17.11: the two lines on the Shopping IL discount disagree; the parking line speaks of neither
+        $this->assertTrue(CheckOwnKnowledge::shareAWord('אין לנו הנחה SHOPIING IL עד יום ראשון', 'יש לנו כרגע הנחה של shopping IL, עד יום ראשון'));
+        $this->assertFalse(CheckOwnKnowledge::shareAWord('מיקום החניון הקרוב ביותר', 'יש לנו כרגע הנחה של shopping IL, עד יום ראשון'));
+        $this->assertTrue(CheckOwnKnowledge::shareAWord('Returns within 14 days', 'returns are free'));
     }
 }

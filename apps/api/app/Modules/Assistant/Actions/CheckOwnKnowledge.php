@@ -38,7 +38,7 @@ final class CheckOwnKnowledge
 
     public const ACTION = 'assistant.check_own_knowledge';
 
-    public const PROMPT_VERSION = 2;
+    public const PROMPT_VERSION = 3;
 
     /** The team's other lines it is compared with, at most. */
     private const TEAM = 20;
@@ -159,6 +159,12 @@ final class CheckOwnKnowledge
                     $why = is_array($conflict) ? trim((string) ($conflict['why'] ?? '')) : '';
                     $same = isset($titles[$id]) ? $titles[$id].'|'.$why : '';
 
+                    // another line of the team only when it speaks of what this one does, by a word they share: v2 named the two
+                    // discount lines that disagree under the parking line too (Rocks, 17.11)
+                    if (str_starts_with($id, 't') && ! self::shareAWord($input['line'], $texts[$id] ?? '')) {
+                        continue;
+                    }
+
                     if (isset($titles[$id]) && $why !== '' && ! isset($notes[$same])) {
                         $notes[$same] = ['title' => $titles[$id], 'why' => mb_substr($why, 0, self::MAX_WHY), 'text' => $texts[$id] ?? ''];
                     }
@@ -176,6 +182,27 @@ final class CheckOwnKnowledge
         }
 
         return $result;
+    }
+
+    /** Whether two lines share a word of four letters or more, as Hebrew writes it (a prefix letter before it, final letters). */
+    public static function shareAWord(string $a, string $b): bool
+    {
+        $forms = function (string $text): array {
+            $out = [];
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(strtr($text, ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']))) ?: [] as $w) {
+                if (mb_strlen($w) < 4) {
+                    continue;
+                }
+                $out[$w] = true;
+                if (mb_strlen($w) > 4 && preg_match('/^[והבלמשכ]/u', $w) === 1) {
+                    $out[mb_substr($w, 1)] = true;
+                }
+            }
+
+            return $out;
+        };
+
+        return array_intersect_key($forms($a), $forms($b)) !== [];
     }
 
     private function usedToday(string $shopId): int
