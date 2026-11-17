@@ -924,6 +924,29 @@ final class SearchCatalog
                 }
                 $unknown = array_values(array_diff($unknown, array_keys($nearWords)));
             }
+            // Every word of the search is one the store has nothing close to ("חולצה" in a hardware store, a jewellery store): what
+            // the spelling still found only looks like it ("חוליות" for "חולצה": 412 chains; "ציפוי" for "ציפורים": 285 coatings),
+            // and was shown as "the nearest by meaning". It is no find: what is truly near by meaning is shown, or nothing.
+            $nothingKnown = false;
+            if ($unknown !== [] && $nearWords === [] && array_filter(explode(' ', HebrewSearch::normalize($query)),
+                fn (string $word): bool => mb_strlen($word) >= 3 && preg_match('/\d/u', $word) !== 1 && ! HebrewSearch::saysNothing($word) && ! in_array($word, $unknown, true)) === []) {
+                $nothingKnown = true;
+                $before = array_column($spelling, 'id');
+                // ...but words typed with no space between them still begin with the store's word ("מכנסייםאדומים": "מכנסי")
+                $begins = function (array $hit) use ($unknown, $index): bool {
+                    foreach (explode(' ', HebrewSearch::normalize((string) ($index['records'][$hit['id']]['title'] ?? ''))) as $said) {
+                        foreach (mb_strlen($said) >= 4 ? $unknown : [] as $word) {
+                            if (str_starts_with((string) $word, $said)) {
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                };
+                $spelling = array_values(array_filter($spelling, fn (array $hit): bool => ! str_starts_with((string) $hit['id'], 'p:') || $begins($hit)));
+                $this->trace?->dropped($before, array_column($spelling, 'id'), 'only_looks_alike');
+            }
             $termHits = [];
             // several words, some read as the store's: the words searched as the store writes them, every word counting ("טבעת
             // זהב" is "ring gold", gold rings, never every ring and every gold piece); each word alone when nothing holds all
@@ -952,7 +975,8 @@ final class SearchCatalog
             // search leans on the meaning alone, since every cover is about as near to a genre as any other (.6 to .7).
             // The words found a few already and say nothing of how it looks: no cover is near "a story about captivity"
             // more than any other, and the pictures would only pad them ("השבט", "העדן" after the books about captivity).
-            $pictures = $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
+            // no word of it known and none that says how a thing looks: every picture is about as near to it as any other (.6)
+            $pictures = $byMeaning && ! ($nothingKnown && ! HebrewSearch::visual($query)) && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)) ? $this->pictures($shopId, $query, $index['records']) : [];
             $this->trace?->step('pictures', ['ran' => $byMeaning && (count($spelled) < self::SPELLED_ENOUGH || HebrewSearch::visual($query)), 'words_found' => count($spelled)]);
             // The words found some and say nothing of how it looks: a picture adds only what the meaning kept beside them.
             // Every bag's picture is about as near to "בקבוק" as a bottle's (.56 and .62, Take Me Home 9.11).
