@@ -143,6 +143,10 @@ return [
         'label' => 'Answer code rules: the conversation\'s kind, a least price, "nothing written"',
         'description' => '1 turns them on: a reply keeps the conversation\'s kind of product, an offer from a least price says the amount, and "nothing written" counts as unanswered. Measured on the quality baseline before it is turned on.',
     ],
+    'products_by_search' => [
+        'label' => 'A question\'s products from the store\'s search',
+        'description' => 'For each question, the products the store\'s search finds by its words and its meaning go to the topic check and to the answer\'s writer, before those shown on the screen while it was typed.',
+    ],
     'site_similarity_drop' => [
         'label' => 'How far below the nearest piece a piece is still sent',
         'description' => 'A piece further below the nearest than this is not sent. 0 turns it off. Measured on the quality baseline before it is turned on.',

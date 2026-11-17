@@ -18,6 +18,7 @@ use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductSets;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Contracts\ProductsNear;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
@@ -1693,7 +1694,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         // show, before what the search showed: named in the answer without its card, it sent the shopper looking for it.
         if ($viewing === null && ! $followUp && $named === []) {
             $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
-            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$shown]));
+            // and what the store's own search finds for the question, by its words and by meaning (assistant.products_by_search):
+            // the products on the screen were those the words found while it was typed, "מתאמים" for "מה מתאים…" (Gueta, 17.11)
+            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown]));
         }
         // "What is recommended most": the store's most popular, before the rest, and kept through the choice below. What
         // its customers buy, open and add to the cart, never a model's taste (as Aviad asked, 26.10).
@@ -5203,6 +5206,27 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @return list<array{title: string, text: string}>
      */
+    /** The products the store's search finds for a question are read by the topic check and offered to the writer, this many. */
+    private const BY_SEARCH = 3;
+
+    /** @var array<string, list<string>> the store's search for a question, asked once an answer */
+    private array $searched = [];
+
+    /**
+     * The products the store's own search finds for the question, nearest first, where the shop asks it
+     * (assistant.products_by_search) and the search is there to ask. Stored vectors only.
+     *
+     * @return list<string> external ids
+     */
+    private function bySearch(string $shopId, string $question): array
+    {
+        if (! app()->bound(ProductsNear::class) || ! (bool) Settings::get('assistant.products_by_search', $shopId)) {
+            return [];
+        }
+
+        return $this->searched[$shopId.'|'.$question] ??= app(ProductsNear::class)->near($shopId, $question, self::BY_SEARCH);
+    }
+
     private function storeSays(string $shopId, string $question): array
     {
         $floor = (float) Settings::get('assistant.site_min_similarity', $shopId);
@@ -5215,10 +5239,21 @@ final class AnswerSiteQuestion implements TriesQuestions
             $near = self::merged($this->passages->near($shopId, $fixed, ['product', 'content'], self::SAYS_PIECES), $near, self::SAYS_PIECES);
         }
 
-        return array_values(array_map(
+        $says = array_values(array_map(
             fn (array $p): array => ['title' => (string) $p['title'], 'text' => mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) $p['text'])), 0, self::SAYS_CHARS)],
             array_slice(array_values(array_filter($near, fn (array $p): bool => $p['similarity'] >= $floor)), 0, self::SAYS_PIECES),
         ));
+        // and the products the store's search finds for it: a store that sells pigeon spikes is asked about birds
+        $titles = array_column($says, 'title');
+        foreach ($this->bySearch($shopId, $question) as $id) {
+            $title = (string) CatalogProduct::query()->whereNull('removed_at')->where('external_id', $id)->value('title');
+            if ($title !== '' && ! in_array($title, $titles, true)) {
+                $says[] = ['title' => $title, 'text' => ''];
+                $titles[] = $title;
+            }
+        }
+
+        return $says;
     }
 
     /**

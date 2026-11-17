@@ -390,6 +390,12 @@
             "scope": "shop"
         },
         {
+            "name": "products_by_search",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "site_similarity_drop",
             "type": "float",
             "default": 0,
