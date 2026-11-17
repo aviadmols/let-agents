@@ -55,7 +55,7 @@
           // a shopper who got an answer is worth asking, once a page, and only where the shop set it up
           var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: null, busy: true } : null;
           if (lead) { LEARN.offered = true; }
-          update(turn, { loading: false, answer: d.answer, picks: [], sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead });
+          update(turn, { loading: false, answer: d.answer, picks: [], sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead, team: !!d.team, noAnswer: d.no_answer || null });
           announce(t('announceReady') + ': ' + d.answer);
           if (lead) { learn('lead_start', null, null, {}); leadStep(turn, {}); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
@@ -137,7 +137,7 @@
         return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds));
       }).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
+          update(turn, { loading: false, answer: d.answer, team: !!d.team, noAnswer: d.no_answer || null, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null, alsoBudget: !!(named && named.budget) });
           announce(t('announceReady') + ': ' + d.answer);
@@ -480,7 +480,7 @@
     return parts.length > 0 && parts.every(function (s) { return PARTIAL.test(s) || GIVES_CONTACT.test(s) || TEAM.test(s); });
   }
   function partialHtml(turn) {
-    var answer = String(turn.answer || ''), asked = WANTS_PERSON.test(String(turn.q || '')), contact = GIVES_CONTACT.test(answer);
+    var answer = String(turn.answer || ''), asked = WANTS_PERSON.test(String(turn.q || '')), contact = GIVES_CONTACT.test(answer) || !!turn.team;
     if (!turn.answer || turn.leadFlow || (!PARTIAL.test(answer) && !asked && !contact) || noAnswerOf(turn) === 'none') { return ''; }
     if (turn.partialOpen || turn.lead) { return '<div class="ls-partial" style="margin-top:14px">' + noInfoHtml(turn, true) + '</div>'; }
     var h = hours(), link = noAnswerOf(turn) === 'team' && h.open ? wa(waText(turn, subjectOf(turn))) : null;

@@ -3082,6 +3082,23 @@ final class AnswerSiteQuestion implements TriesQuestions
     private const TEAM_OFFER = '/צוות|לנסח|ניסוח|(?<![\p{L}])ה?פני(?:י)?ה(?![\p{L}])|לפנות|ליצור\s+קשר|ו?וו?א?טסאפ|whatsapp|\bteam\b|\bcontact\b|reach\s+out|\bword\s+(?:a|the|your)\s+(?:request|message)\b/iu';
 
     /**
+     * An answer that sends the shopper to a person: the team, customer service or a representative glad to help, or a way
+     * to reach them, in any words ("צוות שירות הלקוחות שלנו ישמח לעמוד לרשותכם"), and one that says the site does not settle
+     * it ("לא מצאנו פרטים על כך באתר").
+     */
+    private const SENDS_TO_TEAM = '/(?:צוות|נציג|שירות\s+(?:ה)?לקוחות)[^.!?\n]{0,50}(?:ישמח|ישמחו|יעזור|יעזרו|יחזור|יחזרו|זמין|זמינים|לרשותכם|לעזור|לפנות|ליצור\s+קשר)|(?:צרו|ליצור)\s+(?:איתנו\s+)?קשר|(?:לפנות|פנו)[^.!?\n]{0,40}(?:צוות|נציג|שירות|אלינו)|(?:לא\s+(?:מצאנו|ראינו|מצאתי)|אין\s+(?:לנו|באתר))\s+(?:\S+\s+){0,3}?(?:מידע|פרטים|פירוט)(?![\p{L}])|\b(?:team|customer\s+(?:service|care|support)|representative)\b[^.!?\n]{0,50}\b(?:glad|happy|help|get\s+back|available|assist)|\bcontact\s+(?:us|our|the\s+store)\b|\b(?:could\s*n[o\x27]t|did\s*n[o\x27]t|could\s+not|did\s+not)\s+find\b/iu';
+
+    /**
+     * Whether an answer hands the shopper to the store's team: the drawer then always offers a way to reach them under it
+     * (WhatsApp in the opening hours, leaving a phone or an email), whatever the words (as Aviad asked, 17.11: "צוות שירות
+     * הלקוחות שלנו ישמח לעמוד לרשותכם" had nothing under it, the drawer read only "צוות החנות ישמח").
+     */
+    public static function sendsToTeam(string $answer): bool
+    {
+        return trim($answer) !== '' && (preg_match(self::SENDS_TO_TEAM, $answer) === 1 || preg_match(self::UNSETTLED, $answer) === 1);
+    }
+
+    /**
      * An answer that says the pages do not settle it closes with the store's team, never with an offer to do what only
      * a person can ("תרצו שנעזור לבדוק את האורך המתאים לכם?" after "צריך לבדוק אותה", Rocks 11.11): its closing offer
      * becomes "the store's team will be glad to help", and the drawer offers that team under it. Code only.
@@ -4841,7 +4858,9 @@ final class AnswerSiteQuestion implements TriesQuestions
         unset($result['answer_id'], $result['reason']);
 
         // What the storefront offers instead of an answer: the team, leaving details, or nothing (NoAnswer).
-        $then = $result['outcome'] === AssistantAnswer::ANSWERED ? [] : ['no_answer' => NoAnswer::offer($shopId)];
+        // and an answer that sends the shopper to the team says so, for the drawer to offer the way to them under it
+        $then = $result['outcome'] !== AssistantAnswer::ANSWERED ? ['no_answer' => NoAnswer::offer($shopId)]
+            : (self::sendsToTeam((string) ($result['answer'] ?? '')) ? ['team' => true, 'no_answer' => NoAnswer::offer($shopId)] : []);
 
         return $result + ['ask_id' => $ask->id, 'whatsapp' => $whatsapp] + $then;
     }

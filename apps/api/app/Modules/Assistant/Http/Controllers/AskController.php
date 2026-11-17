@@ -81,6 +81,10 @@ final class AskController
         // Not an answer: what the storefront offers instead, as the shop chose it (the team, leaving details, or nothing).
         if (isset($result['outcome']) && $result['outcome'] !== AssistantAnswer::ANSWERED) {
             $result['no_answer'] = NoAnswer::offer($connection->shop_id);
+        } elseif (($result['outcome'] ?? null) === AssistantAnswer::ANSWERED && empty($result['team']) && AnswerSiteQuestion::sendsToTeam((string) ($result['answer'] ?? ''))) {
+            // an answer that sends the shopper to the team: the way to them under it, as under the search box's
+            $result['team'] = true;
+            $result['no_answer'] = NoAnswer::offer($connection->shop_id);
         }
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
