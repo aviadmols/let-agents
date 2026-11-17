@@ -11,7 +11,7 @@ return [
     'triggers' => [
         'manual' => 'Manual',
         'schedule' => 'Scheduled',
-        'webhook' => 'Store update',
+        'webhook' => 'A shopper on the site',
         'system' => 'Pipeline step',
     ],
     'fields' => [
@@ -32,6 +32,7 @@ return [
         'error' => 'Error',
         'provider' => 'Provider',
         'model' => 'Model',
+        'model_detail' => ':model, :calls calls: in :input, out :output, $:cost',
         'input' => 'Input',
         'output' => 'Output',
     ],

@@ -10,7 +10,7 @@ enum RunTrigger: string
     /** The scheduler started it. */
     case Schedule = 'schedule';
 
-    /** A store told us something changed. */
+    /** A shopper on the store's site asked (a question, a photo, a set): every run started by this value is one. */
     case Webhook = 'webhook';
 
     /** Another run started it, as a step of a larger job. */

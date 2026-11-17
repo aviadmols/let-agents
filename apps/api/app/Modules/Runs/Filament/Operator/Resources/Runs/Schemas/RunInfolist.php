@@ -10,6 +10,7 @@ use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
+use Illuminate\Support\Facades\DB;
 
 final class RunInfolist
 {
@@ -68,8 +69,15 @@ final class RunInfolist
                     ->columns(4)
                     ->visible(fn (Run $record): bool => filled($record->provider))
                     ->schema([
-                        TextEntry::make('provider')->label(__('runs::runs.fields.provider')),
-                        TextEntry::make('model')->label(__('runs::runs.fields.model'))->fontFamily(FontFamily::Mono),
+                        TextEntry::make('provider')->label(__('runs::runs.fields.provider'))
+                            ->state(fn (Run $record): string => implode(', ', array_unique(array_column(self::byModel($record), 'provider'))) ?: (string) $record->provider),
+                        // every model the run called, each with its own tokens and cost (a search answer: the writer and the
+                        // checker), never only the last one beside the tokens of all
+                        TextEntry::make('model')->label(__('runs::runs.fields.model'))->fontFamily(FontFamily::Mono)
+                            ->state(fn (Run $record): array => array_map(fn (array $m): string => __('runs::runs.fields.model_detail', [
+                                'model' => $m['model'], 'calls' => (string) $m['calls'], 'input' => number_format($m['input']), 'output' => number_format($m['output']), 'cost' => number_format($m['cost'], 4),
+                            ]), self::byModel($record)) ?: [(string) $record->model])
+                            ->listWithLineBreaks(),
                         TextEntry::make('input_tokens')
                             ->label(__('runs::runs.fields.tokens'))
                             ->formatStateUsing(fn (Run $record): string => __('runs::runs.fields.tokens_detail', [
@@ -97,6 +105,19 @@ final class RunInfolist
                         self::json('output', __('runs::runs.fields.output')),
                     ]),
             ]);
+    }
+
+    /**
+     * The run's model calls by model, in the order first called.
+     *
+     * @return list<array{provider: string, model: string, calls: int, input: int, output: int, cost: float}>
+     */
+    private static function byModel(Run $record): array
+    {
+        return DB::table('ai_usage')->where('run_id', $record->id)
+            ->selectRaw('provider, model, count(*) as calls, sum(input_tokens) as input, sum(output_tokens) as output, sum(cost_usd) as cost, min(id) as first')
+            ->groupBy('provider', 'model')->orderBy('first')->get()
+            ->map(fn (object $r): array => ['provider' => (string) $r->provider, 'model' => (string) $r->model, 'calls' => (int) $r->calls, 'input' => (int) $r->input, 'output' => (int) $r->output, 'cost' => (float) $r->cost])->all();
     }
 
     private static function json(string $attribute, string $label): TextEntry

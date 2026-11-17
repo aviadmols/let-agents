@@ -98,10 +98,11 @@ final class PostKnowledgeTest extends TestCase
         $this->assertStringContainsString('מתחת לכפתור ההוספה לסל', $passages[0]['text']);
         $this->assertTrue($passages[0]['speaks']);
         // under the page it came from (8d): its title and id, so the answer cites the page and its link; the fact alone
-        $this->assertSame((string) $this->entry()->id, $passages[0]['source_id'], 'as it is today, until the quality run');
-        config(['assistant.post_sources' => true]);
-        $passages = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+        config(['assistant.post_sources' => false]);
+        $before = $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
             ->invoke(app(AnswerSiteQuestion::class), 'יש לכם מחשבון חיתוך?', $this->shop->id, []));
+        $this->assertSame((string) $this->entry()->id, $before[0]['source_id'], 'switched off: as it was');
+        config(['assistant.post_sources' => null]);
         $this->assertSame((string) $cutting->id, $passages[0]['source_id']);
         $this->assertSame('מחשבון חיתוך: איך מזמינים פלטות חתוכות', $passages[0]['title']);
         $this->assertStringNotContainsString('(מחשבון חיתוך', $passages[0]['text']);

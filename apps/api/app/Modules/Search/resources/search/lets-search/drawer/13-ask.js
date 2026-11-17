@@ -201,6 +201,9 @@
     if (turn.ctx || turn.oneProduct) { turn.alsoIds = []; return; }
     // a question of the store's (shipping, returns): no products are related to its words (Vans QA, 16.11)
     if (turn.storeQ) { turn.alsoIds = []; return; }
+    // a reply in a conversation ("כן מה צריך?") is no subject of its own: its words found a book titled "כן אדוני הנשיא"
+    // beside an answer about returns (Sella, 17.11)
+    if (turn.thread && turn.thread.length) { turn.alsoIds = []; return; }
     turn.alsoIds = [];
     if ((turn.sources || []).some(function (s) { return s && s.store; })) { return; }
     json(API + '/search/' + SITE + '?counted=1&q=' + encodeURIComponent(turn.q)).then(function (r) {

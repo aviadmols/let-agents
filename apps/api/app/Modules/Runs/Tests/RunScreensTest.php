@@ -5,6 +5,7 @@ namespace App\Modules\Runs\Tests;
 use App\Modules\Admin\Models\User;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
+use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Filament\Operator\Resources\Runs\Pages\ListRuns;
 use App\Modules\Runs\Models\RunCall;
 use App\Modules\Tenancy\Models\Shop;
@@ -60,6 +61,18 @@ final class RunScreensTest extends TestCase
             ->assertSeeInOrder([__('runs::flow.found'), __('runs::prompts.assistant.answer_site')])
             ->assertSee(__('runs::flow.found_detail', ['passages' => '9', 'passages_sent' => '4', 'products' => '12', 'products_sent' => '3']))
             ->assertSee('$0.00406', false);
+
+        // every model it called, each with its own tokens and cost, never only the last one (6c)
+        DB::table('ai_usage')->insert(['run_id' => $answer->id, 'shop_id' => $shop->id, 'agent' => 'assistant.site_answerer', 'action' => 'assistant.answer_site', 'provider' => 'anthropic', 'model' => 'claude-haiku-5-5', 'input_tokens' => 5131, 'output_tokens' => 301, 'cost_usd' => 0.00066, 'day' => now()->toDateString(), 'created_at' => now()]);
+        $answer->forceFill(['provider' => 'anthropic', 'model' => 'claude-haiku-5-5', 'input_tokens' => 7382])->save();
+        $this->get("/operator/runs/{$answer->id}")->assertOk()
+            ->assertSeeInOrder([
+                __('runs::runs.fields.model_detail', ['model' => 'gpt-5.4-mini', 'calls' => '1', 'input' => '2,251', 'output' => '226', 'cost' => '0.0041']),
+                __('runs::runs.fields.model_detail', ['model' => 'claude-haiku-5-5', 'calls' => '1', 'input' => '5,131', 'output' => '301', 'cost' => '0.0007']),
+            ], false)
+            ->assertSee('openai, anthropic');
+        // a shopper's question started it, not a store's update (6d)
+        $this->assertSame('A shopper on the site', RunTrigger::Webhook->label());
 
         foreach (['he', 'en'] as $locale) {
             $this->withHeader('Accept-Language', $locale)

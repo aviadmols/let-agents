@@ -49,6 +49,7 @@ use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\Passages;
+use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Retrieval\Contracts\TopicQuestions;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -303,6 +304,15 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** @var list<string> the products the store's team linked the question being answered to (QuestionLinks), external ids */
     private array $linked = [];
+
+    /** @var list<string> the product others are asked to be like ("מה עוד דומה?"), never one of them (prepare()), external ids */
+    private array $anchors = [];
+
+    /** Asks for products like another: "מה עוד דומה?", "הכי קרוב ל…", "something like this", "alternatives". */
+    private const ASKS_SIMILAR = '/(?:^|[^\p{L}])(?:[והכלמש]?דומ(?:ה|ים|ות|י)|(?:עוד|משהו|ספרים|מוצרים|אחרים|אחר|אחרות)\s+(?:כמו|בסגנון)|בסגנון\s+(?:הזה|הזאת|דומה)|(?:ה?כי\s+)?קרוב(?:ים|ות|ה)?\s+(?:ל|אל)|חלופ(?:ה|ות|י)|similar|alternatives?|(?:more|others?|something|anything)\s+like|like\s+(?:this|that|it)|closest\s+to)(?:[^\p{L}]|$)/iu';
+
+    /** How many products near the one asked about are given to choose from, when the screen shows only it. */
+    private const NEAREST_TO = 8;
 
     /** @var list<string> a wish with a price that names no product: the store's range inside it, of every kind (wishedWithin()) */
     private array $wish = [];
@@ -1316,8 +1326,8 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             // what the posts say: a passage for each page it came from, under that page's title (postPassages); its pieces
             // the meaning search found are read into it, never sent again as they were
-            // (tried in a quality run's own process before it is on: assistant.post_sources)
-            if ($entry->external_id === BuildShopKnowledge::POSTS && config('assistant.post_sources') !== true) {
+            // (measured 17.11 on 38 conversations, three runs each way: the same facts in the answers, every digest passage under its page; off with assistant.post_sources false)
+            if ($entry->external_id === BuildShopKnowledge::POSTS && config('assistant.post_sources') === false) {
                 $text = implode("\n", array_slice(array_filter(explode("\n", $text), $speaks), 0, self::POST_LINES));
             } elseif ($entry->external_id === BuildShopKnowledge::POSTS) {
                 array_push($first, ...$this->postPassages($entry, $text, $found, $speaks));
@@ -1602,7 +1612,19 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
         // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
         // showed none of those it names; a question about what was shown stays about what was shown.
-        $named = $viewing === null ? $this->namedProducts($question) : [];
+        // "מה עוד דומה?", "מה הכי קרוב ל'עקידה'?": the product named or alone on the screen is what the others are measured
+        // by, never one of them (Sella, 17.11: "עקידה" itself was "the closest", twice). The others on the screen are those
+        // asked about; with none, the products nearest it by meaning. Every store, every trade.
+        $this->anchors = [];
+        if (preg_match(self::ASKS_SIMILAR, $question) === 1) {
+            $anchors = array_values(array_unique(array_filter([(string) $viewing, ...$this->namedProducts($question), ...(count($shown) === 1 ? [(string) $shown[0]] : [])])));
+            if ($anchors !== []) {
+                $others = array_values(array_diff(array_map('strval', $shown), $anchors));
+                $shown = $others !== [] ? $others : $this->nearestTo($anchors[0]);
+                [$this->anchors, $viewing] = [$anchors, null];
+            }
+        }
+        $named = $viewing === null && $this->anchors === [] ? $this->namedProducts($question) : [];
         $shown = $named === [] || array_diff($named, $shown) === [] ? $shown : $named;
         // What the store's words and pages bring is then about those products, not about every one sharing a word.
         $this->namedTitles = $named === [] ? [] : CatalogProduct::query()->whereIn('external_id', $named)->pluck('title')->map(fn ($t): string => self::titleCore((string) $t))->filter()->values()->all();
@@ -1680,6 +1702,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             $shown = array_values(array_unique([...$wish, ...$shown]));
         }
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
+        // what the others are measured by is never one of them, whatever brought it back (its own page found by meaning)
+        $candidates = array_values(array_filter($candidates, fn (array $c): bool => ! in_array((string) ($c['external_id'] ?? ''), $this->anchors, true)));
         if ($wish !== []) {
             // a gift card is still there to offer, after what can be given itself
             usort($candidates, fn (array $a, array $b): int => (int) self::giftCard($a['title']) <=> (int) self::giftCard($b['title']));
@@ -2167,6 +2191,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         // and every product whose own page it rests on: "מתוך: פטריית קורדיספס" under an answer about
                         // cordyceps, with no card to buy it from (Mycolivia, 25.10)
                         $picks = self::citedProducts($cited, $byRef, $picks, $prepared['productsByRef']);
+                        $picks = $this->withoutAnchors($picks);
                     }
                     // Sentences code took out (a number the pages do not have), the rest kept.
                     $checked['trimmed'] = $screened['trimmed'];
@@ -2256,7 +2281,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $answer = $choices !== [] ? $answer : ($forward
                     // an answer that shows products is never taken for one said again: "white sneakers" after another
                     // search for shoes found three, and was told "this is one for our team to check" (15.11)
-                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain($picks === [] ? self::notSaidAgain($answer, $this->conversation, $locale, config('assistant.new_case') === true ? (string) $this->asked : '') : $answer, $this->conversation), $locale));
+                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain($picks === [] ? self::notSaidAgain($answer, $this->conversation, $locale, config('assistant.new_case') !== false ? (string) $this->asked : '') : $answer, $this->conversation), $locale));
                 // a size asked on a product's page: the sizes it comes in, said by code when the writer left them out
                 $viewed = self::viewingOf($prepared);
                 if ($forward === null && $choices === [] && $refusal === null && is_string($viewed) && isset($productsByRef[$viewed])) {
@@ -2295,7 +2320,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
 
                 $result = $refusal === null
-                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored ?: self::picksFromSources($sources)), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored) + $this->wishRows($stored, $corrected ?? $question, $locale)
+                    ? ['outcome' => $outcome, 'answer' => $answer, 'from' => 'model', 'sources' => $sources, 'picks' => $this->present($stored ?: $this->withoutAnchors(self::picksFromSources($sources))), 'answer_id' => $saved?->id] + $this->describedFor($names, $stored) + $this->wishRows($stored, $corrected ?? $question, $locale)
                         + ($choices === [] ? [] : ['choices' => $choices])
                     : ($unfit ? $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'unfit']
                         : $this->fixed($noAnswer, $locale, 'model') + ['answer_id' => $saved?->id, 'reason' => mb_substr((string) $refusal, 0, 40)] + ($notFound === null ? [] : ['not_found' => $notFound]));
@@ -4016,6 +4041,28 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array<string, mixed>>  $sources
      * @return list<array{external_id: string, title: string, why: string}>
      */
+    /**
+     * @param  list<array<string, mixed>>  $picks
+     * @return list<array<string, mixed>> without the product the others were asked to be like
+     */
+    private function withoutAnchors(array $picks): array
+    {
+        return array_values(array_filter($picks, fn (array $p): bool => ! in_array((string) ($p['external_id'] ?? ''), $this->anchors, true)));
+    }
+
+    /** @return list<string> the products nearest this one by meaning, external ids, nearest first, itself not among them */
+    private function nearestTo(string $externalId): array
+    {
+        $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id']);
+        if ($product === null) {
+            return [];
+        }
+        $ids = array_map(fn (array $hit): string => (string) $hit['source_id'], app(SemanticSearch::class)->similarTo('product', (string) $product->id, ['product'], self::NEAREST_TO + 1));
+        $external = CatalogProduct::query()->whereNull('removed_at')->whereIn('id', $ids)->pluck('external_id', 'id')->mapWithKeys(fn ($e, $id): array => [(string) $id => (string) $e])->all();
+
+        return array_slice(array_values(array_filter(array_map(fn (string $id): ?string => $external[$id] ?? null, $ids), fn (?string $e): bool => $e !== null && $e !== $externalId)), 0, self::NEAREST_TO);
+    }
+
     private static function picksFromSources(array $sources): array
     {
         $urls = array_values(array_unique(array_filter(array_map(fn ($s): string => is_array($s) && ($s['type'] ?? null) === 'product' ? (string) ($s['url'] ?? '') : '', $sources))));

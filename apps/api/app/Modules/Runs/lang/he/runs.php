@@ -11,7 +11,7 @@ return [
     'triggers' => [
         'manual' => 'ידני',
         'schedule' => 'מתוזמן',
-        'webhook' => 'עדכון מהחנות',
+        'webhook' => 'גולש באתר',
         'system' => 'שלב בתהליך',
     ],
     'fields' => [
@@ -32,6 +32,7 @@ return [
         'error' => 'שגיאה',
         'provider' => 'ספק',
         'model' => 'מודל',
+        'model_detail' => ':model, :calls קריאות: קלט :input, פלט :output, $:cost',
         'input' => 'קלט',
         'output' => 'פלט',
     ],
