@@ -10,6 +10,8 @@ return [
         'help' => 'A ZIP file with everything kept about the shop: its settings, team, catalogue, questions and answers, searches, visits, and the details shoppers left (leads and saved lists). Each table opens in Excel.',
         'button' => 'Download the file',
         'note' => 'The file holds shoppers\' personal details. Keep it somewhere safe.',
+        'going' => 'Preparing the file.',
+        'going_sub' => 'The download starts by itself within a few minutes. You can keep working meanwhile; just leave this tab open.',
         'readme' => "The data of :shop at Lets, as of :date.\n\n"
             ."shop.csv: the shop. team.csv: its people and roles. settings.csv: the settings chosen for it.\n"
             ."In the folders: a table for each kind of data, by area (Catalog, Leads, Shortlist: saved lists, Search, Assistant: questions and answers, Analytics: visits and orders, and more).\n\n"

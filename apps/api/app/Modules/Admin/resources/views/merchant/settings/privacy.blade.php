@@ -9,9 +9,11 @@
         {{-- Download everything --}}
         <x-lp::card :title="$t('export.title')" :help="$t('export.help')" data-privacy-export>
             @if ($owner)
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
-                    <a class="lp-btn lp-btn-primary" href="{{ $this->exportUrl() }}" download data-export>{{ $t('export.button') }}</a>
-                    <span class="lp-note">{{ $t('export.note') }}</span>
+                {{-- the file takes a while to build and the browser shows nothing meanwhile: the press says it is on its way --}}
+                <div x-data="{ going: false }" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+                    <a class="lp-btn lp-btn-primary" href="{{ $this->exportUrl() }}" download data-export x-on:click="going = true; setTimeout(() => going = false, 300000)" x-bind:style="going ? 'pointer-events: none; opacity: .6' : ''" x-bind:aria-disabled="going">{{ $t('export.button') }}</a>
+                    <span class="lp-note" x-show="! going">{{ $t('export.note') }}</span>
+                    <span class="lp-note" x-show="going" x-cloak role="status" data-export-going><b>{{ $t('export.going') }}</b> {{ $t('export.going_sub') }}</span>
                 </div>
             @else
                 <p class="lp-note">{{ $t('owners_only') }}</p>
