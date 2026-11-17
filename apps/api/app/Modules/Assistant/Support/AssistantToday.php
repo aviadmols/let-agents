@@ -28,6 +28,9 @@ final class AssistantToday implements TodayImprovements
         $open = AssistantAnswer::query()
             ->where('status', AssistantAnswer::SHOWN)
             ->where('outcome', AssistantAnswer::NO_INFO)
+            // asked by a shopper: the questions Lets prepares at setup (asked_count 0) wait on the questions screen, never
+            // here. A new store nobody visited showed "2" beside Improvements (App Store review, 17.11)
+            ->where('asked_count', '>', 0)
             ->where('last_asked_at', '>=', now()->subDays(self::DAYS))
             ->orderByDesc('asked_count')->orderByDesc('last_asked_at')
             ->limit(self::SHOWN)->get(['id', 'question', 'asked_count', 'product_id']);
