@@ -89,6 +89,9 @@ final class SearchCatalog
     /** A search that found nothing is tried again without one word, this many words at most (loosened()). */
     private const LOOSE_TRIES = 3;
 
+    /** A word this many products say at most tells them apart: alone, it is the nearest search when no other found. */
+    private const TELLING_WORD = 12;
+
     /** Words that only join or point at a filter: never what a loosened search left out. */
     private const LOOSE_WORDS = '/^(?:עמ|ו?בצבע|צבע|ו?בגוונ|ו?במיד(?:ה|ת|ות)|מיד(?:ה|ת|ות)|בגודל|with|in|colou?r|size|for|and)$/u';
 
@@ -293,9 +296,11 @@ final class SearchCatalog
     {
         $words = array_values(array_filter(preg_split('/\s+/u', trim($raw)) ?: [], fn (string $w): bool => $w !== ''));
         // a word alone is never loosened, and narrower searches already offered stay what is offered
-        if (count($words) < 2 || ($result['focus']['options'] ?? []) !== []) {
+        if (count($words) < 2) {
             return $result;
         }
+        // narrower searches already offered ("למה התכוונתם?") stay what is offered, unless one word of them tells few products apart (below)
+        $offered = ($result['focus']['options'] ?? []) !== [];
         $index = $this->tenant->run($shopId, fn (): ?array => LoadedIndex::for($shopId));
         if ($index === null) {
             return $result;
@@ -360,7 +365,7 @@ final class SearchCatalog
         // "תיק לבן" without the white is the bags
         $kinds = self::askedKinds($index, $raw);
         $found = [];
-        foreach ($rungs as $rung) {
+        foreach ($offered ? [] : $rungs as $rung) {
             if ($rung['query'] === '' || HebrewSearch::normalize($rung['query']) === HebrewSearch::normalize($raw)) {
                 continue;
             }
@@ -372,6 +377,65 @@ final class SearchCatalog
             // its letters ("אופניים חשמליות" without "חשמליות" showed seven pieces near "אופניים", none a bicycle: Rocks QA)
             if (($tried['counts']['product'] ?? 0) > 0 && ($tried['unknown'] ?? []) === []) {
                 $found[] = $rung + ['result' => $tried];
+            }
+        }
+        // Still nothing: the one word of them that few products say, alone. "מרחיק יונים", "נגד יונים במרפסת": the spike is
+        // written "להרחקת יונים", no product says the other words with it, and by meaning it is too far to show (.35). A word
+        // many products say ("נגד") is no such word; the last typed that finds is taken, and what was left out is said.
+        // ...never leaving out a price, whom it is for, or the kind of product it names: "צמיד זול" with no bracelet that cheap is
+        // nothing, not the studs; "מכונת פוליש" is never every machine
+        $bound = array_filter($words, fn (string $w): bool => HebrewSearch::pricePart($w) || isset($kindWords[self::wordForm(HebrewSearch::normalize($w))])
+            || array_filter($whomSaid, fn (string $said): bool => $said !== '' && str_contains(HebrewSearch::normalize($w), $said)) !== []);
+        if ($found === [] && ($result['price'] ?? null) === null) {
+            // ...nor a word a product's title opens with: that is a kind the store sells ("צמיד יהלומים" with no bracelet of diamonds
+            // is nothing, never the diamond studs)
+            $opens = [];
+            foreach ($index['records'] as $record) {
+                if (($record['t'] ?? null) === 'product') {
+                    $opens[self::wordForm(explode(' ', HebrewSearch::normalize((string) ($record['title'] ?? '')), 2)[0])] = true;
+                }
+            }
+            $bound += array_filter($words, fn (string $w): bool => isset($opens[self::wordForm(HebrewSearch::normalize($w))]));
+            $telling = null;
+            foreach ($words as $at => $word) {
+                $plain = HebrewSearch::normalize($word);
+                if (mb_strlen($plain) < 3 || HebrewSearch::saysNothing($plain) || preg_match(self::LOOSE_WORDS, $plain) === 1 || HebrewSearch::pricePart($word)) {
+                    continue;
+                }
+                $tried = $this->searchOnce($shopId, $word, $only, false, $perGroup, false);
+                $count = max((int) ($tried['counts']['product'] ?? 0), (int) ($tried['total'] ?? 0));
+                // said in so many letters by the first it found, never a word that only looks like it ("אדמים": "אדם")
+                $top = $index['records'][(string) ($tried['groups']['product'][0]['id'] ?? '')] ?? null;
+                if ($top === null || ! HebrewSearch::holdsAny((string) ($top['title'] ?? '').' '.(string) ($top['kw'] ?? ''), [$plain])) {
+                    continue;
+                }
+                // the word few products say: the fewest of them, a word typed later before one typed earlier
+                if ($count > 0 && $count <= self::TELLING_WORD && (int) ($tried['held'] ?? 0) > 0 && HebrewSearch::unknownWords($index['engine'], $word) === []
+                    && ($telling === null || $count <= $telling['count'])) {
+                    $rest = $words;
+                    unset($rest[$at]);
+                    if (array_intersect_key($bound, $rest) !== []) {
+                        continue;
+                    }
+                    // where narrower searches were offered ("מקדחה בצבע שחור": the drills, or black ones), they stay, unless the word is
+                    // no kind of the store's and what is left out says no colour ("מרחיק יונים": the spike, not "מרחיק (5)" or "יונימ (3)")
+                    if ($offered && (isset($opens[self::wordForm($plain)]) || array_filter($rest, fn (string $w): bool => Colours::mentions($w) !== []) !== [])) {
+                        continue;
+                    }
+                    $telling = ['count' => $count, 'query' => $word, 'left' => array_values($rest), 'result' => $tried];
+                }
+            }
+            if ($telling !== null) {
+                // only the products that say the word themselves: "יונים" alone also brought a cutting disc and cable ties by letters
+                // that only look like it (Gueta, 17.11)
+                $says = fn (array $p): bool => HebrewSearch::holdsAny((string) ($index['records'][(string) ($p['id'] ?? '')]['title'] ?? '').' '.(string) ($index['records'][(string) ($p['id'] ?? '')]['kw'] ?? ''), [HebrewSearch::normalize($telling['query'])]);
+                $kept = array_values(array_filter((array) ($telling['result']['groups']['product'] ?? []), $says));
+                $telling['result']['groups']['product'] = $kept;
+                $telling['result']['counts']['product'] = count($kept);
+                $telling['result']['total'] = count($kept) + count((array) ($telling['result']['groups']['content'] ?? []));
+                $telling['result']['ids'] = array_values(array_filter((array) ($telling['result']['ids'] ?? []), fn ($id): bool => ! str_starts_with((string) $id, 'p:') || in_array((string) $id, array_column($kept, 'id'), true)));
+                unset($telling['count']);
+                $found[] = $telling;
             }
         }
         if ($found === []) {
@@ -999,7 +1063,9 @@ final class SearchCatalog
             }
             // Far by meaning, yet its own description says what was searched: "פטריה לקשב וריכוז" is .34 from the formula
             // that speaks of "מיקוד הקשב" and "ריכוז", where an unrelated search is .1. Those near ones are shown, alone.
-            $said = $weak ? DescribedProducts::saying($shopId, (string) $index['hash'], $query, $near['products']) : [];
+            // ...never for one word the store has nothing close to: a necklace whose description says it goes well over a
+            // "חולצה" is no shirt (Rocks, 17.11: seven of them for "חולצה")
+            $said = $weak && ! ($nothingKnown && ! str_contains(trim($query), ' ')) ? DescribedProducts::saying($shopId, (string) $index['hash'], $query, $near['products']) : [];
             if ($said !== []) {
                 $this->trace?->dropped([...$near['products'], ...$pictures], $said, 'meaning_far');
                 $this->trace?->step('meaning', ['far' => true, 'said' => $said]);
