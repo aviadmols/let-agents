@@ -131,12 +131,12 @@ final class AnswerChangesTest extends TestCase
         $this->assertSame(['להציע לבוא לחנות כשזה עוזר'], AnswerRules::texts($this->shop->id));
         $this->assertFalse(app(CheckAnswerChange::class)->apply($started['id'], $this->shop->id), 'kept once');
 
-        // shoppers are answered by the released writer (v29, as v26 reading no rules), given no rules, and saved answers stay as they were
-        $this->assertSame(29, AnswerSiteQuestion::releasedVersion('answer_site'));
-        $this->assertNull(AnswerSiteQuestion::toneKey($this->shop->id));
+        // shoppers are answered by the released writer, which reads the store's rules since v30 (17.11): the rule kept is given
+        $this->assertSame(30, AnswerSiteQuestion::releasedVersion('answer_site'));
+        $this->assertNotNull(AnswerSiteQuestion::toneKey($this->shop->id), 'saved answers are written again with the rule');
         $this->replies = [['found' => true, 'answer' => 'יש משלוח לכל הארץ.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true, 'safe' => true]];
         $this->ask('יש משלוחים?');
-        $this->assertArrayNotHasKey('rules', json_decode(end($this->calls) === false ? '{}' : $this->calls[count($this->calls) - 2]['user'], true));
+        $this->assertSame(['להציע לבוא לחנות כשזה עוזר'], json_decode(end($this->calls) === false ? '{}' : $this->calls[count($this->calls) - 2]['user'], true)['rules'] ?? null);
     }
 
     public function test_a_fact_is_not_a_rule_and_is_never_kept(): void
@@ -209,7 +209,7 @@ final class AnswerChangesTest extends TestCase
             ->assertSeeHtml('https://store.test/wp-admin/post.php?post=700&amp;action=edit')
             ->assertSee('אפשר להחזיר מוצר תוך 14 יום מקבלתו, באריזה המקורית.')
             ->assertSee('עוד אין חוקים')
-            ->assertSee('ויתחילו לפעול בתשובות לגולשים בקרוב')
+            ->assertDontSee('ויתחילו לפעול בתשובות לגולשים בקרוב')
             ->call('startRule')
             ->set('change.text', 'להציע לבוא לחנות כשזה עוזר')
             ->call('checkChange')

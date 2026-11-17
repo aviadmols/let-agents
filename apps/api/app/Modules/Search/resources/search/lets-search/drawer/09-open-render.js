@@ -77,7 +77,17 @@
     };
     // typed on the page: the field takes the focus at once, inside the keystroke, so the next letters
     // land in it (and a phone keeps its keyboard up)
-    if (opts.from) { focusField(); } else { setTimeout(focusField, isPhone() ? 60 : 30); }
+    if (opts.from) { focusField(); } else {
+      // the field is ready to type in as the drawer opens (as Aviad asked, 17.11): focused inside the click itself, so a
+      // phone raises its keyboard (a focus a moment later is refused there), then as before, and once more when the opening
+      // is done, if the theme took the focus back meanwhile; never over another field of ours the shopper is in
+      if (opts.focus !== false) { try { INPUT.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ } }
+      setTimeout(focusField, isPhone() ? 60 : 30);
+      setTimeout(function () {
+        var here = INPUT.getRootNode && INPUT.getRootNode().activeElement;
+        if (S.open && opts.focus !== false && !(here && /^(INPUT|TEXTAREA|SELECT)$/.test(here.tagName))) { INPUT.focus({ preventScroll: true }); }
+      }, 520);
+    }
   }
   function close(fromHistory) {
     if (!S.open) { return; }

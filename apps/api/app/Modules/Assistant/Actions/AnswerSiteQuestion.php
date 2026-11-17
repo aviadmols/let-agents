@@ -121,8 +121,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * a reply naming no subject keeps the conversation's, how-to answers give the fee, the deadline and the way to
      * arrange, the store's contact when the answer sends the shopper to it, no stale offer; the checker reads the
      * conversation.
+     *
+     * v30 (answer_site and verify_site; scope_site stays v29) released 17.11 on 42 real conversations from 9 stores, two
+     * runs each of v29 and v30: no offer to tell more of the answer's own subject (none in either run, one or two in
+     * every v29 run: "תרצו שנפרט מה צריך לצרף להחזרה?" led to "check with our team", Sella), the same facts in the
+     * answers; the team's lines the check reads as instructions come as `rules`, never as passages (8a).
      */
-    public const PROMPT_VERSION = 29;
+    public const PROMPT_VERSION = 30;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
