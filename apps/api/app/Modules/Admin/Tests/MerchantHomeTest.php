@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Tests;
 
 use App\Core\Facades\Settings;
+use App\Modules\Admin\Contracts\TodayFix;
 use App\Modules\Admin\Filament\Merchant\Pages\ShopOverview;
 use App\Modules\Admin\Livewire\TodayFeed;
 use App\Modules\Admin\Models\User;
@@ -56,6 +57,31 @@ final class MerchantHomeTest extends TestCase
         // the user menu: the connection and the plan, each to its own page (the plan left the connection page in the redesign)
         $this->get("/merchant/{$shop->slug}/settings/connection")->assertOk()->assertSee('החיבור לחנות')
             ->assertSee('חבילה וחיוב')->assertSee("/merchant/{$shop->slug}/settings/plan", false);
+    }
+
+    /**
+     * No shopper searched yet, and something already waits for the owner: Today never calls it a steady week nor says
+     * shoppers are searching (the App Store review's run, 17.11). It waits for the first search, and says what waits.
+     */
+    public function test_a_store_nobody_searched_yet_is_never_told_of_a_steady_week_or_of_shoppers_searching(): void
+    {
+        $shop = Shop::factory()->create();
+        $merchant = User::factory()->create();
+        $merchant->attachShop($shop);
+        $this->actingAs($merchant);
+        app()->setLocale('he');
+        Filament::setCurrentPanel('merchant');
+        Filament::setTenant($shop);
+
+        $page = Livewire::test(ShopOverview::class)->instance();
+        (new \ReflectionProperty($page, 'fixesCache'))->setValue($page, [new TodayFix('k', TodayFix::QUICK, 1, '', 'כותרת', 'טקסט', 'approve', true)]);
+
+        $this->assertFalse($page->firstDay(), 'something waits: not the first day\'s page');
+        $this->assertSame('הכול מוכן.', $page->mood());
+        $this->assertStringNotContainsString('יציב', $page->mood());
+        $this->assertStringStartsWith('קראנו את כל החנות.', $page->lede());
+        $this->assertStringNotContainsString('גולשים מחפשים', $page->lede());
+        $this->assertStringContainsString('וכמה דברים קטנים יכולים לשפר אותו עוד.', $page->lede());
     }
 
     public function test_the_panel_opens_in_english_and_keeps_a_chosen_hebrew(): void

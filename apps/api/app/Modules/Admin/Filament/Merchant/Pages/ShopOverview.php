@@ -146,6 +146,10 @@ final class ShopOverview extends Page
         if ($this->firstDay()) {
             return __('admin::today.mood.live');
         }
+        // no shopper searched yet, with something already waiting: no week to call steady (App Store review, 17.11)
+        if (! $this->searchedEver()) {
+            return __('admin::today.mood.ready');
+        }
         $revenue = $this->numbers()['revenue'] ?? null;
         $change = $revenue === null || (float) $revenue['before'] === 0.0 ? null : ($revenue['now'] - $revenue['before']) / $revenue['before'];
 
@@ -163,8 +167,13 @@ final class ShopOverview extends Page
         if ($this->firstDay()) {
             return __('admin::today.lede.first_day');
         }
+        // "but shoppers are searching" only where they are: a store nobody searched yet is told it waits for the first one
+        if (! $this->searchedEver()) {
+            return __('admin::today.lede.first_day').($this->fixes()['total'] > 0 ? ' '.__('admin::today.lede.waiting') : '');
+        }
         $revenue = $this->numbers()['revenue'] ?? ['now' => 0, 'before' => 0];
         $how = match (true) {
+            (float) $revenue['now'] <= 0 && ! $this->searchedInPeriod() => 'none_quiet',
             (float) $revenue['now'] <= 0 => 'none',
             (float) $revenue['before'] <= 0 => 'first',
             $revenue['now'] > $revenue['before'] => 'more',
@@ -188,14 +197,27 @@ final class ShopOverview extends Page
     /** A store no shopper has searched or asked in yet, with nothing waiting for the owner: Today shows its first day. */
     public function firstDay(): bool
     {
-        $quiet = (bool) Cache::remember('today:'.$this->shop()->id.':first-day', self::CACHE_SECONDS, function (): bool {
+        // a question asked on a product page waits even before the first search
+        return ! $this->searchedEver() && $this->fixes()['total'] === 0;
+    }
+
+    /** Whether any shopper searched or asked in the last 90 days. */
+    private function searchedEver(): bool
+    {
+        return ! (bool) Cache::remember('today:'.$this->shop()->id.':first-day', self::CACHE_SECONDS, function (): bool {
             $found = app(Today::class)->found($this->shop(), now()->subDays(90), now());
 
             return $found !== null && $found['searches'] + $found['questions'] === 0;
         });
+    }
 
-        // a question asked on a product page waits even before the first search
-        return $quiet && $this->fixes()['total'] === 0;
+    /** Whether any shopper searched or asked in the period shown (unknown counts as yes, the words as they were). */
+    private function searchedInPeriod(): bool
+    {
+        [$since, $until] = $this->range();
+        $found = app(Today::class)->found($this->shop(), $since, $until);
+
+        return $found === null || $found['searches'] + $found['questions'] > 0;
     }
 
     /**
@@ -440,6 +462,12 @@ final class ShopOverview extends Page
     public function storeUrl(): ?string
     {
         return collect($this->steps())->firstWhere('key', 'look')?->url;
+    }
+
+    /** Whether "See it as a shopper" leaves the panel (the store) or stays in it (the search check, a store behind its password). */
+    public function storeOutside(): bool
+    {
+        return collect($this->steps())->firstWhere('key', 'look')?->external ?? true;
     }
 
     /** The search check screen, for "Try a search" on the first day, when the panel has it. */

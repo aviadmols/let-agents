@@ -8,7 +8,7 @@
     <div class="lp-d-top-tools">
         @include('admin::merchant.period')
         @if ($this->storeUrl())
-            <a class="lp-d-btn lp-d-btn-line" href="{{ $this->storeUrl() }}" target="_blank" rel="noopener" wire:click="looked" data-see-as-shopper>
+            <a class="lp-d-btn lp-d-btn-line" href="{{ $this->storeUrl() }}" @if ($this->storeOutside()) target="_blank" rel="noopener" @endif wire:click="looked" data-see-as-shopper>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
                 <span>{{ $t('see') }}</span>
             </a>

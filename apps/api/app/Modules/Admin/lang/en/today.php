@@ -7,6 +7,7 @@ return [
 
     'mood' => [
         'live' => 'Search is live.',
+        'ready' => 'All set.',
         'strong' => ['week' => 'Strong week.', 'month' => 'Strong month.', 'period' => 'A strong stretch.'],
         'steady' => ['week' => 'Steady week.', 'month' => 'Steady month.', 'period' => 'A steady stretch.'],
         'quiet' => ['week' => 'Quieter week.', 'month' => 'Quieter month.', 'period' => 'A quieter stretch.'],
@@ -18,6 +19,7 @@ return [
         'same' => ['week' => 'Search sold as much as last week.', 'month' => 'Search sold as much as last month.', 'period' => 'Search sold as much as in the period before.'],
         'first' => ['week' => 'Search made its first sales this week.', 'month' => 'Search made its first sales this month.', 'period' => 'Search made its first sales in this period.'],
         'none' => ['week' => 'No sales through search yet this week, but shoppers are searching.', 'month' => 'No sales through search yet this month, but shoppers are searching.', 'period' => 'No sales through search in this period yet, but shoppers are searching.'],
+        'none_quiet' => ['week' => 'No searches and no sales through search yet this week.', 'month' => 'No searches and no sales through search yet this month.', 'period' => 'No searches and no sales through search in this period yet.'],
         'waiting' => 'A few small things could make it even better.',
     ],
 
