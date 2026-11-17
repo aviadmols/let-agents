@@ -2095,6 +2095,13 @@ final class SearchCatalog
             } else {
                 // Of its own kind, or none: a baby cream's nearest pictures may be blankets on the same white background.
                 $ids = app(ProductKinds::class)->sameKind($product, array_map('strval', $ids), $near);
+                // and what its picture shows it is, where looks lead and the shop asks it (search.similar_seen_kind): a store's one
+                // type of tops made a tank top and a cardigan a knit tee's alike (Miss Nori, 17.11). Those left are "maybe these"
+                if ($looksLead && (bool) Settings::get('search.similar_seen_kind', $shopId)) {
+                    $seenOf = self::seenKind($product, $ids);
+                    $near = [...array_values(array_diff($ids, $seenOf)), ...(array) $near];
+                    $ids = $seenOf;
+                }
             }
             $ids = array_values(array_unique([...$alike, ...array_filter($ids, fn (string $id): bool => ! isset($apart[$id]))]));
             $near = array_values(array_filter((array) $near, fn ($id): bool => ! isset($apart[(string) $id])));
