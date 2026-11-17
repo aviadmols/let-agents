@@ -46,7 +46,9 @@ final class CatalogProductKinds implements ProductKinds
         // "Dream", "Joy", "Focus"; as kinds, no product had a like). Its kind is then read as if it had none.
         // A season or a campaign typed as the type is none (Chozen types its products "חורף 26": a slipper and a fleece
         // were one kind).
-        if ($own['type'] !== '' && ($counts['type'][$own['type']] ?? 0) >= 2 && ! $this->campaign($own['type'])) {
+        // and a type whose titles open with many words is a drawer of everything, not a kind ("אביזרים": a bottle, a carrier,
+        // bandanas, cards; Take Me Home 17.11: the bandanas were a bottle's alike): its kind is then read from its title
+        if ($own['type'] !== '' && ($counts['type'][$own['type']] ?? 0) >= 2 && ! $this->campaign($own['type']) && self::oneKind($own['type'], $counts)) {
             return ['type:'.$own['type']];
         }
 
@@ -73,6 +75,22 @@ final class CatalogProductKinds implements ProductKinds
             fn (string $t): bool => ($counts['tag'][$t] ?? 0) <= $limit && $t !== $own['title'] && preg_match(self::CAMPAIGN, $t) !== 1 && ! $this->onlyWhom($t)
                 && $t !== mb_strtolower(trim((string) $product->brand)),
         )));
+    }
+
+    /** Its products' titles open with this many words at most, as a share of them, for a type to be one kind. */
+    private const TYPE_HEADS_SHARE = 0.35;
+
+    /**
+     * Whether the store's type names one kind: its titles open with a few words ("KIDSSHIRT": T-shirts and shirts), never with
+     * as many as a drawer of everything ("אביזרים": a bottle, a carrier, bandanas, cards).
+     *
+     * @param  array<string, mixed>  $counts
+     */
+    private static function oneKind(string $type, array $counts): bool
+    {
+        $products = (int) ($counts['type'][$type] ?? 0);
+
+        return count((array) ($counts['typeHeads'][$type] ?? [])) <= max(3, (int) ceil($products * self::TYPE_HEADS_SHARE));
     }
 
     /** Whether a tag or category says what a product is: not a campaign, whom alone, its brand, or most of the store. */
@@ -173,6 +191,14 @@ final class CatalogProductKinds implements ProductKinds
                     continue;
                 }
                 $theirs = self::own($other, $prefixes)['head'];
+                // of one type that names one kind, two openings are that kind's ("חולצת פסים", "טי שירט סטרייפס": KIDSSHIRT; Miss Nori
+                // 17.11: the shirt's striped T-shirt, its nearest by meaning and by picture, was only "maybe")
+                $ownType = self::own($product, $prefixes)['type'];
+                if ($ownType !== '' && $ownType === self::own($other, $prefixes)['type'] && $marks === ['type:'.$ownType]) {
+                    $kept[] = $id;
+
+                    continue;
+                }
                 if ($heads !== [] && $theirs !== '' && ! in_array($theirs, $heads, true) && ! $read && ! $this->isRead($other)
                     && ($named($heads[0]) || $named($theirs)) && (string) $id !== (string) $product->external_id) {
                     if ($nearToo) {
@@ -483,11 +509,11 @@ final class CatalogProductKinds implements ProductKinds
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = '5|'.$active->count().'|'.$active->max('updated_at');
+        $version = '6|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
             $prefixes = self::brandPrefixes();
-            $counts = ['products' => 0, 'type' => [], 'head' => [], 'after' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
+            $counts = ['products' => 0, 'type' => [], 'typeHeads' => [], 'head' => [], 'after' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
 
             CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'brand', 'payload'])->orderBy('id')
                 ->chunk(500, function ($products) use (&$counts, $prefixes): void {
@@ -496,6 +522,9 @@ final class CatalogProductKinds implements ProductKinds
                         $counts['products']++;
                         if ($own['type'] !== '') {
                             $counts['type'][$own['type']] = ($counts['type'][$own['type']] ?? 0) + 1;
+                            if ($own['head'] !== '') {
+                                $counts['typeHeads'][$own['type']][$own['head']] = true;
+                            }
                         }
                         if ($own['head'] !== '') {
                             $counts['head'][$own['head']] = ($counts['head'][$own['head']] ?? 0) + 1;

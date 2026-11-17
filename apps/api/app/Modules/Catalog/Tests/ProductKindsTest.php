@@ -263,4 +263,40 @@ final class ProductKindsTest extends TestCase
             $this->assertNotContains('4', [...$same, ...$near], 'never a shirt, not even as maybe');
         });
     }
+
+    public function test_a_type_of_one_kind_joins_its_openings_and_a_drawer_of_everything_is_no_kind(): void
+    {
+        // Miss Nori 17.11: a striped shirt's striped T-shirt (both KIDSSHIRT) was only "maybe"; Take Me Home: a bottle's alike were
+        // bandanas, a carrier and cards, all typed "אביזרים"
+        $shop = Shop::factory()->create();
+        $products = app(TenantContext::class)->run($shop->id, function () use ($shop): array {
+            $make = fn (string $id, string $title, string $type): CatalogProduct => CatalogProduct::query()->create([
+                'shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'price' => 100,
+                'payload' => ['product_type' => $type],
+            ]);
+            $list = ['shirt' => $make('1', 'חולצת פסים אוברסייז | בורדו', 'KIDSSHIRT'), 'bottle' => $make('20', 'בקבוק נירוסטה כדור פורח', 'אביזרים')];
+            foreach (['2' => 'טי שירט אוברסייז סטרייפס | אדום', '3' => 'חולצת כפתורים | לבן', '4' => 'טי שירט בייסיק | שחור', '5' => 'חולצה ארוכה | ירוק'] as $id => $title) {
+                $make($id, $title, 'KIDSSHIRT');
+            }
+            foreach (['21' => 'זוג בנדנות כדור פורח', '22' => 'מנשא בד כדור פורח', '23' => 'כרטיסיות חודשי יום הולדת', '24' => 'שמיכת מוסלין', '25' => 'מוצץ סיליקון', '26' => 'בקבוק שתייה לילדים'] as $id => $title) {
+                $make($id, $title, 'אביזרים');
+            }
+            $make('30', 'מכנסי טרנינג | אפור', 'PANTS');
+            $make('31', 'מכנסי ג׳ינס | כחול', 'PANTS');
+
+            return $list;
+        });
+
+        app(TenantContext::class)->run($shop->id, function () use ($products): void {
+            $kinds = app(ProductKinds::class);
+            $this->assertSame(['type:kidsshirt'], $kinds->marks($products['shirt']));
+            $this->assertContains('2', $kinds->sameKind($products['shirt'], ['2', '30', '3']), 'its T-shirt, of its own type');
+            $this->assertNotContains('30', $kinds->sameKind($products['shirt'], ['2', '30', '3']));
+            $this->assertNotContains('type:אביזרים', $kinds->marks($products['bottle']), 'a type of six openings in seven is no kind');
+            $same = $kinds->sameKind($products['bottle'], ['21', '22', '23', '26']);
+            $this->assertNotContains('21', $same, 'bandanas are no bottle\'s alike');
+            $this->assertContains('26', $same, 'the other bottle is');
+        });
+    }
 }

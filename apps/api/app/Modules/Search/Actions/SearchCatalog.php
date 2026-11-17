@@ -2533,6 +2533,54 @@ final class SearchCatalog
             ->mapWithKeys(fn (CatalogProduct $p): array => [(string) $p->external_id => $kinds->audiences($p)])->all();
     }
 
+    /** At least this share of the "maybe these" share the category that names them. */
+    private const OTHERS_OF_SHARE = 0.5;
+
+    /** A category of more than this share of the store names nothing ("כל המוצרים"). */
+    private const OTHERS_OF_MAX_STORE = 0.5;
+
+    /**
+     * What the "maybe these" beside a product share with it, as the store names it: the category of its own that most of them
+     * are in, the smallest of those that hold as many ("אייקוני כדורים פורחים" for a bottle's bandanas and carrier). Never a
+     * campaign or an offer, whom alone ("ילדים"), or most of the store. Null when no category holds half of them: the drawer
+     * then says only "maybe these". Take Me Home, 17.11: "עוד 8 שאולי יתאימו" said nothing of why they were there.
+     *
+     * @param  list<string>  $otherIds  their external ids
+     */
+    public function othersOf(string $shopId, string $externalId, array $otherIds): ?string
+    {
+        if ($otherIds === []) {
+            return null;
+        }
+
+        return $this->tenant->run($shopId, function () use ($externalId, $otherIds): ?string {
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'external_id']);
+            if ($product === null) {
+                return null;
+            }
+            $kinds = app(ProductKinds::class);
+            $store = max(1, CatalogProduct::query()->whereNull('removed_at')->count());
+            $others = CatalogProduct::query()->whereIn('external_id', array_values(array_unique($otherIds)))->pluck('id')->all();
+            $best = null;
+            foreach ($product->categories()->whereNull('catalog_categories.removed_at')->withCount('products')->get(['catalog_categories.id', 'catalog_categories.name']) as $category) {
+                $name = trim((string) $category->name);
+                if ($name === '' || $kinds->campaign($name) || $kinds->onlyWhom($name) || $category->products_count > $store * self::OTHERS_OF_MAX_STORE) {
+                    continue;
+                }
+                $sharing = $category->products()->whereIn('catalog_products.id', $others)->count();
+                if ($sharing < max(1, (int) ceil(count($others) * self::OTHERS_OF_SHARE))) {
+                    continue;
+                }
+                $key = [$sharing, -$category->products_count, $name];
+                if ($best === null || $key > $best[0]) {
+                    $best = [$key, $name];
+                }
+            }
+
+            return $best[1] ?? null;
+        });
+    }
+
     /** A store whose product titles name a colour this rarely or less tells colours by its filters, not its titles. */
     private const TITLES_COLOUR_SHARE = 0.2;
 

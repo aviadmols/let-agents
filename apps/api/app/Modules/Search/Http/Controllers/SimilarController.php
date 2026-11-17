@@ -58,7 +58,9 @@ final class SimilarController
         $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other', $wants, $others);
         // few or none look like it: those of its kind its look left out, to be shown apart as "maybe these" (never as alike)
         $others = count($products) < self::FEW_ALIKE ? array_slice((array) $others, 0, $limit) : [];
+        // what they share with it, as the store names it: "maybe these from …" says why they are there
+        $of = $others === [] ? null : $search->othersOf($shopId, $id, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $others));
 
-        return response()->json(['products' => $products] + ($others === [] ? [] : ['others' => $others]) + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return response()->json(['products' => $products] + ($others === [] ? [] : ['others' => $others]) + ($of === null ? [] : ['others_of' => $of]) + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

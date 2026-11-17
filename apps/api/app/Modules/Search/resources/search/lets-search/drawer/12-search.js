@@ -833,12 +833,13 @@
     if (turn.loading) { return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' : '') + '</div><div style="padding:12px 0">' + thinking() + '</div>'; }
     if (turn.error) { return '<div class="ls-wide-head">' + back + '</div>' + errorHtml(turn); }
     var list = filtered(turn), shown = list.slice(0, fill(turn.limit || 24));
-    var title = similar ? esc(countText(list.length) + othersCount(turn)) + ' <span>' + esc(t('similar')) + '</span>' : esc(countText(list.length)) + ' <span>"' + esc(turn.q) + '"</span>';
+    var title = similar ? esc(countText(list.length)) + ' <span>' + esc(t('similar')) + '</span>' : esc(countText(list.length)) + ' <span>"' + esc(turn.q) + '"</span>';
     return '<div class="ls-wide-head">' + back + (similar ? '<div style="margin-top:8px">' + ofHero(turn.of, turn.size, turn.oos) + '</div>' + oosNote(turn) : '') +
       '<div class="ls-summary" style="margin-top:' + (similar ? 18 : 8) + 'px"><div class="ls-summary__count ls-num" style="font-size:20px;font-weight:500">' + title + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn) + '</div>' +
-      (similar && !(turn.ids || []).length ? '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>' : list.length ? '<div class="ls-grid">' + shown.map(card).join('') + '</div>' : '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>') +
+      (similar && !(turn.ids || []).length ? (othersHtml(turn, turn.othersOf ? t('similarNoneOthersOf', { c: turn.othersOf }) : t('similarNoneOthers')) || '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>') : list.length ? '<div class="ls-grid">' + shown.map(card).join('') + '</div>' : '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>') +
       // no way out to the theme's own search page: the drawer's results are the search (as Aviad asked, 2026-10-21)
-      (list.length > shown.length ? '<div class="ls-more"><button class="ls-btn ls-btn--secondary" data-loadmore="' + turn.id + '">' + esc(t('loadMore')) + '</button></div>' : '');
+      (list.length > shown.length ? '<div class="ls-more"><button class="ls-btn ls-btn--secondary" data-loadmore="' + turn.id + '">' + esc(t('loadMore')) + '</button></div>' : '') +
+      (similar && (turn.ids || []).length && list.length <= shown.length ? othersHtml(turn, null) : '');
   }
 

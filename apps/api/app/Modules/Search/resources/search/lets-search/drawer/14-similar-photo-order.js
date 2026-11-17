@@ -23,7 +23,7 @@
       return products(ids.slice(0, 24).map(pid).concat(others.map(pid))).then(function () {
         if (oos) { update(turn, oosPatch(turn, ids, oos)); toTurn(turn.id); return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
-        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others });
+        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others, othersOf: (r.body && r.body.others_of) || null });
         toTurn(turn.id);
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -76,26 +76,21 @@
     if (!(turn.ids || []).length) {
       // asked for more than its alike and none is all of it: said so, and its alike are a choice, never shown in its place
       if (turn.wants) { return '<p class="ls-noanswer__text">' + esc(t('similarAskedNone', { w: turn.wants })) + '</p><button class="ls-btn ls-btn--secondary ls-btn--sm" data-similar="' + esc(turn.of) + '">' + esc(t('similarAll')) + '</button>'; }
-      return othersHtml(turn, t('similarNoneOthers')) || '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>';
+      return othersHtml(turn, turn.othersOf ? t('similarNoneOthersOf', { c: turn.othersOf }) : t('similarNoneOthers')) || '<p class="ls-noanswer__text">' + esc(t('noSimilar')) + '</p>';
     }
     var list = filtered(turn), n = gridN(turn);
     // like the results: how many, the order to show them in, and the filters (the large view has them in its head)
-    var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length) + othersCount(turn)) + '</div>' +
+    var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
     return oosNote(turn) + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
       (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '') + othersHtml(turn, null);
   }
-  // what the title counts beside its alike: those shown apart below ("2 products" over a dozen: Naot QA, 16.11)
-  function othersCount(turn) {
-    var n = Math.min(8, (turn.others || []).map(rec).filter(Boolean).length);
-    return n ? ' · ' + t('similarPlus', { n: n }) : '';
-  }
   // those of its kind that do not look like it, apart and said to be so: a line when none is alike, a title when few are
   function othersHtml(turn, line) {
     var list = (turn.others || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    return (line ? '<p class="ls-noanswer__text">' + esc(line) + '</p>' : '<div class="ls-block__title" style="margin-top:18px">' + esc(t('similarMaybe')) + '</div>') +
+    return (line ? '<p class="ls-noanswer__text">' + esc(line) + '</p>' : '<div class="ls-block__title" style="margin-top:18px">' + esc(turn.othersOf ? t('similarMaybeOf', { c: turn.othersOf }) : t('similarMaybe')) + '</div>') +
       '<div class="ls-grid">' + list.slice(0, 8).map(card).join('') + '</div>';
   }
 
