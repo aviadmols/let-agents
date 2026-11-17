@@ -25,6 +25,29 @@
     if (/\s$/.test(INPUT.value)) { liveFor(q); return; }
     wordTimer = setTimeout(function () { if (INPUT.value.trim() === q) { liveFor(q); } }, WORD_REST_MS);
   }
+  // The typing has rested and the ask card is on screen for these very words (a question, or words that found nothing):
+  // the store's AI is asked without the press (as Aviad asked, 17.11). Never on a letter: two seconds after the last one,
+  // the words unchanged, the drawer open. A question the store already answered shows its answer as it is typed and is
+  // not asked again. A few times a visit at most, then the button is the shopper's to press as before: each ask is paid.
+  var REST_ASK_MS = 2000, REST_ASKS = 3, restTimer = null, restAsked = 0;
+  function restAsks() { try { return parseInt(win.sessionStorage.getItem('ls_rest_asks') || '0', 10) || 0; } catch (e) { return restAsked; } }
+  function askAtRest() {
+    clearTimeout(restTimer);
+    var q = INPUT.value.trim();
+    if (!S.open || off('ask') || q.replace(/[^\p{L}\p{N}]/gu, '').length < 4 || (S.config && S.config.suggest === false)) { return; }
+    var tries = 0;
+    var go = function () {
+      if (!S.open || INPUT.value.trim() !== q || !S.live || S.live.q !== q || restAsks() >= REST_ASKS) { return; }
+      // the search by meaning still to answer: what it finds may be the answer, so it is waited for (a little)
+      if ((S.live.waiting || S.live.pending || (S.live.willMean && !S.live.meant)) && tries++ < 6) { restTimer = setTimeout(go, 500); return; }
+      var card = askCardFor(q), btn = !card && isQuestion(q) ? SUG.querySelector('.ls-askcard__btn[data-ask]') : null;
+      if (!card && !btn) { return; }
+      restAsked++;
+      try { win.sessionStorage.setItem('ls_rest_asks', String(restAsks() + 1)); } catch (e) { /* counted in memory */ }
+      if (card) { card.click(); } else { submit(q, 'ask', false, true); }
+    };
+    restTimer = setTimeout(go, REST_ASK_MS);
+  }
   function liveFor(q) {
     if (!S.open || q === S.keptQ) { return; }
     if (!S.index) { loadIndex().then(onType); return; }

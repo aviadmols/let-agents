@@ -13,6 +13,7 @@
     return null;
   }
   INPUT.addEventListener('input', onType);
+  INPUT.addEventListener('input', askAtRest);
   INPUT.addEventListener('focus', function () { setTimeout(onType, 0); });
   INPUT.addEventListener('keydown', function (e) {
     var opts = SUG.classList.contains('is-on') ? SUG.querySelectorAll('[data-opt]') : [];
