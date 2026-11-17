@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Media\Picture;
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -1067,6 +1068,13 @@ final class SearchCatalog
             foreach ($this->trace === null ? [] : $pinned as $id) {
                 $this->trace->found($id, 'resolved');
             }
+            // a word no product says, that a question the store's assistant answered does ("נגד ציפורים", where the spike is
+            // "להרחקת יונים" and "מה מתאים נגד ציפורים?" was answered with it): what that answer picked, first
+            $answeredWith = $byMeaning && $unknown !== [] ? $this->answeredWith($query, $unknown, $index['records']) : [];
+            foreach ($answeredWith as $id) {
+                $this->trace?->found($id, 'answered');
+            }
+            $pinned = array_values(array_unique([...$pinned, ...$answeredWith]));
             // A question about a kind of product ("איזה עץ…") shows that kind first: products of the
             // categories named after it, before products that only mention the word (a bracket
             // "לעמודי עץ"). The assistant then picks from them too.
@@ -3568,6 +3576,55 @@ final class SearchCatalog
         }
 
         return $ids;
+    }
+
+    /**
+     * The products the store's assistant picked when it answered a question that says the words no product says. A shopper
+     * who searches "נגד ציפורים" where the spike is written "להרחקת יונים" gets what "מה מתאים נגד ציפורים?" was answered
+     * with: the answer was written from the store's pages and checked, so its picks are the store's own reading of the word.
+     * Every such word must be in the question, as a word of its own, and every other word of the search in the question or
+     * in the product's own words ("כלוב ציפורים" is not answered by a spike against birds); only
+     * products the index still has in stock are shown. Nothing of the question or its answer is shown, only the products.
+     *
+     * @param  list<string>  $unknown  the search's words no product says, as the engine writes them
+     * @param  array<string, array<string, mixed>>  $records
+     * @return list<string>
+     */
+    private function answeredWith(string $query, array $unknown, array $records): array
+    {
+        // the search's other words: each said by the question or by the product itself ("כלוב ציפורים" is neither's)
+        $rest = array_values(array_filter(array_diff(explode(' ', HebrewSearch::normalize($query)), array_map('strval', $unknown)), fn (string $word): bool => mb_strlen($word) >= 3));
+        $words = array_map(fn (string $word): string => HebrewSearch::withFinals($word), array_map('strval', $unknown));
+        if ($words === [] || array_filter($words, fn (string $word): bool => mb_strlen($word) < 3) !== []) {
+            return [];
+        }
+        $answers = AssistantAnswer::query()
+            ->where('outcome', AssistantAnswer::ANSWERED)->where('status', AssistantAnswer::SHOWN)
+            ->whereNull('product_id')->whereNull('content_id')->whereNotNull('picks');
+        foreach ($words as $word) {
+            $answers->where('question', 'like', '%'.addcslashes($word, '%_\\').'%');
+        }
+        $ids = [];
+        foreach ($answers->latest('updated_at')->limit(self::ANSWERED_FEW)->get(['id', 'question', 'picks']) as $answer) {
+            foreach ($words as $word) {
+                // a word of its own, with the letters Hebrew joins before one: "חול" is not in "כחול"
+                if (preg_match('/(?<![\p{L}\p{N}])[ובלמהשכ]{0,2}'.preg_quote($word, '/').'(?![\p{L}\p{N}])/iu', (string) $answer->question) !== 1) {
+                    continue 2;
+                }
+            }
+            foreach ((array) $answer->picks as $pick) {
+                $id = 'p:'.(string) (is_array($pick) ? ($pick['external_id'] ?? '') : '');
+                if (($records[$id]['t'] ?? null) !== 'product' || (int) ($records[$id]['s'] ?? 0) !== 1) {
+                    continue;
+                }
+                $says = (string) $answer->question.' '.(string) ($records[$id]['title'] ?? '').' '.(string) ($records[$id]['kw'] ?? '');
+                if (array_filter($rest, fn (string $word): bool => ! HebrewSearch::holdsAny($says, [$word])) === []) {
+                    $ids[$id] = true;
+                }
+            }
+        }
+
+        return array_slice(array_map('strval', array_keys($ids)), 0, self::ANSWERED_FEW);
     }
 
     /**
