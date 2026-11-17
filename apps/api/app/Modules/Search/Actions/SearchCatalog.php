@@ -665,6 +665,24 @@ final class SearchCatalog
         return $codes !== [] && array_diff($words, $said) === [] ? array_values(array_unique($codes)) : [];
     }
 
+    /** Within a price asked, this many products or fewer are few: the step above it is offered. */
+    private const FEW_IN_PRICE = 6;
+
+    /**
+     * The round price a step above one asked: half of its order of size, or all of it where that is a small step
+     * (3,000: 3,500; 2,000: 2,500; 3,500: 4,000; 150: 200; 80: 90).
+     */
+    public static function nextPrice(float $max): float
+    {
+        if ($max <= 0) {
+            return $max;
+        }
+        $step = 10 ** floor(log10($max)) / 2;
+        $step = $step < $max * 0.15 ? $step * 2 : $step;
+
+        return (floor($max / $step) + 1) * $step;
+    }
+
     private function ofLength(string $shopId, array $index, ?int $days, ?float $minPrice, ?float $maxPrice, array $actions, ?array $only, bool $count, ?int $perGroup, array $visit, array $codes = []): array
     {
         // no length: every product (a search of actions alone, "מבצעים"); a price only when one was asked
@@ -1070,6 +1088,7 @@ final class SearchCatalog
             $perGroup ??= (int) Settings::get('search.results_per_group', $shopId);
 
             $groups = array_fill_keys(self::GROUPS, []);
+            $above = [];
 
             foreach ($ranked as $id) {
                 $record = $index['records'][$id] ?? null;
@@ -1082,6 +1101,10 @@ final class SearchCatalog
                 }
 
                 if ($record !== null && $type === 'product' && ! HebrewSearch::inRange($record['pr'] ?? null, $minPrice, $maxPrice)) {
+                    // a little over what was asked: counted apart, for "N more up to …" when few are within it
+                    if ($maxPrice !== null && ($record['s'] ?? 0) === 1 && HebrewSearch::inRange($record['pr'] ?? null, $maxPrice + 0.01, self::nextPrice($maxPrice))) {
+                        $above[] = $record;
+                    }
                     $this->trace?->left($id, 'price');
 
                     continue;
@@ -1156,6 +1179,15 @@ final class SearchCatalog
                 $this->trace?->dropped($before, array_column($groups['product'], 'id'), 'facet');
             }
 
+            // few within the price asked: how many more a step above it holds, of all else that was asked (Rocks QA, 17.11: two
+            // rings up to 3,000 and nothing said of the five more up to 3,500). Counted by code from what was already found.
+            $morePriced = null;
+            if ($above !== [] && count($groups['product']) <= self::FEW_IN_PRICE) {
+                $fit = array_filter($above, fn (array $r): bool => ($kinds === [] || self::ofKinds($r, $kinds, $worded))
+                    && array_all($read, fn (array $values, int $at): bool => self::holdsRead($r, $at, self::notRefused($r, $values), (array) ($index['facets'] ?? []))));
+                $morePriced = $fit === [] ? null : ['max' => self::nextPrice((float) $maxPrice), 'count' => count($fit)];
+            }
+
             // "הכי זול", "במבצע": filtered and sorted as asked, before any is cut.
             $before = array_column($groups['product'], 'id');
             $groups['product'] = HebrewSearch::applyActions($groups['product'], $actions);
@@ -1202,7 +1234,7 @@ final class SearchCatalog
             return ['query' => $query, 'unknown' => $unknown, 'held' => max(count(self::whole($spelling)), count($translatedHeld ?? [])), 'total' => $total, 'semantic' => $meaning !== [] || $pictures !== [] || $guides !== [], 'resolved' => $pinned !== [], 'subject' => $subject !== [], 'actions' => $actions['ids'], 'ids' => $all, 'single' => $single, 'focus' => $focus, 'groups' => $groups, 'counts' => $counts]
                 // the price the words asked for, as it was applied, and the words without it: the drawer shows it as a filter
                 // of its own, which taken off searches the rest ("שרשרת זהב עד 1000 שקל" showed no sign of its price: Rocks QA)
-                + ($minPrice === null && $maxPrice === null ? [] : ['price' => ['min' => $minPrice, 'max' => $maxPrice, 'rest' => trim($priced)]])
+                + ($minPrice === null && $maxPrice === null ? [] : ['price' => ['min' => $minPrice, 'max' => $maxPrice, 'rest' => trim($priced)] + ($morePriced === null ? [] : ['more' => $morePriced])])
                 // the words read by meaning as the store writes them ("מפוספס": "פסים"), for the drawer to show as it reads them
                 + ($nearWords === [] ? [] : ['near' => array_map(fn (string $w, string $t): array => ['word' => $w, 'term' => $t], array_keys($nearWords), array_values($nearWords))])
                 // a sentence no product holds as typed, searched by what it asks for: what "held" counts is of those words, not

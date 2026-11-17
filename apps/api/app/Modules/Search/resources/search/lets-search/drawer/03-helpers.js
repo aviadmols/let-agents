@@ -123,7 +123,13 @@
   var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
   // an email address in an answer, with whatever is joined to it ("ל־info@store.co.il."): to press, as Aviad asked (15.11)
   var EMAIL_WORD = /^(.*?)([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})([.,;:!?)"'״]*)$/;
+  // a phone number in an answer, with whatever is joined to it ("ל־054-4600563", "ל'054-3979035'."): to press, and never in
+  // the quote marks a writer put around it (Rocks QA, 17.11). A number that opens with 0 or + and has nine to thirteen digits:
+  // never a price, a code or a year.
+  var PHONE_WORD = /^(.*?)['"׳״‘’“”]?((?:\+\d|0)[\d-]{7,14}\d)['"׳״‘’“”]?([.,;:!?)"'״]*)$/;
   function ltrWord(w) {
+    var ph = PHONE_WORD.exec(w), digits = ph ? ph[2].replace(/\D/g, '') : '';
+    if (ph && digits.length >= 9 && digits.length <= 13 && !/\d$/.test(ph[1])) { return esc(ph[1]) + '<bdi dir="ltr" class="ls-nb"><a class="ls-answer__page-link" href="tel:' + (ph[2].charAt(0) === '+' ? '+' : '') + digits + '">' + esc(ph[2]) + '</a></bdi>' + esc(ph[3]); }
     var e = EMAIL_WORD.exec(w);
     if (e) { return esc(e[1]) + '<bdi dir="ltr"><a class="ls-answer__page-link" href="mailto:' + esc(e[2]) + '">' + esc(e[2]) + '</a></bdi>' + esc(e[3]); }
     var m = LTR_WORD.exec(w);
