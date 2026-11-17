@@ -48,6 +48,10 @@ final class DescribedProductsTest extends TestCase
         $this->assertMatchesRegularExpression((string) DescribedProducts::pattern('שבע באוקטובר'), ' את ה 7 באוקטובר ');
         $this->assertDoesNotMatchRegularExpression((string) DescribedProducts::pattern('7 באוקטובר'), ' 17 באוקטובר ');
         $this->assertNull(DescribedProducts::pattern('א'), 'too short to mean anything');
+        // "שמלה" is never "מלה" inside "מלמלה" (muslin) after two prefix letters (Take Me Home, 17.11)
+        $this->assertDoesNotMatchRegularExpression((string) DescribedProducts::pattern('שמלה'), ' שמיכת מלמלה רכה ');
+        $this->assertMatchesRegularExpression((string) DescribedProducts::pattern('שמלה'), ' עם השמלה התואמת ');
+        $this->assertMatchesRegularExpression((string) DescribedProducts::pattern('באוקטובר'), ' עד לאוקטובר ');
     }
 
     public function test_the_store_subject_is_no_kind_and_what_a_description_says_tells_products_apart(): void

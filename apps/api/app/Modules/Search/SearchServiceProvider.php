@@ -28,6 +28,7 @@ use App\Modules\Search\Console\ForgetVisitsCommand;
 use App\Modules\Search\Console\RecountSearchesCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
+use App\Modules\Search\Console\WordAuditCommand;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
@@ -173,6 +174,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
             SearchCommand::class,
             CompareEmbeddersCommand::class,
             RecountSearchesCommand::class,
+            WordAuditCommand::class,
         ];
     }
 }

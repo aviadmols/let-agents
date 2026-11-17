@@ -66,8 +66,10 @@ final class DescribedProducts
 
         foreach ($words as $word) {
             $forms = [preg_quote($word, '/')];
-            // "באוקטובר" is also "אוקטובר" with any prefix in the text ("לאוקטובר", "אוקטובר").
-            if (preg_match('/^'.self::PREFIX.'{1,2}[א-ת]{3,}$/u', $word) === 1) {
+            // "באוקטובר" is also "אוקטובר" with any prefix in the text ("לאוקטובר", "אוקטובר"); only where four letters are left:
+            // "שמלה" is never "מלה", which "מלמלה" (muslin) holds after two prefix letters (Take Me Home, 17.11: every muslin
+            // blanket was a dress)
+            if (preg_match('/^'.self::PREFIX.'{1,2}[א-ת]{4,}$/u', $word) === 1) {
                 $forms[] = preg_quote((string) preg_replace('/^'.self::PREFIX.'{1,2}/u', '', $word), '/');
             }
             // a number in digits or in words is all its forms: "7", "שבע", "השבעה" (the ה is a prefix here)
@@ -152,8 +154,12 @@ final class DescribedProducts
         }
 
         $forms = [HebrewSearch::stem($word) => true];
+        // a stem of two letters is no word's: "שמלה" less ש is "מלה", stem "מל", which "מלמלה" (muslin) holds too (17.11)
         for ($cut = 1; $cut <= 2 && mb_strlen($word) - $cut >= 3 && preg_match('/^'.self::PREFIX.'$/u', mb_substr($word, $cut - 1, 1)) === 1; $cut++) {
-            $forms[HebrewSearch::stem(mb_substr($word, $cut))] = true;
+            $stem = HebrewSearch::stem(mb_substr($word, $cut));
+            if (mb_strlen($stem) >= 3) {
+                $forms[$stem] = true;
+            }
         }
 
         return $forms;
