@@ -31,8 +31,11 @@ final class WordMeanings
      * v2: the word said plainly in the store's language first, then whether the store's word names exactly that, and only
      * then is it read as the store's word: v1 read "נשים" as "unisex" in an English store that writes no "women" (Jean
      * Rachel, 16.11), and men's necklaces were shown for women's. Any word, any language: nothing listed in code.
+     *
+     * v3: letters struck at random are no word, and are read as none: v2 read "גדששד" as the store's "אחר", and 22 products
+     * that say "אחר" were shown for it (Gueta, 17.11).
      */
-    public const PROMPT = 'word_meaning.v2';
+    public const PROMPT = 'word_meaning.v3';
 
     /**
      * The gate's version, beside the prompt's: "+forms" also takes what the word plainly means when the store writes it in
@@ -118,6 +121,8 @@ final class WordMeanings
         // code's gate: a word of the store's own, as the store writes it, that names exactly what the shopper's word does
         // (same), or none
         $said = trim((string) ($reply->data['term'] ?? ''));
+        // no word at all (v3: an empty translation): nothing of the store's is its reading, whatever term came with it
+        $said = trim((string) ($reply->data['translation'] ?? '')) === '' ? '' : $said;
         $term = $said === '' || ($reply->data['same'] ?? false) !== true ? null : ($byKey[HebrewSearch::normalize($said)] ?? self::formIn($said, $words));
         // ...or what the word plainly means, when the store writes that very word in some form: "צמיד" is "bracelet", the store
         // writes "bracelets", and the model called it no match (Jean Rachel, 16.11; "shoes", "hoodie", "towels" the same)

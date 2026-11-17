@@ -1,0 +1,10 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["translation", "term", "same"],
+    "properties": {
+        "translation": {"type": "string"},
+        "term": {"type": "string"},
+        "same": {"type": "boolean"}
+    }
+}
