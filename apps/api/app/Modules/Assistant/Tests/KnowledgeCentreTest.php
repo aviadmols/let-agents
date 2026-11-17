@@ -237,12 +237,11 @@ final class KnowledgeCentreTest extends TestCase
         $this->assertSame([['title' => 'תקנון', 'why' => 'באתר: 10 ש"ח לחיתוך.', 'text' => 'חיתוך: 10 ש"ח לחתך.']], $check['notes'], 'the title and the words come from code; p9 was never sent');
         $this->assertCount(1, $this->calls);
 
-        // The same line against the same passages: no second call.
-        $other = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->addOwn('חיתוך: 8 ש"ח לחתך.'));
-        app(CheckOwnKnowledge::class)->handle($this->shop->id, $other);
+        // The same line against the same passages and the same other lines: no second call.
+        app(CheckOwnKnowledge::class)->handle($this->shop->id, $id);
         $this->assertCount(1, $this->calls, 'never asked twice');
 
-        Livewire::test(AboutStore::class)->call('show', 'notes')->assertSee('באתר כתוב אחרת')->assertSee('באתר: 10 ש"ח לחיתוך.');
+        Livewire::test(AboutStore::class)->call('show', 'notes')->assertSee('באתר או בשורה אחרת שלכם כתוב אחרת')->assertSee('באתר: 10 ש"ח לחיתוך.');
     }
 
     public function test_a_line_another_line_contradicts_shows_that_line_once_and_it_is_fixed_where_it_is_written(): void
@@ -280,15 +279,16 @@ final class KnowledgeCentreTest extends TestCase
         $this->assertSame([$newer], array_column($this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()), 'id'), 'deleted where it is written');
     }
 
-    public function test_nothing_on_the_site_near_the_line_means_no_model_is_asked(): void
+    public function test_nothing_on_the_site_near_the_line_is_nothing_to_contradict_and_its_kind_is_still_read(): void
     {
         $this->near = [];
         $id = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->addOwn('אפשר לאסוף מהמחסן בשישי.'));
 
         app(CheckOwnKnowledge::class)->handle($this->shop->id, $id);
 
-        $this->assertSame([], $this->calls);
-        $this->assertSame('nothing', $this->inShop(fn (): string => app(BuildShopKnowledge::class)->ownRows()[0]['check']['status']));
+        // whether it is an instruction to the assistant or a fact for shoppers does not depend on the site (8a)
+        $this->assertCount(1, $this->calls);
+        $this->assertSame(['nothing', 'information'], array_values(array_intersect_key($this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()[0]['check']), ['status' => 1, 'kind' => 1])));
     }
 
     public function test_pages_show_what_they_say_and_how_many_questions_they_answered(): void

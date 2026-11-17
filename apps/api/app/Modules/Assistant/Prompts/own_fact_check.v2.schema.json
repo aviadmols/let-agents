@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["kind", "conflicts"],
+    "properties": {
+        "kind": { "type": "string", "enum": ["instruction", "information"] },
+        "conflicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "why"],
+                "properties": {
+                    "id": { "type": "string" },
+                    "why": { "type": "string" }
+                }
+            }
+        }
+    }
+}

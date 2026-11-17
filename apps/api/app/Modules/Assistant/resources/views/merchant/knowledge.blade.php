@@ -253,6 +253,8 @@
                                                     @case('failed') {{ __('assistant::ui.centre.own.check_failed') }} @break
                                                     @default {{ __('assistant::ui.centre.own.checking') }}
                                                 @endswitch
+                                                {{-- a line that tells the assistant how to answer (8a): followed, never told to shoppers --}}
+                                                @if (($check['kind'] ?? null) === 'instruction') · {{ __('assistant::ui.centre.own.kind_instruction') }} @endif
                                             </span>
                                             @if (($check['status'] ?? null) === 'conflict')
                                                 {{-- each place that says otherwise once, with the line it is written in, fixed there --}}

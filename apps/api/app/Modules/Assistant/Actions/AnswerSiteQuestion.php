@@ -305,6 +305,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** @var list<string> the products the store's team linked the question being answered to (QuestionLinks), external ids */
     private array $linked = [];
 
+    /** @var list<string> the team's lines that tell the assistant how to answer, read as rules, never as passages (knowledge()) */
+    private array $teamRules = [];
+
     /** @var list<string> the product others are asked to be like ("מה עוד דומה?"), never one of them (prepare()), external ids */
     private array $anchors = [];
 
@@ -632,7 +635,8 @@ final class AnswerSiteQuestion implements TriesQuestions
             return [];
         }
 
-        return $this->voice !== null ? $this->voice['rules'] : AnswerRules::texts($shopId);
+        // the store's rules, then the team's lines that are instructions ("never write a coupon code", 8a): followed, never told
+        return array_values(array_unique([...($this->voice !== null ? $this->voice['rules'] : AnswerRules::texts($shopId)), ...$this->teamRules]));
     }
 
     /**
@@ -1282,6 +1286,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         // the question's words, and its topic's when it asks if the store is open ("שעות פתיחה" for "פתוחים עכשיו?"), or
         // about coming over: the rows with the address and the hours ("אפשר לבוא למדוד אצלכם?", Rocks 9.11)
+        $this->teamRules = [];
         $words = array_values(array_unique([
             ...$this->words($question),
             ...(self::asksIfOpen($question) || self::asksAboutVisit($question) ? PrepareStoreAnswers::TOPICS['hours'] : []),
@@ -1351,6 +1356,19 @@ final class AnswerSiteQuestion implements TriesQuestions
             // them as the answer (Rocks, 2.11: its parking row among seven, and the accessibility page was what it told);
             // whole rows, so the cut never takes one in its middle
             if ($entry->external_id === BuildShopKnowledge::OWN) {
+                // a line the check found to be an instruction to the assistant, when the writer reads rules: a rule, never a
+                // passage it may tell or cite (8a; Rocks: "אל תרשום קוד קופון בשיחות…" among its facts)
+                if (self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::releasedVersion('answer_site'), 'rules')) {
+                    foreach ((array) ($entry->terms['rows'] ?? []) as $row) {
+                        if (is_array($row) && (($row['check']['kind'] ?? null) === 'instruction')) {
+                            $this->teamRules[] = AnswerRules::clean((string) $row['text']);
+                            $text = str_replace('- '.$row['text'], '', $text);
+                        }
+                    }
+                    $text = trim((string) preg_replace('/
+{2,}/u', '
+', $text));
+                }
                 $whole = function (array $rows): string {
                     while (count($rows) > 1 && mb_strlen(implode("\n", $rows)) > self::KNOWLEDGE_CHARS) {
                         array_pop($rows);
