@@ -789,7 +789,7 @@ final class SiteQuestionTest extends TestCase
         $data = $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data');
         $this->assertSame(['answered', 'code', []], [$data['outcome'], $data['from'], $data['picks']]);
         $this->assertSame(['805', '807', '806', '801', '802'], $data['set']['ids'], 'every earring up to 500 in stock, cheapest first');
-        $this->assertStringStartsWith('5 ', $data['answer']);
+        $this->assertStringStartsWith('מצאנו 5 מוצרים', $data['answer']);
 
         // "cheaper than" is the price, not "the cheapest": every one in the range too; "the cheapest" stays three picks
         $this->assertSame(['805', '807', '806', '801', '802'], $this->askWith('any earrings cheaper than 500 dollars?', ['801'])->json('data.set.ids'));
@@ -826,6 +826,36 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame('model', $this->askWith('מתנה לאשתי ליום נישואין, משהו עדין עד 2000 שקל', ['806', '807'])->json('data.from'));
         // and a product search with a price is still code's
         $this->assertSame('code', $this->askWith('עגילים עד 500 ש"ח?', ['801'])->json('data.from'));
+
+        // words one product happens to say are no kind of product: "מתנה לאמא" is the text of one ring ("MOM"), and code
+        // answered that ring alone, no choice, no question back (Rocks, 17.11)
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return true;
+            }
+
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return false;
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                return str_contains($question, 'אמא') ? ['806'] : ['801', '802', '804', '805', '806', '807'];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'למתנה לאמא, עגילי פרח זהב או עגילי טיפה זהב.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'עדינים']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->assertSame('model', $this->askWith('מחפשת מתנה לאמא עד 1,500 ש"ח', ['806'])->json('data.from'));
     }
 
     public function test_a_reply_naming_a_kind_inside_the_conversations_price_is_every_one_of_it_never_called_the_cheapest(): void

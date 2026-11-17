@@ -78,7 +78,7 @@
         },
         {
             "name": "ai_share",
-            "default": true
+            "default": false
         },
         {
             "name": "agent_connector",

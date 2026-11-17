@@ -126,11 +126,16 @@
       turn.askId = d.ask_id ? String(d.ask_id) : null;
       // a whole set asked to see ("תציג לי את ספריית שיבולת"): every product of it as a grid, a question to narrow it by, and the search for more
       var set = d.set && d.set.ids && d.set.ids.length ? d.set : null;
-      var setIds = set ? set.ids.map(function (id) { return pid(id); }).filter(function (id) { return !!rec(id); }) : null;
+      // known only once the store's index is in: read before it, a set of twenty showed none or one (Rocks, 17.11: "עגילי
+      // זהב לבן עד ₪2,000", 20 in the answer, one card)
+      var setIds = null;
       // what the answer recommends by a name none of its picks has ("שיטאקה"): the products whose descriptions hold it
       var named = d.named && d.named.ids && d.named.ids.length ? d.named : null;
       var namedIds = named ? named.ids.map(function (id) { return pid(id); }) : [];
-      return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds)).then(function () {
+      return (set ? loadIndex().catch(function () { /* the answer stands without it */ }) : Promise.resolve()).then(function () {
+        setIds = set ? set.ids.map(function (id) { return pid(id); }).filter(function (id) { return !!rec(id); }) : null;
+        return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds));
+      }).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,

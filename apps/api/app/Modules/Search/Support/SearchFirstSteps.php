@@ -7,6 +7,7 @@ use App\Modules\Admin\Contracts\ConnectionFacts;
 use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Analytics\Models\AnalyticsEvent;
+use App\Modules\Analytics\Models\AnalyticsVisit;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Search\Filament\Merchant\Pages\ManualConnectSettings;
 use App\Modules\Search\Models\SearchLog;
@@ -18,8 +19,10 @@ use Illuminate\Support\Facades\DB;
  * Two of the shop's first steps, the search's own:
  *
  *   on     Lets is live in the store. The store decides that (the plugin's mode, the Shopify app embed),
- *          so it is read from what shoppers did: in preview no shopper sees Lets, so shoppers who saw or
- *          opened it, or several of them searching, mean it is live.
+ *          so it is read from what shoppers did: in preview no shopper sees Lets, so a page of the store
+ *          that loaded Lets outside the preview (a visit), shoppers who saw or opened it, or several of them
+ *          searching, mean it is live. A visit is the first sign: a new store had no suggestion yet to see or
+ *          click, one person searching, and stayed "In preview" with its search on (17.11).
  *   look   the merchant saw it as a shopper: the store with the preview link, in a new tab. Done when
  *          they opened it from here (the home marks it), or once the store is live.
  */
@@ -81,7 +84,8 @@ final class SearchFirstSteps implements FirstSteps
     {
         $since = now()->subDays(14);
 
-        return AnalyticsEvent::query()->where('preview', false)->whereIn('type', ['exposure', 'open', 'click'])->where('occurred_at', '>=', $since)->exists()
+        return AnalyticsVisit::query()->where('preview', false)->where('created_at', '>=', $since)->exists()
+            || AnalyticsEvent::query()->where('preview', false)->whereIn('type', ['exposure', 'open', 'click'])->where('occurred_at', '>=', $since)->exists()
             || SearchLog::query()->where('created_at', '>=', $since)->whereNotNull('session_id')->distinct()->count('session_id') >= self::LIVE_SESSIONS;
     }
 }

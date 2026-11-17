@@ -51,6 +51,8 @@ final class ShareSearchTest extends TestCase
         $this->shop = Shop::factory()->create(['name' => 'טבעות ושות׳', 'content_locale' => 'he']);
         Features::override('search.semantic', false, $this->shop->id);
         Features::override('search.pictures', false, $this->shop->id);
+        // off for a shop installed since 17.11; on for this one, whose sharing is what is tested
+        Features::override('search.ai_share', true, $this->shop->id);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create(['shop_id' => $this->shop->id, 'site_url' => 'https://www.rings.test', 'access_token' => self::TOKEN]));
         $this->site = SiteKeys::site(self::TOKEN);
 

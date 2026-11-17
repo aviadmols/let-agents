@@ -59,6 +59,9 @@ final class SearchSettingsPagesTest extends TestCase
 
     public function test_the_outside_ai_is_closed_from_the_search_window(): void
     {
+        // off for a shop installed since 17.11 (Aviad): a new shop starts without it
+        $this->assertFalse(Features::enabled('search.ai_share', $this->shop->id));
+        Features::override('search.ai_share', true, $this->shop->id);
         $this->product('1', 'טבעת סוליטר');
         app(BuildSearchIndex::class)->handle($this->shop->id);
 

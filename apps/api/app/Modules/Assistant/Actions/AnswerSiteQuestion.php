@@ -260,6 +260,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** Products a superlative answered in code shows. */
     private const MAX_COMPUTED = 3;
 
+    /** Words before a price that fewer products than this say are a wish, not a kind of product (computed()). */
+    private const KIND_PRODUCTS = 3;
+
     /** Words a question wraps around the product it names. */
     private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'ומה', 'ומהו', 'ואיזה', 'ואיזו', 'ואילו', 'ויש', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than',
         // Words for the store and its products in general: "מה הכי זול בין המוצרים" names no product.
@@ -3944,7 +3947,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             // 2000"), all of its words: a wish in a reply is the writer's as well
             $said = app(PriceRange::class)->read($question);
             $left = self::wishWords((string) ($said['words'] ?? (($said['min'] ?? null) === null && ($said['max'] ?? null) === null ? $question : '')));
-            if ($left !== '' && ! app(ProductsNamed::class)->holds($this->tenant->require(), $left)) {
+            // and words one or two products happen to say are no kind of product: "מתנה לאמא" is the text of one ring ("MOM"),
+            // and that ring alone was the answer, with no other choice and no question back (Rocks, 17.11)
+            if ($left !== '' && (! app(ProductsNamed::class)->holds($this->tenant->require(), $left)
+                || count(app(ProductsNamed::class)->all($this->tenant->require(), $left)) < self::KIND_PRODUCTS)) {
                 return null;
             }
         }
