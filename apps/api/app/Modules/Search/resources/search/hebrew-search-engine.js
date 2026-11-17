@@ -173,7 +173,9 @@
         });
       });
       var hay = (normalize(item.title + ' ' + (item.keywords || '')) + ' ' + taggedOrder.join(' ')).trim();
-      records.push({ id: String(item.id), title: String(item.title), name: name, named: ' ' + name + ' ', hay: hay, tagged: tagged });
+      // what it is, its stems in the order the index keeps them (BuildSearchIndex::kindStems: its picture's words, its type, its
+      // tags, its categories): a word near the start says what the product is, one at the end what it goes with
+      records.push({ id: String(item.id), title: String(item.title), name: name, named: ' ' + name + ' ', hay: hay, tagged: tagged, kinds: (item.kinds || []).map(String) });
       var words = hay.split(' ');
       for (var w = 0; w < words.length; w++) {
         var word = words[w];
@@ -276,7 +278,9 @@
         // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
         } else if (length >= 2 && candidate.indexOf(variant) === 0 && !heldWhole(index.holders, variant)) {
           score = Math.max(score, 0.9 - 0.02 * (candidate.length - length));
-        } else if (length >= 3 && stem(candidate) === base) {
+        // a word of two letters is no form of a longer one: "מל" (מ"ל, millilitres) is never "שמלה" read as ש+"מלה" (Take Me
+        // Home, 17.11: every cream of 70 מ"ל was a dress; the server's closeWords)
+        } else if (length >= 3 && candidate.length >= 3 && stem(candidate) === base) {
           score = Math.max(score, 0.85);
         // after a prefix letter, the word or a form of it, its letters as typed: "למכונת" is "מכונה"; "בסיס" is never "סוס",
         // and a letter is taken off one side only: "באורך" is never "מאורכות" (the server's closeWords)
@@ -513,14 +517,26 @@
           }
         }
       }
-      found.push({ id: record.id, title: record.title, score: (tier >= 0 ? 10 - tier : 0) + (score[r] || 0) / tokens.length, exact: tier >= 0, full: full });
+      found.push({ id: record.id, title: record.title, score: (tier >= 0 ? 10 - tier : 0) + (score[r] || 0) / tokens.length, exact: tier >= 0, full: full, kind: kindAt(record, tokens) });
     }
 
-    // What holds the whole query before what holds part of it; then by score.
+    // What holds the whole query before what holds part of it; then by score; of the same score, what the word says it is
+    // before what it goes with ("דיקט": the plywood before the Kreg screw for plywood, Gueta 17.11; the server's rank).
     found.sort(function (a, b) {
-      return ((b.full ? 1 : 0) - (a.full ? 1 : 0)) || (b.score - a.score) || (a.title.length - b.title.length);
+      return ((b.full ? 1 : 0) - (a.full ? 1 : 0)) || (b.score - a.score) || (a.kind - b.kind) || (a.title.length - b.title.length);
     });
     return found;
+  }
+
+  /** How near the start of what a product is any word of the search stands (its kinds' stems); 99 when none does. */
+  function kindAt(record, tokens) {
+    var kinds = record.kinds || [];
+    var best = 99;
+    for (var t = 0; t < tokens.length && kinds.length; t++) {
+      var at = tokens[t] ? kinds.indexOf(stem(tokens[t])) : -1;
+      if (at >= 0 && at < best) { best = at; }
+    }
+    return best;
   }
 
   // A word in the name counts 1, one of its keywords 0.7, one of its tags between the two by how central the

@@ -1383,7 +1383,8 @@ final class HebrewSearch
                 }
             }
             $hay = trim(self::normalize($item['title'].' '.($item['keywords'] ?? '')).' '.implode(' ', array_keys($tagged)));
-            $records[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'name' => $name, 'named' => ' '.$name.' ', 'hay' => $hay, 'tagged' => $tagged];
+            // what it is, its stems in the order the index keeps them (BuildSearchIndex::kindStems), as the browser has them
+            $records[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'name' => $name, 'named' => ' '.$name.' ', 'hay' => $hay, 'tagged' => $tagged, 'kinds' => array_values(array_map('strval', (array) ($item['kinds'] ?? [])))];
 
             foreach (explode(' ', $hay) as $word) {
                 if ($word === '') {
@@ -1464,7 +1465,8 @@ final class HebrewSearch
                     // one: "לב" is a heart, never "לבן"; "שבי" is captivity, never "שביל" (Sela, 26.10)
                 } elseif ($length >= 2 && str_starts_with($candidate, $variant) && ! self::heldWhole($index['holders'], $variant)) {
                     $score = max($score, 0.9 - 0.02 * (mb_strlen($candidate) - $length));
-                } elseif ($length >= 3 && self::stem($candidate) === $base) {
+                    // a word of two letters is no form of a longer one: "מל" (מ"ל) is never "שמלה" read as ש+"מלה" (Take Me Home, 17.11)
+                } elseif ($length >= 3 && mb_strlen($candidate) >= 3 && self::stem($candidate) === $base) {
                     $score = max($score, 0.85);
                     // after a prefix letter, the word or a form of it, its letters as typed: "למכונת" is "מכונה" (Gueta, 10.11:
                     // "פוליש מכונה" missed the discs "למכונת פוליש"); "בסיס" is never "סוס", and a letter is taken off one side
@@ -1716,13 +1718,38 @@ final class HebrewSearch
                 'exact' => $tier >= 0,
                 // Holds every word that counts, as typed or close to it: "טבעת יהלום סוליטר בכסף" in full.
                 'full' => $tier >= 0 || array_diff_key(array_flip($required), $matched[$at] ?? []) === [],
+                'kind' => self::kindAt($record, $tokens),
             ];
         }
 
-        // What holds the whole query before what holds part of it; then by score.
-        usort($found, static fn (array $a, array $b): int => (int) $b['full'] <=> (int) $a['full'] ?: $b['score'] <=> $a['score'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
+        // What holds the whole query before what holds part of it; then by score; of the same score, what the word says it is
+        // before what it goes with ("דיקט": the plywood before the Kreg screw for plywood, Gueta 17.11).
+        usort($found, static fn (array $a, array $b): int => (int) $b['full'] <=> (int) $a['full'] ?: $b['score'] <=> $a['score'] ?: $a['kind'] <=> $b['kind'] ?: mb_strlen($a['title']) <=> mb_strlen($b['title']));
 
-        return $found;
+        return array_map(static function (array $hit): array {
+            unset($hit['kind']);
+
+            return $hit;
+        }, $found);
+    }
+
+    /**
+     * How near the start of what a product is any word of the search stands (its kinds' stems); 99 when none does.
+     *
+     * @param  array<string, mixed>  $record
+     * @param  list<string>  $tokens
+     */
+    private static function kindAt(array $record, array $tokens): int
+    {
+        $best = 99;
+        foreach ($tokens as $token) {
+            $at = $token === '' ? false : array_search(self::stem($token), $record['kinds'] ?? [], true);
+            if ($at !== false && $at < $best) {
+                $best = (int) $at;
+            }
+        }
+
+        return $best;
     }
 
     /**

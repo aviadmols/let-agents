@@ -27,7 +27,7 @@
       S.index = d; S.config = d.config || {}; S.facets = d.facets || [];
       (d.items || []).forEach(function (it) { if (it.url != null) { it.url = safeUrl(it.url); } if (it.img != null) { it.img = safeUrl(it.img); } if (it.i2 != null) { it.i2 = safeUrl(it.i2); } S.records[it.id] = it; });
       if (S.engine && S.engine.build) {
-        try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '', tags: i.tg || null }; })); } catch (e) { S.built = null; }
+        try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '', tags: i.tg || null, kinds: i.kd || null }; })); } catch (e) { S.built = null; }
       }
       // the index carries the shop's look too (and is all a preview reads): the same choices as /look
       if (S.config.theme) { applyLook(S.config); }

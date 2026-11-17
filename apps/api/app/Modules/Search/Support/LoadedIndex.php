@@ -45,7 +45,7 @@ final class LoadedIndex
 
         foreach ($items as $item) {
             $records[(string) $item['id']] = $item;
-            $source[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'keywords' => (string) ($item['kw'] ?? ''), 'tags' => is_array($item['tg'] ?? null) ? $item['tg'] : []];
+            $source[] = ['id' => (string) $item['id'], 'title' => (string) $item['title'], 'keywords' => (string) ($item['kw'] ?? ''), 'tags' => is_array($item['tg'] ?? null) ? $item['tg'] : [], 'kinds' => is_array($item['kd'] ?? null) ? $item['kd'] : []];
             if (($item['t'] ?? null) === 'product') {
                 foreach ((array) ($item['f'] ?? []) as $code) {
                     $counts[(int) $code] = ($counts[(int) $code] ?? 0) + 1;
