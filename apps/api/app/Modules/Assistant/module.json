@@ -649,7 +649,7 @@
         {
             "name": "bench_judge_input_usd_per_million",
             "type": "float",
-            "default": 3,
+            "default": 2,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -658,7 +658,7 @@
         {
             "name": "bench_judge_output_usd_per_million",
             "type": "float",
-            "default": 15,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",

@@ -90,6 +90,14 @@ final class OfferedAgainTest extends TestCase
 
         $new = 'אפשר לבחור אורך אחר מהרשימה: 45, 50 או 55 ס"מ, וההזמנה מגיעה תוך שלושה ימי עסקים לכל הארץ.';
         $this->assertSame($new, AnswerSiteQuestion::notSaidAgain($new, $conversation, 'he'), 'a reply that says something new stays');
+        $this->assertSame('את זה צריך לבדוק מול הצוות שלנו. צוות החנות ישמח לעזור לכם.', AnswerSiteQuestion::notSaidAgain($again, $conversation, 'he', 'כן, אשמח שתעזרו לי לבדוק'), 'a yes names nothing new');
+
+        // the same terms, said to hold for a case the shopper newly names (Vans, 17.11)
+        $terms = 'המשלוח חינם בהזמנה מעל 199 ₪, ומתחת לכך הוא עולה 19.90 ₪. זמן האספקה הוא עד 3 ימי עסקים מרגע קבלת חשבונית העסקה במייל, בימים ראשון עד חמישי.';
+        $delivery = [['question' => 'כמה זמן לוקח משלוח וכמה זה עולה?', 'answer' => $terms]];
+        $eilat = 'לאילת אין תנאים נפרדים: '.$terms;
+        $this->assertSame($eilat, AnswerSiteQuestion::notSaidAgain($eilat, $delivery, 'he', 'ואם אני גר באילת?'));
+        $this->assertSame('את זה צריך לבדוק מול הצוות שלנו. צוות החנות ישמח לעזור לכם.', AnswerSiteQuestion::notSaidAgain($terms, $delivery, 'he', 'ואם אני גר באילת?'), 'the same terms that never say the case');
     }
 
     public function test_a_yes_to_our_own_offer_goes_forward_with_a_question_never_to_the_team(): void

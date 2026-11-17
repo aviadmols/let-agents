@@ -1398,9 +1398,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /**
      * What the posts say, a passage for each page it came from, under that page's own title and id: the answer cites the
      * page and its link, never "what the posts say" (8d, Aviad 16.11: where a passage came from matters). A line whose
-     * page already came with the pages is left out, the page says it whole. The lines the meaning search found in it
-     * first, then those that share a word with the question; a page none of whose lines shares a word with it keeps the
-     * score it was found by, so a question about a product drops it as it dropped the piece it came in. A line whose page
+     * page already came with the pages is left out, the page says it whole. The lines that share a word with the
+     * question, or when none does, those the meaning search found in it, which keep the score they were found by, so a
+     * question about a product drops them as it dropped the piece they came in. A line whose page
      * is gone or unknown stays under the entry's own title, as before.
      *
      * @param  list<array<string, mixed>>  $found
@@ -1419,7 +1419,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                 }
             }
         }
-        $lines = array_values(array_unique([...array_keys($near), ...array_slice(array_values(array_filter($all, $speaks)), 0, self::POST_LINES)]));
+        // the lines that share a word with the question when there are such, as before; else those the meaning search
+        // found (its pieces' other lines were the posts' collaborations and privacy beside a delivery question, Vans 17.11)
+        $worded = array_slice(array_values(array_filter($all, $speaks)), 0, self::POST_LINES);
+        $lines = $worded !== [] ? $worded : array_keys($near);
         if ($lines === []) {
             return [];
         }
@@ -2253,7 +2256,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                 $answer = $choices !== [] ? $answer : ($forward
                     // an answer that shows products is never taken for one said again: "white sneakers" after another
                     // search for shoes found three, and was told "this is one for our team to check" (15.11)
-                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain($picks === [] ? self::notSaidAgain($answer, $this->conversation, $locale) : $answer, $this->conversation), $locale));
+                    ?? self::teamWhenUnsettled(self::withoutOfferedAgain($picks === [] ? self::notSaidAgain($answer, $this->conversation, $locale, config('assistant.new_case') === true ? (string) $this->asked : '') : $answer, $this->conversation), $locale));
                 // a size asked on a product's page: the sizes it comes in, said by code when the writer left them out
                 $viewed = self::viewingOf($prepared);
                 if ($forward === null && $choices === [] && $refusal === null && is_string($viewed) && isset($productsByRef[$viewed])) {
@@ -2899,11 +2902,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * A reply that says again what the answer before it said ("כן, אשמח שתעזרו לי לבדוק" after "צריך לבדוק אותה", and
      * the same answer once more, Rocks 11.11) is no answer: the shopper is told it is the team's to check, and the
      * drawer offers that team under it. Most of its words in the answer before it, its words read as the search reads
-     * them. Code only.
+     * them. Code only. A reply about a case the question newly names ("ואם אני גר באילת?" after the delivery terms, Vans
+     * 17.11) may well hold the same terms, and saying they hold for that case is its answer: a word of the question
+     * found nowhere before in the conversation, and in the reply, keeps it.
      *
      * @param  list<array{question: string, answer: string}>  $conversation
      */
-    public static function notSaidAgain(string $answer, array $conversation, string $locale): string
+    public static function notSaidAgain(string $answer, array $conversation, string $locale, string $question = ''): string
     {
         $before = $conversation === [] ? '' : (string) end($conversation)['answer'];
 
@@ -2942,6 +2947,23 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         if (count($now) < 8 || $held / count($now) < 0.7) {
             return $answer;
+        }
+
+        if ($question !== '') {
+            $earlier = [];
+            foreach ($conversation as $turn) {
+                foreach ($forms((string) ($turn['question'] ?? '').' '.(string) ($turn['answer'] ?? '')) as $set) {
+                    foreach ($set as $form) {
+                        $earlier[$form] = true;
+                    }
+                }
+            }
+            $replied = array_flip(array_merge(...array_map(fn (array $set): array => $set, $now ?: [[]])));
+            foreach ($forms($question) as $set) {
+                if (mb_strlen($set[0]) >= 4 && array_filter($set, fn (string $f): bool => isset($earlier[$f])) === [] && array_filter($set, fn (string $f): bool => isset($replied[$f])) !== []) {
+                    return $answer;
+                }
+            }
         }
 
         return (string) __('assistant::answers.site.team_check', [], $locale === 'en' ? 'en' : 'he');

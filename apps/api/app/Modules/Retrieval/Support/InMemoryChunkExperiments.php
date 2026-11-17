@@ -99,7 +99,7 @@ final class InMemoryChunkExperiments implements ChunkExperiments
      */
     private function pieces(string $shopId, int $chunkChars, string $cut = 'size'): array
     {
-        $key = $shopId.'|'.$chunkChars.'|'.$cut.(config('retrieval.notes_once') === true ? '|once' : '');
+        $key = $shopId.'|'.$chunkChars.'|'.$cut.(config('retrieval.notes_once') !== false ? '|once' : '');
         if (isset($this->pieces[$key])) {
             return $this->pieces[$key];
         }

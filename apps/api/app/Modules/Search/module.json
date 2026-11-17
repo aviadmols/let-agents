@@ -525,7 +525,7 @@
         {
             "name": "photo_tags_input_usd_per_million",
             "type": "float",
-            "default": 3,
+            "default": 2,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -534,7 +534,7 @@
         {
             "name": "photo_tags_output_usd_per_million",
             "type": "float",
-            "default": 15,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -576,7 +576,7 @@
         {
             "name": "photo_second_input_usd_per_million",
             "type": "float",
-            "default": 3,
+            "default": 2,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -585,7 +585,7 @@
         {
             "name": "photo_second_output_usd_per_million",
             "type": "float",
-            "default": 15,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -996,7 +996,7 @@
         {
             "name": "photo_rank_input_usd_per_million",
             "type": "float",
-            "default": 3,
+            "default": 2,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -1005,7 +1005,7 @@
         {
             "name": "photo_rank_output_usd_per_million",
             "type": "float",
-            "default": 15,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",

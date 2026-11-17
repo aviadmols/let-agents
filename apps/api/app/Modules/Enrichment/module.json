@@ -671,7 +671,7 @@
         {
             "name": "schema_reviewer_input_usd_per_million",
             "type": "float",
-            "default": 3.0,
+            "default": 2,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -680,7 +680,7 @@
         {
             "name": "schema_reviewer_output_usd_per_million",
             "type": "float",
-            "default": 15.0,
+            "default": 10,
             "min": 0,
             "max": 400,
             "scope": "global",

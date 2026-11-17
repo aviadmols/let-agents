@@ -51,8 +51,8 @@ final class ContentDocuments implements DocumentSource
         }
         $lines[] = (string) $content->body;
         // a takeaway that is a sentence of the body word for word ("Highlight: …") says nothing the body does not, and
-        // stood twice in the same piece (Miss Nori, 16.11: four of its returns page's six). Tried in a quality run first.
-        array_push($lines, ...(config('retrieval.notes_once') === true ? array_values(array_filter($notes, fn (string $note): bool => ! self::inBody($note, (string) $content->body))) : $notes));
+        // stood twice in the same piece (Miss Nori, 16.11: four of its returns page's six). Measured 17.11: recall the same, 5% less text, the needed pieces further above the rest.
+        array_push($lines, ...(config('retrieval.notes_once') !== false ? array_values(array_filter($notes, fn (string $note): bool => ! self::inBody($note, (string) $content->body))) : $notes));
 
         return new SourceDocument(
             $content->id,
