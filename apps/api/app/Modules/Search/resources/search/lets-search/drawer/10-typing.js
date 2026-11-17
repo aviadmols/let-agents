@@ -25,22 +25,35 @@
     if (/\s$/.test(INPUT.value)) { liveFor(q); return; }
     wordTimer = setTimeout(function () { if (INPUT.value.trim() === q) { liveFor(q); } }, WORD_REST_MS);
   }
-  // The typing has rested and the ask card is on screen for these very words (a question, or words that found nothing):
+  // The typing has rested and the ask card is on screen for these very words, which read as a question:
   // the store's AI is asked without the press (as Aviad asked, 17.11). Never on a letter: two seconds after the last one,
   // the words unchanged, the drawer open. A question the store already answered shows its answer as it is typed and is
   // not asked again. A few times a visit at most, then the button is the shopper's to press as before: each ask is paid.
   var REST_ASK_MS = 2000, REST_ASKS = 3, restTimer = null, restAsked = 0;
   function restAsks() { try { return parseInt(win.sessionStorage.getItem('ls_rest_asks') || '0', 10) || 0; } catch (e) { return restAsked; } }
+  // a question in words: it reads as one (the engine's isQuestion), has three words or more, and at least one of them is
+  // a word the store itself writes ("מה זה גדששד?" names nothing the store knows)
+  function asksInWords(q) {
+    if (!isQuestion(q)) { return false; }
+    var said = String(q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean);
+    if (said.length < 3) { return false; }
+    var telling = said.filter(function (w) { return w.length >= 3 && !/\d/.test(w) && !STOP.test(w); });
+    return telling.length > localUnknown(q).length;
+  }
   function askAtRest() {
     clearTimeout(restTimer);
     var q = INPUT.value.trim();
     if (!S.open || off('ask') || q.replace(/[^\p{L}\p{N}]/gu, '').length < 4 || (S.config && S.config.suggest === false)) { return; }
     var tries = 0;
     var go = function () {
-      if (!S.open || INPUT.value.trim() !== q || !S.live || S.live.q !== q || restAsks() >= REST_ASKS) { return; }
+      // (no live results: a reply in a conversation, or a question on a product page, shows the ask row alone)
+      if (!S.open || INPUT.value.trim() !== q || (S.live && S.live.q !== q) || restAsks() >= REST_ASKS) { return; }
       // the search by meaning still to answer: what it finds may be the answer, so it is waited for (a little)
-      if ((S.live.waiting || S.live.pending || (S.live.willMean && !S.live.meant)) && tries++ < 6) { restTimer = setTimeout(go, 500); return; }
-      var card = askCardFor(q), btn = !card && isQuestion(q) ? SUG.querySelector('.ls-askcard__btn[data-ask]') : null;
+      if (S.live && (S.live.waiting || S.live.pending || (S.live.willMean && !S.live.meant)) && tries++ < 6) { restTimer = setTimeout(go, 500); return; }
+      // only what reads as a question: letters struck at random, a few letters, or words that found nothing ("ווכמקן",
+      // "חולצה" in a hardware store) wait for the shopper's own press, as before (as Aviad asked, 17.11)
+      if (!asksInWords(q)) { return; }
+      var card = askCardFor(q), btn = !card ? SUG.querySelector('.ls-askcard__btn[data-ask]') : null;
       if (!card && !btn) { return; }
       restAsked++;
       try { win.sessionStorage.setItem('ls_rest_asks', String(restAsks() + 1)); } catch (e) { /* counted in memory */ }
