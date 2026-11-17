@@ -2207,6 +2207,15 @@ final class SearchCatalog
             if (array_filter($audiences, $young) !== []) {
                 $records = array_values(array_filter($records, fn (array $r): bool => $young($audiences[substr((string) $r['id'], 2)] ?? []) === $young($ownFor)));
             }
+            // and a woman's product is never a man's alike, nor the other way: only one the store says is for the other side
+            // alone goes (one it says nothing of, or for both, stays). As Aviad asked, 17.11: same gender, same kind.
+            $side = fn (array $a): ?string => in_array('women', $a, true) === in_array('men', $a, true) ? null : (in_array('women', $a, true) ? 'women' : 'men');
+            if (($ownSide = $side($ownFor)) !== null) {
+                $records = array_values(array_filter($records, fn (array $r): bool => ($theirs = $side($audiences[substr((string) $r['id'], 2)] ?? [])) === null || $theirs === $ownSide));
+                // the "maybe these" too
+                $maybeFor = $this->audiencesOf(array_map(fn (array $o): string => (string) $o['external_id'], $others));
+                $others = array_values(array_filter($others, fn (array $o): bool => ($theirs = $side($maybeFor[(string) $o['external_id']] ?? [])) === null || $theirs === $ownSide));
+            }
 
             // by its picture (a model's name for a title): weighed as a shopper sees it, its shape before its colour, even where
             // its title names one: a black two-strap slide's alike were black sandals of any shape (Naot, 15.11)

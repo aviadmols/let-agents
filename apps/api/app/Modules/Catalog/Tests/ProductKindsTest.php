@@ -299,4 +299,28 @@ final class ProductKindsTest extends TestCase
             $this->assertContains('26', $same, 'the other bottle is');
         });
     }
+
+    public function test_a_store_that_tags_women_on_everything_has_its_men_tagged_product_a_mans(): void
+    {
+        // Miss Nori, 17.11: "women" on the whole catalogue, "MEN" on a tee too: it was both, and a woman's shirt its alike
+        $shop = Shop::factory()->create();
+        $products = app(TenantContext::class)->run($shop->id, function () use ($shop): array {
+            $make = fn (string $id, string $title, array $tags): CatalogProduct => CatalogProduct::query()->create([
+                'shop_id' => $shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                'url' => "https://www.store.test/p/{$id}", 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'price' => 100,
+                'payload' => ['tags' => $tags],
+            ]);
+            foreach (['2' => 'חולצת סולאנז׳', '3' => 'שמלת מידי', '4' => 'חצאית פליסה', '5' => 'מכנסי ג׳ינס'] as $id => $title) {
+                $make($id, $title, ['women', 'SHIRT']);
+            }
+
+            return ['tee' => $make('1', 'טי שירט קרלוס', ['MEN', 'SHIRT', 'women']), 'unisex' => $make('6', 'קפוצ׳ון', ['unisex', 'women'])];
+        });
+
+        app(TenantContext::class)->run($shop->id, function () use ($products): void {
+            $kinds = app(ProductKinds::class);
+            $this->assertSame(['men'], $kinds->audiences($products['tee']));
+            $this->assertSame(['women', 'men'], $kinds->audiences($products['unisex']), 'one said to be for anyone stays so');
+        });
+    }
 }

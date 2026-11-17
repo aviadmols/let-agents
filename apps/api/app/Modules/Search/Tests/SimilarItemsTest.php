@@ -211,7 +211,12 @@ final class SimilarItemsTest extends TestCase
         });
         app(TenantContext::class)->run($this->shop->id, function (): void {
             CatalogProduct::query()->where('external_id', '302')->update(['in_stock' => true]);
-            foreach (['301' => ['נמר', 'חום', 'שחור'], '302' => ['אדום'], '303' => ['נמר', 'חום']] as $id => $words) {
+            // titles that say what they are (a model's name alone is read by its picture: another path)
+            foreach (['301' => 'תיק גב Panenka', '302' => 'תיק גב Volley', '303' => 'תיק גב Campo'] as $id => $title) {
+                CatalogProduct::query()->where('external_id', $id)->update(['title' => $title]);
+            }
+            // what a picture shows opens its words ("תיק גב"), as the reader writes them
+            foreach (['301' => ['תיק גב', 'נמר', 'חום', 'שחור'], '302' => ['תיק גב', 'אדום'], '303' => ['תיק גב', 'נמר', 'חום']] as $id => $words) {
                 $product = CatalogProduct::query()->where('external_id', $id)->sole();
                 RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $product->title,
                     'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words]);
@@ -225,7 +230,7 @@ final class SimilarItemsTest extends TestCase
         // overshirt's, for being button shirts)
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
 
-        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['נמר', 'כחול'])]));
+        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '303')->update(['caption_words' => json_encode(['תיק גב', 'נמר', 'כחול'])]));
         // a blue leopard is its alike in another colour: its colour orders, never leaves out (Rocks, 26.10: a wide ring with
         // white stones is like the same ring with green ones)
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'), 'of its print in another colour');
@@ -233,7 +238,7 @@ final class SimilarItemsTest extends TestCase
         $this->assertSame(['302'], array_column($this->similar('301', 2)->json('others'), 'external_id'));
 
         // its picture names no colour: its print still keeps the plain bag apart
-        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => json_encode(['נמר'])]));
+        app(TenantContext::class)->run($this->shop->id, fn () => RetrievalImage::query()->where('external_id', '301')->update(['caption_words' => json_encode(['תיק גב', 'נמר'])]));
         $this->assertSame(['303'], array_column($this->similar('301', 2)->json('products'), 'external_id'));
     }
 
@@ -771,6 +776,29 @@ final class SimilarItemsTest extends TestCase
         $make($rings + ['673' => 'עגיל תלוי 1', '674' => 'צמיד טניס 2', '675' => 'תליון לב 3']);
         $this->app->instance(SemanticSearch::class, $this->nearness(['662', '663', '664', '665'], []));
         $this->assertEqualsCanonicalizing(['662', '663', '664', '665'], array_column($this->similar('661')->json('products'), 'external_id'));
+    }
+
+    public function test_a_womans_product_is_never_a_mans_alike(): void
+    {
+        // as Aviad asked, 17.11: similar items are of its gender and its kind; one the store says nothing of stays
+        Settings::set('search.similar_by', 'both', $this->shop->id);
+        app(TenantContext::class)->run($this->shop->id, function (): void {
+            CatalogProduct::query()->whereIn('external_id', ['301', '302', '303'])->update(['removed_at' => now()]);
+            foreach (['601' => 'סניקרס עור לנשים', '602' => 'סניקרס קנבס לגברים', '603' => 'סניקרס ריצה לגברים', '604' => 'סניקרס בד לנשים', '605' => 'סניקרס לבנות'] as $id => $title) {
+                CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://www.store.test/p/{$id}", 'image_url' => null, 'price' => '100', 'currency' => 'ILS', 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+            }
+        });
+        $this->travel(2)->seconds();
+        LoadedIndex::forget();
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+        $this->app->instance(SemanticSearch::class, $this->nearness(['602', '603', '604', '605'], []));
+
+        $shown = array_column($this->similar('601')->json('products'), 'external_id');
+        $this->assertContains('604', $shown);
+        $this->assertNotContains('602', $shown, 'a man\'s sneaker beside a woman\'s');
+        $this->assertNotContains('603', $shown);
+        $this->assertNotContains('602', array_column((array) $this->similar('601')->json('others'), 'external_id'), 'nor as maybe');
     }
 
     /**

@@ -319,9 +319,23 @@ final class CatalogProductKinds implements ProductKinds
         if (isset($said['unisex'])) {
             return ['women', 'men'];
         }
+        // both, by its tags, in a store that says one of them of nearly everything (Miss Nori tags "women" on its whole
+        // catalogue): the other is what it is. Its "MEN" tee was a woman's shirt's alike, and hers its (17.11)
+        if (isset($said['women'], $said['men']) && self::saidIn((string) $product->title) === []) {
+            $counts = $this->counts((string) $product->shop_id);
+            $all = max(1, (int) $counts['products']);
+            foreach ([['women', 'men'], ['men', 'women']] as [$wide, $own]) {
+                if (($counts['said'][$wide] ?? 0) >= $all * self::STORE_WIDE_WHOM && ($counts['said'][$own] ?? 0) < $all * self::STORE_WIDE_WHOM / 2) {
+                    return [$own];
+                }
+            }
+        }
 
         return array_values(array_filter(['women', 'men'], fn (string $a): bool => isset($said[$a])));
     }
+
+    /** A side said of at least this share of the store's products is the store's own tag, not one product's word. */
+    private const STORE_WIDE_WHOM = 0.6;
 
     public function onlyWhom(string $name): bool
     {
@@ -509,17 +523,20 @@ final class CatalogProductKinds implements ProductKinds
     private function counts(string $shopId): array
     {
         $active = CatalogProduct::query()->whereNull('removed_at');
-        $version = '6|'.$active->count().'|'.$active->max('updated_at');
+        $version = '7|'.$active->count().'|'.$active->max('updated_at');
 
         return Cache::remember('catalog:kinds:'.$shopId.':'.md5($version), now()->addHours(12), function (): array {
             $prefixes = self::brandPrefixes();
-            $counts = ['products' => 0, 'type' => [], 'typeHeads' => [], 'head' => [], 'after' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
+            $counts = ['products' => 0, 'said' => [], 'type' => [], 'typeHeads' => [], 'head' => [], 'after' => [], 'category' => [], 'tag' => [], 'prefix' => $prefixes];
 
             CatalogProduct::query()->whereNull('removed_at')->select(['id', 'title', 'brand', 'payload'])->orderBy('id')
                 ->chunk(500, function ($products) use (&$counts, $prefixes): void {
                     foreach ($products as $product) {
                         $own = self::own($product, $prefixes);
                         $counts['products']++;
+                        foreach (array_keys(self::saidAudiences($product)) as $whom) {
+                            $counts['said'][$whom] = ($counts['said'][$whom] ?? 0) + 1;
+                        }
                         if ($own['type'] !== '') {
                             $counts['type'][$own['type']] = ($counts['type'][$own['type']] ?? 0) + 1;
                             if ($own['head'] !== '') {
