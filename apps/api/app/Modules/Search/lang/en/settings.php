@@ -331,6 +331,10 @@ return [
         'description' => 'By content (name, description and specs), by picture, or both together. Where different products look alike (books, bundles), by content is better.',
         'options' => ['both' => 'Content and picture', 'meaning' => 'By content', 'picture' => 'By picture'],
     ],
+    'similar_near_looks' => [
+        'label' => '"Similar items" only from the nearest pictures',
+        'description' => 'A product is similar only if it is of the same kind and among this many nearest pictures. The rest of its kind show below, under "You may also like". 0: any product of its kind the pictures found.',
+    ],
     'similar_count' => [
         'label' => 'How many "similar items"',
         'description' => 'How many similar products show beside a product, up to 24. 0: as many as each group of results.',

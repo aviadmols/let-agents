@@ -929,6 +929,15 @@
             "scope": "shop"
         },
         {
+            "name": "similar_near_looks",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 150,
+            "scope": "shop",
+            "unit": "results"
+        },
+        {
             "name": "similar_count",
             "type": "int",
             "default": 0,

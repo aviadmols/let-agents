@@ -2127,7 +2127,11 @@ final class SearchCatalog
             // and only what its pictures found near: one its words alone found is at most "maybe these". A kid's sneaker
             // was a man's boot's alike by "נעליים" and "נעלי" in their titles, and no picture near it (Chozen, 30.10)
             if ($looksLead && ! $otherColour && ($wants['words'] ?? []) === []) {
-                $seen = array_flip([...$looks, ...$alike, ...$filled]);
+                // and near it among them, where the shop asks it (search.similar_near_looks): of the 150 pictures read, any of its
+                // kind was alike, and a striped knit tee had a tank top and a cardigan beside it (Miss Nori, 17.11). The rest of its
+                // kind are "maybe these", apart under them
+                $nearLooks = (int) Settings::get('search.similar_near_looks', $shopId);
+                $seen = array_flip([...($nearLooks > 0 ? array_slice($looks, 0, $nearLooks) : $looks), ...$alike, ...$filled]);
                 $ids = self::seenAlike($product, array_values(array_filter($ids, fn (string $id): bool => isset($seen[$id]))));
             }
             // what its look left out, as the store sells them now: never the product itself, and still all the question asked

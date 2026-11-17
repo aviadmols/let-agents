@@ -57,7 +57,8 @@ final class SimilarController
         $wants = $asked === '' ? null : $search->similarWants($shopId, $id, $asked);
         $products = $search->similar($shopId, $id, $limit, $request->query('colour') === 'other', $wants, $others);
         // few or none look like it: those of its kind its look left out, to be shown apart as "maybe these" (never as alike)
-        $others = count($products) < self::FEW_ALIKE ? array_slice((array) $others, 0, $limit) : [];
+        // and always where the shop keeps its alike to the nearest pictures (search.similar_near_looks): the rest of its kind under them
+        $others = count($products) < self::FEW_ALIKE || (int) Settings::get('search.similar_near_looks', $shopId) > 0 ? array_slice((array) $others, 0, $limit) : [];
         // what they share with it, as the store names it: "maybe these from …" says why they are there
         $of = $others === [] ? null : $search->othersOf($shopId, $id, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $others));
 
