@@ -5,7 +5,9 @@ namespace App\Modules\Search\Tests;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\SearchCatalog;
+use App\Modules\Search\Support\LoadedIndex;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,5 +43,13 @@ final class SimilarOthersOfTest extends TestCase
         $this->assertSame('אייקוני כדורים פורחים', $search->othersOf($shop->id, '1', ['2', '3', '4']), 'two of three are of its print; a sale, all and whom name nothing');
         $this->assertNull($search->othersOf($shop->id, '1', ['4', '5', '6']), 'none of its own named categories holds half of them');
         $this->assertNull($search->othersOf($shop->id, '1', []));
+
+        // nothing alike and nothing of its kind: the others of its own most specific category, never an empty page
+        app(BuildSearchIndex::class)->handle($shop->id);
+        LoadedIndex::forget();
+        $nearby = $search->nearbyOf($shop->id, '1', 8);
+        $this->assertSame('אייקוני כדורים פורחים', $nearby['of'] ?? null);
+        $this->assertEqualsCanonicalizing(['2', '3'], array_column($nearby['products'] ?? [], 'external_id'), 'of its print, not the sale, not the whole store');
+        $this->assertNull($search->nearbyOf($shop->id, '5', 8), 'a product filed only under the whole store has none');
     }
 }

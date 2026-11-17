@@ -2619,6 +2619,69 @@ final class SearchCatalog
         });
     }
 
+    /** A product with nothing alike is shown others of a category of its own that holds at least this many besides it. */
+    private const NEARBY_MIN = 2;
+
+    /**
+     * For a product with nothing alike and nothing of its kind: products of its own most specific category, in stock, for
+     * its people, so the shopper is never left with an empty page (as Aviad asked, 17.11: a bottle whose only like was
+     * sold out showed "no similar items" and nothing else). Never a campaign or an offer, whom alone, or most of the store;
+     * its product type where no category serves. Said to be from that category, never to be alike.
+     *
+     * @return array{of: string, products: list<array<string, mixed>>}|null
+     */
+    public function nearbyOf(string $shopId, string $externalId, int $limit): ?array
+    {
+        return $this->tenant->run($shopId, function () use ($shopId, $externalId, $limit): ?array {
+            $index = LoadedIndex::for($shopId);
+            $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first(['id', 'shop_id', 'external_id', 'title', 'brand', 'payload']);
+            if ($index === null || $product === null || $limit < 1) {
+                return null;
+            }
+            $kinds = app(ProductKinds::class);
+            $store = max(1, CatalogProduct::query()->whereNull('removed_at')->count());
+            // in stock and in the index, never itself
+            $shown = fn (array $ids): array => array_values(array_filter(array_map('strval', $ids), fn (string $id): bool => $id !== $externalId && (int) ($index['records']['p:'.$id]['s'] ?? 0) === 1));
+            $best = null;
+            foreach ($product->categories()->whereNull('catalog_categories.removed_at')->withCount('products')->get(['catalog_categories.id', 'catalog_categories.name']) as $category) {
+                $name = trim((string) $category->name);
+                if ($name === '' || $kinds->campaign($name) || $kinds->onlyWhom($name) || $category->products_count > $store * self::OTHERS_OF_MAX_STORE) {
+                    continue;
+                }
+                $ids = $shown($category->products()->whereNull('catalog_products.removed_at')->pluck('catalog_products.external_id')->all());
+                // the most specific: the smallest that still holds some
+                if (count($ids) >= self::NEARBY_MIN && ($best === null || count($ids) < count($best['ids']))) {
+                    $best = ['of' => $name, 'ids' => $ids];
+                }
+            }
+            if ($best === null) {
+                $type = trim((string) ($product->payload['product_type'] ?? ''));
+                $ids = $type === '' ? [] : $shown(CatalogProduct::query()->whereNull('removed_at')->where('payload->product_type', $type)->pluck('external_id')->all());
+                if (count($ids) < self::NEARBY_MIN || preg_match('/\p{L}/u', $type) !== 1 || $kinds->campaign($type)) {
+                    return null;
+                }
+                // a type is the store's own code as often as a name ("KIDSSHIRT"): shown, never named
+                $best = ['of' => '', 'ids' => $ids];
+            }
+            // for its people: never a man's beside a woman's, a child's beside a grown-up's
+            $whom = $this->audiencesOf([$externalId, ...$best['ids']]);
+            $young = fn (array $a): bool => array_intersect($a, ['kids', 'babies']) !== [];
+            $side = fn (array $a): ?string => in_array('women', $a, true) === in_array('men', $a, true) ? null : (in_array('women', $a, true) ? 'women' : 'men');
+            $own = $whom[$externalId] ?? [];
+            $anyYoung = array_filter($whom, $young) !== [];
+            $ids = array_values(array_filter($best['ids'], function (string $id) use ($whom, $young, $side, $own, $anyYoung): bool {
+                $theirs = $whom[$id] ?? [];
+                if ($anyYoung && $young($theirs) !== $young($own)) {
+                    return false;
+                }
+
+                return $side($own) === null || $side($theirs) === null || $side($theirs) === $side($own);
+            }));
+
+            return $ids === [] ? null : ['of' => $best['of'], 'products' => array_map(fn (string $id): array => $this->present($index['records']['p:'.$id]), array_slice($ids, 0, $limit))];
+        });
+    }
+
     /** A store whose product titles name a colour this rarely or less tells colours by its filters, not its titles. */
     private const TITLES_COLOUR_SHARE = 0.2;
 

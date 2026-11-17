@@ -61,6 +61,10 @@ final class SimilarController
         $others = count($products) < self::FEW_ALIKE || (int) Settings::get('search.similar_near_looks', $shopId) > 0 ? array_slice((array) $others, 0, $limit) : [];
         // what they share with it, as the store names it: "maybe these from …" says why they are there
         $of = $others === [] ? null : $search->othersOf($shopId, $id, array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $others));
+        // nothing alike and nothing of its kind: others of its own category, said to be that, never an empty page
+        if ($products === [] && $others === [] && $wants === null && $request->query('for') !== 'oos' && ($nearby = $search->nearbyOf($shopId, $id, $limit)) !== null) {
+            [$others, $of] = [$nearby['products'], $nearby['of'] !== '' ? $nearby['of'] : null];
+        }
 
         return response()->json(['products' => $products] + ($others === [] ? [] : ['others' => $others]) + ($of === null ? [] : ['others_of' => $of]) + ($wants === null ? [] : ['asked' => $wants]), 200, ['Cache-Control' => 'public, max-age=300'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
