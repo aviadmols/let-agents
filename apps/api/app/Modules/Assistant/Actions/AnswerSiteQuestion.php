@@ -1702,7 +1702,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
             // and what the store's own search finds for the question, by its words and by meaning (assistant.products_by_search):
             // the products on the screen were those the words found while it was typed, "מתאמים" for "מה מתאים…" (Gueta, 17.11)
-            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown]));
+            // Nothing on the screen (asked in the box of a product page, no search before it) and the question asks for products
+            // ("איזו מתנה מתאימה לאשתי עד 1500 ש"ח, משהו עדין עם יהלום"): what the store's own search finds for it, in its budget,
+            // is what the shopper would have had in front of them. Without it the writer had three product pages as passages,
+            // with no price, named them without their cards and said "their prices are not here" (Rocks, 17.11).
+            $forIt = $shown === [] && in_array(AnswerContext::type($question), ['recommendation', 'price_range', 'superlative'], true) ? $this->searchedFor($shopId, $question) : [];
+            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown, ...$forIt]));
         }
         // "What is recommended most": the store's most popular, before the rest, and kept through the choice below. What
         // its customers buy, open and add to the cart, never a model's taste (as Aviad asked, 26.10).
@@ -5247,6 +5252,21 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $this->searched[$shopId.'|'.$question] ??= app(ProductsNear::class)->near($shopId, $question, self::BY_SEARCH);
+    }
+
+    /**
+     * What the store's own search finds for a question that asks for products, when nothing was on the screen: as many as
+     * the writer is given at most. None when the search is not there to ask or fails: the answer goes on without.
+     *
+     * @return list<string> external ids
+     */
+    private function searchedFor(string $shopId, string $question): array
+    {
+        try {
+            return app()->bound(ProductsNear::class) ? ($this->searched[$shopId.'|all|'.$question] ??= app(ProductsNear::class)->near($shopId, $question, self::MAX_PRODUCTS)) : [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /** Whether the store's own search finds a product for the question, by its words or by meaning (stored vectors only). */
