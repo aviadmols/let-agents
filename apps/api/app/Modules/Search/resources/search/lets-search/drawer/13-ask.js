@@ -39,6 +39,7 @@
     }
     var turn = addTurn(Object.assign({ kind: 'answer', q: q, shown: S.askAs && S.askAs !== q ? S.askAs : undefined, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));
+    if (!turn.ctx && !(extra && extra.thread)) { preFor(turn, q); }
     var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from). A reply to an answer
@@ -257,8 +258,32 @@
     var shown = filtered(turn).length, all = turn.ids.length;
     return shown === all || !shown ? answer : answer.replace(new RegExp('\\(' + all + '\\)'), '(' + shown + ')');
   }
+  // While an answer is written (seven to ten seconds for a new question): the place its words will take is kept, as lines
+  // being written, so nothing jumps when they come; and under it, at once, the products the store's own search finds for the
+  // question, where some hold its words (as Aviad asked, 17.11). They are the search's, said to be so, never the answer's picks.
+  function writingHtml(turn) {
+    var lines = '<div class="ls-writing" aria-hidden="true"><span style="width:92%"></span><span style="width:78%"></span><span style="width:55%"></span></div>';
+    var pre = (turn.pre || []).map(rec).filter(Boolean).slice(0, 4);
+    return lines + (pre.length ? '<div class="ls-block__title" style="margin-top:14px">' + esc(t('meanwhile')) + '</div><div class="ls-grid">' + pre.map(card).join('') + '</div>' : '');
+  }
+  // The store's search for a question, asked beside it, nothing counted. Only for a question that names a kind of product
+  // the store sells ("יש לכם טבעת עם אבן אדומה?": rings), and only products of that kind: a question about returns or about
+  // what 14K means finds products too, and none of them is its answer (Rocks, 17.11: a ring sizer under "איך מחזירים מוצר?").
+  function preFor(turn, q) {
+    loadIndex().then(function () {
+      var kinds = [];
+      try { kinds = readValues(blankC(), q).filter(function (r) { var f = S.facets[Math.floor(r.code / 1000)]; return f && (f.k === 'type' || f.k === 'category'); }).map(function (r) { return r.code; }); } catch (e) { kinds = []; }
+      if (!kinds.length || !turn.loading) { return; }
+      return json(API + '/search/' + SITE + '?counted=1&typing=1&meaning=1&q=' + encodeURIComponent(q)).then(function (r) {
+        var d = r.body || {}, ids = ((d.groups && d.groups.product) || []).map(function (p) { return p.id; });
+        ids = ids.filter(function (id) { var x = rec(id); return x && x.s === 1 && kinds.some(function (code) { return (x.f || []).indexOf(code) >= 0; }); }).slice(0, 4);
+        if (!turn.loading || ids.length < 2 || d.loosened) { return; }
+        return products(ids).then(function () { if (turn.loading) { update(turn, { pre: ids }); } });
+      });
+    }).catch(function () { /* the answer comes all the same */ });
+  }
   function answerHtml(turn) {
-    if (turn.loading) { return thinking(t('thinkingAsk')); }
+    if (turn.loading) { return thinking(t('thinkingAsk')) + writingHtml(turn); }
     if (turn.error) { return errorHtml(turn); }
     // asked for advice among a search's results: with no clear pick, those results to talk over with another AI, not a form
     // not "not found" but something else (the day's questions used, not the store's to answer, unavailable): said as it is

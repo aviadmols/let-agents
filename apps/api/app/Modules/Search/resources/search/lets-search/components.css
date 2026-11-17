@@ -55,6 +55,14 @@
 /* "Thinking…" line: the mark plus a light pass over the words */
 .ls-think { display: inline-flex; align-items: center; gap: 10px; color: var(--ls-fg-muted); font-size: var(--lsp-text-md); }
 .ls-think .ls-mark { color: var(--ls-fg); }
+/* an answer being written: the place of its words kept, three lines filling in one after the other */
+.ls-writing { display: grid; gap: 10px; margin-top: 12px; min-height: 76px; }
+.ls-writing span { display: block; height: 14px; border-radius: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--ls-fg) 9%, transparent) 0 40%, color-mix(in srgb, var(--ls-fg) 18%, transparent) 50%, color-mix(in srgb, var(--ls-fg) 9%, transparent) 60% 100%); background-size: 240% 100%; transform-origin: var(--ls-writing-from, right) center; animation: ls-write 1.1s ease-out both, ls-writing-glow 1.6s linear infinite; }
+.ls-writing span:nth-child(2) { animation-delay: .45s, 0s; }
+.ls-writing span:nth-child(3) { animation-delay: .9s, 0s; }
+[dir="ltr"] .ls-writing span, .ls[dir="ltr"] .ls-writing span { --ls-writing-from: left; }
+@keyframes ls-write { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes ls-writing-glow { from { background-position: 100% 0; } to { background-position: -40% 0; } }
 .ls-think__text {
   color: var(--ls-fg);
   -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / .5) 0%, rgb(0 0 0 / .5) 40%, #000 50%, rgb(0 0 0 / .5) 60%, rgb(0 0 0 / .5) 100%);
@@ -448,6 +456,7 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
   .ls *, .ls *::before, .ls *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
   .ls *, .ls *::before, .ls *::after { animation-delay: 0s !important; }
   .ls .ls-mark--think, .ls .ls-mark--think i { animation: none !important; }
+  .ls .ls-writing span { animation: none !important; }
   .ls .ls-think__text { animation: none !important; -webkit-mask-image: none; mask-image: none; color: var(--ls-fg-muted); }
   .ls .ls-drawer, .ls .ls-sheet { transform: none !important; opacity: 0; visibility: hidden; transition: opacity 200ms ease, visibility 0s 200ms !important; }
   .ls .ls-drawer.is-open, .ls .ls-sheet.is-open { opacity: 1; visibility: visible; transition: opacity 200ms ease !important; }
