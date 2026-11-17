@@ -1427,9 +1427,9 @@ final class HebrewSearch
         }
 
         foreach ($variants as $position => $variant) {
-            // the word less its first letter only when the word as typed has no form in the catalogue: "כחול" is blue, never כ+"חול"
-            // found in "חוליה" (a chain's link), nor "מחוטא" מ+"חוטא" in "חוט" (word-audit 17.11)
-            if ($position > 0 && array_filter($found, fn (float $score): bool => $score >= 0.85) !== []) {
+            // the word less its first letter only when the word as typed has no form in the catalogue, or what is left is a word the
+            // catalogue has whole: "המדינה" is "מדינה", "בישראל" is "ישראל", but "כחול" is never כ+"חול" in "חוליה" (word-audit 17.11)
+            if ($position > 0 && ! isset($index['holders'][$variant]) && array_filter($found, fn (float $score): bool => $score >= 0.85) !== []) {
                 break;
             }
             $scores = [];
@@ -1525,9 +1525,12 @@ final class HebrewSearch
         // only looks like it with its ו and י dropped is not ("עגול": Rocks, 25.10, "עגילי זהב" found rings cut round). A slip
         // nothing plainly holds ("לבין") is still read as the word it is close to.
         if (array_any(array_keys($found), fn ($candidate): bool => self::formOf((string) $candidate, $variants))) {
-            // ...and of the words merely spelled like it, only a slip (.8 and up): "מבצעים", with "מבצע" in the catalogue, is never
-            // "מצעים", bed sheets (word-audit 17.11)
-            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || (! self::vowelsApart((string) $candidate, $variants) && $score >= 0.8), ARRAY_FILTER_USE_BOTH);
+            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || ! self::vowelsApart((string) $candidate, $variants), ARRAY_FILTER_USE_BOTH);
+        }
+        // A word with a form of its own in the catalogue (.85 and up: "מבצע" for "מבצעים") takes of the words merely spelled like it
+        // only a slip (.8 and up): never "מצעים", bed sheets (word-audit 17.11). A slip of its own ("הפוליטקה") keeps them all.
+        if (array_filter($found, static fn ($score, $candidate): bool => $score >= 0.85 && self::formOf((string) $candidate, $variants), ARRAY_FILTER_USE_BOTH) !== []) {
+            $found = array_filter($found, static fn ($score, $candidate): bool => self::formOf((string) $candidate, $variants) || $score >= 0.8, ARRAY_FILTER_USE_BOTH);
         }
 
         $floor = $found ? max(self::FLOOR, max($found) * self::RELATIVE_FLOOR) : self::FLOOR;

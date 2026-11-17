@@ -61,4 +61,16 @@ final class ShortWordsTest extends TestCase
             $this->assertSame($ids, array_column(HebrewSearch::search($index, $query), 'id'), "\"{$query}\"");
         }
     }
+
+    public function test_a_prefix_letter_comes_off_where_what_is_left_is_a_word_of_the_catalogue(): void
+    {
+        // the regression check of 17.11 (Sela): "המדינה" is "מדינה" and "בישראל" is "ישראל" though each is in the catalogue as typed
+        $index = HebrewSearch::build([
+            ['id' => 'p:1', 'title' => 'מדינה יהודית', 'keywords' => ''], ['id' => 'p:2', 'title' => 'המדינה הזאת', 'keywords' => ''],
+            ['id' => 'p:3', 'title' => 'ספר על ישראל', 'keywords' => ''], ['id' => 'p:4', 'title' => 'הפוליטיקה בישראל', 'keywords' => ''],
+        ]);
+        $ids = fn (string $q): array => array_column(HebrewSearch::search($index, $q), 'id');
+        $this->assertEqualsCanonicalizing(['p:1', 'p:2'], $ids('המדינה'));
+        $this->assertEqualsCanonicalizing(['p:3', 'p:4'], $ids('בישראל'));
+    }
 }

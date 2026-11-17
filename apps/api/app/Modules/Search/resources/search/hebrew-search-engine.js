@@ -236,9 +236,10 @@
     }
 
     for (var position = 0; position < variants.length; position++) {
-      // the word less its first letter only when the word as typed has no form in the catalogue: "כחול" is blue, never כ+"חול"
-      // found in "חוליה" (a chain's link), nor "מחוטא" מ+"חוטא" in "חוט" (word-audit 17.11; the server's closeWords)
-      if (position > 0 && order.some(function (w) { return found[w] >= 0.85; })) { break; }
+      // the word less its first letter only when the word as typed has no form in the catalogue, or what is left is a word the
+      // catalogue has whole: "המדינה" is "מדינה" and "בישראל" is "ישראל", but "כחול" is blue, never כ+"חול" found in "חוליה" (a
+      // chain's link), nor "מחוטא" מ+"חוטא" in "חוט" (word-audit 17.11; the server's closeWords)
+      if (position > 0 && !Object.prototype.hasOwnProperty.call(index.holders, variants[position]) && order.some(function (w) { return found[w] >= 0.85; })) { break; }
       var variant = variants[position];
       var scores = {};
       var base = stem(variant);
@@ -331,9 +332,12 @@
     // ו and י dropped is not ("עגול"). A slip nothing plainly holds ("לבין") is still read as the word it is close to.
     // As on the server (HebrewSearch::closeWords).
     if (order.some(function (c) { return formOf(c, variants); })) {
-      // ...and of the words merely spelled like it, only a slip (.8 and up): "מבצעים", with "מבצע" in the catalogue, is never
-      // "מצעים", bed sheets (word-audit 17.11; the server's closeWords)
-      order = order.filter(function (c) { return formOf(c, variants) || (!vowelsApart(c, variants) && found[c] >= 0.8); });
+      order = order.filter(function (c) { return formOf(c, variants) || !vowelsApart(c, variants); });
+    }
+    // A word with a form of its own in the catalogue (.85 and up: "מבצע" for "מבצעים") takes of the words merely spelled like it
+    // only a slip (.8 and up): never "מצעים", bed sheets (word-audit 17.11). A slip of its own ("הפוליטקה") keeps them all.
+    if (order.some(function (c) { return found[c] >= 0.85 && formOf(c, variants); })) {
+      order = order.filter(function (c) { return formOf(c, variants) || found[c] >= 0.8; });
     }
 
     var best = 0;
