@@ -3217,7 +3217,10 @@ final class AnswerSiteQuestion implements TriesQuestions
         // 100 ₪") and how to reach it; quoted from there, that is the store's word, not one made up. And the prices above.
         // The team's own word too, cited or not: an address or a link it wrote is the store's.
         $own = array_keys(array_filter($byRef, fn (array $passage): bool => in_array($passage['from'] ?? null, self::OWN_WORD, true)));
-        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], array_values(array_unique([...$cited, ...$own]))))."\n".$prices;
+        $pages = implode("\n", array_map(fn (string $ref): string => $byRef[$ref]['title']."\n".$byRef[$ref]['text'], array_values(array_unique([...$cited, ...$own]))))."\n".$prices
+            // and the sums the shopper's own question names ("עד 1500 ש"ח"): an answer that says the budget back states no price of
+            // the store's. Its sentence was taken out as a price no page writes, and nothing of the answer was left (Rocks, 17.11).
+            ."\n".self::sumsOf($question);
 
         // What the writer said from general knowledge (answer_site v24: a term of the trade, the steps any website takes):
         // only sentences that say nothing of the store; one that does is taken out of the answer (general()). What stays
@@ -3240,7 +3243,13 @@ final class AnswerSiteQuestion implements TriesQuestions
             default => null,
         };
         if ($refusal === null) {
-            [$answer, $refusal, $trimmed] = self::gate($answer, $known, $pages);
+            $written = $answer;
+            [$answer, $refusal, $trimmed] = self::gate($written, $known, $pages);
+            // Products picked stand on their own: what is clean of the answer stays with them, however little. Emptied, it went
+            // to the checker as "" beside three fitting rings, and the checker refused the whole (Rocks, 17.11).
+            if ($answer === '' && $picks !== []) {
+                [$answer, $refusal, $trimmed] = self::gate($written, $known, $pages, 0.0);
+            }
         }
 
         return ['answer' => $refusal === null ? $answer : '', 'cited' => $cited, 'picks' => $picks, 'refusal' => $refusal, 'known' => $known, 'pages' => $pages, 'trimmed' => $trimmed,
@@ -3293,7 +3302,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @return array{0: string, 1: string|null, 2: int} what is left, the refusal when nothing is, sentences taken out
      */
-    public static function gate(string $answer, string $known, string $pages): array
+    public static function gate(string $answer, string $known, string $pages, float $share = self::KEPT_SHARE): array
     {
         $fault = function (string $text) use ($known, $pages): ?string {
             // what a link holds is no number or ref of the answer ("yXaw11dYgA8"); the link itself is checked as contact details are
@@ -3316,7 +3325,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             return [$answer, null, 0];
         }
 
-        [$left, $out] = self::withoutSentences($answer, fn (string $sentence): bool => $fault($sentence) !== null);
+        [$left, $out] = self::withoutSentences($answer, fn (string $sentence): bool => $fault($sentence) !== null, $share);
 
         return $left === '' ? ['', $whole, $out] : [$left, null, $out];
     }
@@ -5302,6 +5311,14 @@ final class AnswerSiteQuestion implements TriesQuestions
         return (float) Settings::get("assistant.{$name}_usd_per_million");
     }
 
+    /** The sums a shopper's question names, as the gate reads the pages. Short numbers only, never a phone number. */
+    public static function sumsOf(string $question): string
+    {
+        preg_match_all('/(?<![\d,.])(?:\d{1,3}(?:,\d{3})+|\d{1,6})(?![\d,]*\d)/u', $question, $m);
+
+        return implode(' ', $m[0]);
+    }
+
     /**
      * Whether every sum of money the answer names ("100 ₪", "₪100", "100 שקל") is written in the pages it
      * cites: a fee the store's policy states, never a product's price (the page shows that) or one made up.
@@ -5344,8 +5361,13 @@ final class AnswerSiteQuestion implements TriesQuestions
     private static function hasNumberNotIn(string $answer, string $known): bool
     {
         preg_match_all('~\d+(?:[.,]\d+)?~u', $answer, $numbers);
+        // thousands written with or without their comma are one number: "1,500" for the shopper's "עד 1500"
+        $plain = (string) preg_replace('/(?<=\d),(?=\d{3}(?!\d))/u', '', $known);
 
         foreach ($numbers[0] as $number) {
+            if (preg_match('/^\d{1,3},\d{3}$/', $number) === 1 && str_contains($plain, str_replace(',', '', $number))) {
+                continue;
+            }
             if (! str_contains($known, $number) && ! str_contains($known, str_replace(',', '.', $number))) {
                 return true;
             }
