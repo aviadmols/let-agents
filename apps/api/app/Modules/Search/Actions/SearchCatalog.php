@@ -3634,9 +3634,17 @@ final class SearchCatalog
      */
     private static function surestFirst(array $products, array $read): array
     {
-        $tier = function (array $r) use ($read): int {
+        // one word read as a value of two filters ("לב": the motif and the stone's shape) asks for one thing: sure of either is
+        // sure of it. Rocks, 17.11: a heart pendant sure of its motif stood last for its stone's shape
+        $asked = [];
+        foreach ($read as $values) {
+            foreach ($values as $code => $label) {
+                $asked[HebrewSearch::normalize((string) $label)][(int) $code] = (string) $label;
+            }
+        }
+        $tier = function (array $r) use ($asked): int {
             $least = 100;
-            foreach ($read as $values) {
+            foreach ($asked as $values) {
                 $best = 0;
                 foreach ($values as $code => $label) {
                     $best = max($best, Evidence::of($r, (int) $code, HebrewSearch::says((string) ($r['title'] ?? ''), (string) $label)));
