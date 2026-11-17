@@ -2131,7 +2131,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                     // Asked about given products (from a product's page, or the turn before): they are the
                     // store's, whatever the words alone seem to be about ("מה מיוחד במוצר הזה?").
                     if (! $scoped['about_store'] && $keep) {
-                        if ($remember) {
+                        // kept, and told to everyone who asks the same for days, only where the store's own search finds nothing
+                        // for it either: "מה מתאים לטיפול בציפורים?" was refused, and the refusal served again, in a store that
+                        // sells pigeon spikes (Gueta, 17.11). One it does find products for is judged afresh each time.
+                        if ($remember && ! $this->searchFinds($shopId, $corrected ?? $question)) {
                             $this->save($question, AssistantAnswer::OUT_OF_SCOPE, null, [], [], $scoper['model'], $replies, $run, $flags);
                         }
                         $result = $this->fixed('out_of_scope', $locale, 'model') + ['reason' => 'not_about_store'];
@@ -5225,6 +5228,16 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $this->searched[$shopId.'|'.$question] ??= app(ProductsNear::class)->near($shopId, $question, self::BY_SEARCH);
+    }
+
+    /** Whether the store's own search finds a product for the question, by its words or by meaning (stored vectors only). */
+    private function searchFinds(string $shopId, string $question): bool
+    {
+        try {
+            return app()->bound(ProductsNear::class) && app(ProductsNear::class)->near($shopId, $question, 1) !== [];
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function storeSays(string $shopId, string $question): array
