@@ -297,7 +297,11 @@
       // under "Men > Sandals" after the sandals (Naot QA, 16.11: "Fiord")
       // ...and before both, what its own name says the search is: black flip-flops after the black shoes (VANS QA, 17.11), where
       // some names say it
-      var pure = onlyColour(c), kind = seenAs(c), shade = shadeOf(c), says = namesSearch(turn);
+      // (the words no filter was read from: "men" of "sandals for men" is the filter, not a name to look for)
+      var taken = [];
+      Object.keys(c.auto || {}).forEach(function (code) { [].push.apply(taken, (c.at && c.at[code]) || []); });
+      var left = taken.length ? wordsOf(turn.q || '').filter(function (w, i) { return taken.indexOf(i) < 0; }).join(' ') : '';
+      var pure = onlyColour(c), kind = seenAs(c), shade = shadeOf(c), says = left ? namesSearch({ words: left }) : function () { return 0; };
       if (!out.some(function (r) { return says(r); })) { says = function () { return 0; }; }
       out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || says(b) - says(a) || pure(b) - pure(a) || shade(b) - shade(a) || kind(b) - kind(a); });
     }
