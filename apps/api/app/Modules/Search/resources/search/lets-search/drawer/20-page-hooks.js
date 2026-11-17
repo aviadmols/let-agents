@@ -55,6 +55,8 @@
   var OWN_TRIGGERS = '[data-lets-open]';
   function onSearchTrigger(e) {
     var sel = (CFG.takeOver !== false ? SEARCH_TRIGGERS + ',' : '') + OWN_TRIGGERS + (CFG.openSelectors ? ',' + CFG.openSelectors : '');
+    // the saved heart may stand inside the theme's search element: its press is its own, never the search's (Rocks, 17.11)
+    if (e.target && e.target.closest && e.target.closest('[data-lets-heart]')) { return; }
     var node = e.target && e.target.closest ? e.target.closest(sel) : null;
     if (!node || node.closest('form') || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey) { return; }
     e.preventDefault(); e.stopImmediatePropagation();
@@ -172,8 +174,8 @@
     var h = doc.createElement('span');
     h.setAttribute('data-lets-heart', '');
     var sr = h.attachShadow({ mode: 'open' });
-    sr.innerHTML = '<style>:host{all:initial;display:inline-flex;align-items:center;color:inherit;vertical-align:middle}' +
-      'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:' + (size + 18) + 'px;height:' + (size + 18) + 'px;cursor:pointer;color:inherit;border-radius:50%;-webkit-tap-highlight-color:transparent}' +
+    sr.innerHTML = '<style>:host{all:initial;display:inline-flex;align-items:center;color:inherit;vertical-align:middle;margin-inline-start:-4px}' +
+      'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:' + (size + 8) + 'px;height:' + (size + 8) + 'px;cursor:pointer;color:inherit;border-radius:50%;-webkit-tap-highlight-color:transparent}' +
       'button:focus-visible{outline:2px solid currentColor;outline-offset:2px}' +
       'svg{width:' + size + 'px;height:' + size + 'px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;transition:fill 160ms ease,transform 260ms cubic-bezier(.2,.8,.2,1)}' +
       'button.is-full svg{fill:currentColor}button.is-pop svg{transform:scale(1.18)}@media (prefers-reduced-motion:reduce){svg{transition:none}}</style>' +
@@ -189,7 +191,10 @@
     if (own) { return own; }
     var found = [];
     try { found = [].slice.call(doc.querySelectorAll(SEARCH_TRIGGERS + ',' + OWN_TRIGGERS + (CFG.openSelectors ? ',' + CFG.openSelectors : ''))); } catch (e) { found = [].slice.call(doc.querySelectorAll(SEARCH_TRIGGERS)); /* a selector the browser cannot read */ }
-    return found.filter(function (n) { return !n.closest('form') && !n.closest('[data-lets-launcher]') && n.parentNode && n.getClientRects().length > 0; })[0] || null;
+    var at = found.filter(function (n) { return !n.closest('form') && !n.closest('[data-lets-launcher]') && n.parentNode && n.getClientRects().length > 0; })[0] || null;
+    // beside the whole search element, never inside it: a press inside it is the theme's to open its search with
+    try { while (at && at.parentElement && at.parentElement !== doc.body && at.parentElement.matches(SEARCH_TRIGGERS + ',details,summary')) { at = at.parentElement; } } catch (e) { /* as found */ }
+    return at;
   }
   // full once something is saved; a save makes it beat once
   function paintHeart(pop) {
