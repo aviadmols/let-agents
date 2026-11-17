@@ -87,7 +87,9 @@ final class CheckOwnKnowledge
         $titles = [];
         $texts = [];
 
-        foreach ($this->passages->near($shopId, $line, ['content'], self::PASSAGES) as $i => $piece) {
+        // the team's own lines come whole as `team`: a piece of them found by meaning is the line itself, "a conflict" (Gueta, 17.11)
+        $found = array_values(array_filter($this->passages->near($shopId, $line, ['content'], self::PASSAGES + 2), fn (array $p): bool => ($p['external_id'] ?? null) !== BuildShopKnowledge::OWN));
+        foreach (array_slice($found, 0, self::PASSAGES) as $i => $piece) {
             $id = 'p'.($i + 1);
             $passages[] = ['id' => $id, 'title' => (string) $piece['title'], 'text' => mb_substr(trim((string) $piece['text']), 0, self::MAX_PASSAGE)];
             $titles[$id] = (string) $piece['title'];
@@ -161,7 +163,7 @@ final class CheckOwnKnowledge
 
                     // another line of the team only when it speaks of what this one does, by a word they share: v2 named the two
                     // discount lines that disagree under the parking line too (Rocks, 17.11)
-                    if (str_starts_with($id, 't') && ! self::shareAWord($input['line'], $texts[$id] ?? '')) {
+                    if (str_starts_with($id, 't') && self::sharedWords($input['line'], $texts[$id] ?? '') < 2) {
                         continue;
                     }
 
@@ -184,8 +186,8 @@ final class CheckOwnKnowledge
         return $result;
     }
 
-    /** Whether two lines share a word of four letters or more, as Hebrew writes it (a prefix letter before it, final letters). */
-    public static function shareAWord(string $a, string $b): bool
+    /** How many words of four letters or more of the first line the second has, as Hebrew writes them (a prefix letter, final letters). */
+    public static function sharedWords(string $a, string $b): int
     {
         $forms = function (string $text): array {
             $out = [];
@@ -193,16 +195,18 @@ final class CheckOwnKnowledge
                 if (mb_strlen($w) < 4) {
                     continue;
                 }
-                $out[$w] = true;
-                if (mb_strlen($w) > 4 && preg_match('/^[והבלמשכ]/u', $w) === 1) {
-                    $out[mb_substr($w, 1)] = true;
-                }
+                $out[$w] = mb_strlen($w) > 4 && preg_match('/^[והבלמשכ]/u', $w) === 1 ? [$w, mb_substr($w, 1)] : [$w];
             }
 
             return $out;
         };
 
-        return array_intersect_key($forms($a), $forms($b)) !== [];
+        $theirs = [];
+        foreach ($forms($b) as $set) {
+            $theirs += array_flip($set);
+        }
+
+        return count(array_filter($forms($a), fn (array $set): bool => array_intersect_key(array_flip($set), $theirs) !== []));
     }
 
     private function usedToday(string $shopId): int

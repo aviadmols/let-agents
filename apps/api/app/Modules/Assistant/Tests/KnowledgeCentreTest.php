@@ -250,22 +250,29 @@ final class KnowledgeCentreTest extends TestCase
         $title = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->entries()[BuildShopKnowledge::OWN]->title);
         $newer = $this->inShop(fn (): string => (string) app(BuildShopKnowledge::class)->addOwn('אין לנו הנחה SHOPPING IL עד יום ראשון'));
         $passage = "- אין לנו הנחה SHOPPING IL עד יום ראשון\n- יש הנחת shopping IL של 20% עד יום ראשון בשעה 12.00";
-        // two pieces of the team's own text, each found saying otherwise: one note
+        // a piece of the team's own text found by meaning is the line itself: never a passage; the other line comes whole
+        // as the team's (t1), named twice: one note
         $this->near = [
             ['source' => 'content', 'source_id' => '1', 'external_id' => BuildShopKnowledge::OWN, 'title' => $title, 'text' => $passage, 'similarity' => 0.9],
-            ['source' => 'content', 'source_id' => '1', 'external_id' => BuildShopKnowledge::OWN, 'title' => $title, 'text' => $passage, 'similarity' => 0.8],
         ];
-        $this->app->instance(ChatModel::class, new class implements ChatModel
+        $sent = new \ArrayObject;
+        $this->app->instance(ChatModel::class, new class($sent) implements ChatModel
         {
+            public function __construct(private \ArrayObject $sent) {}
+
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                return new ModelReply(['conflicts' => [['id' => 'p1', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.'], ['id' => 'p2', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.']]], 600, 30);
+                $this->sent->append(json_decode($user, true));
+
+                return new ModelReply(['kind' => 'information', 'conflicts' => [['id' => 't1', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.'], ['id' => 't1', 'why' => 'כתוב שיש הנחת shopping IL עד יום ראשון.']]], 600, 30);
             }
         });
 
         app(CheckOwnKnowledge::class)->handle($this->shop->id, $newer);
         $check = collect($this->inShop(fn (): array => app(BuildShopKnowledge::class)->ownRows()))->firstWhere('id', $newer)['check'];
         $this->assertCount(1, $check['notes'], 'the same note once');
+        $this->assertSame([], $sent[0]['passages'], 'its own text is no passage');
+        $this->assertSame([['id' => 't1', 'text' => 'יש הנחת shopping IL של 20% עד יום ראשון בשעה 12.00']], $sent[0]['team']);
 
         $page = Livewire::test(AboutStore::class)->call('show', 'notes')
             ->assertSeeHtml('data-own-conflicts')
