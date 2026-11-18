@@ -268,6 +268,34 @@ final class ColourFamiliesTest extends TestCase
         $this->assertSame(['Sandals', 'Shoes'], array_column((array) ($tags['v'] ?? []), 'l'), 'never an app\'s tag, a menu\'s heading or a hashtag');
     }
 
+    public function test_one_model_in_colours_shares_what_its_pictures_say_of_the_model_never_a_colour_or_a_print(): void
+    {
+        // Me369 QA, 18.11: the green Martha camisole dress said "sleeveless", the white one only "thin straps", and "white
+        // sleeveless dress" missed the white one.
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'en']);
+        app(TenantContext::class)->run($shop->id, function () use ($shop): void {
+            foreach ([
+                '1' => [['maxi dress', 'green', 'dark green', 'sleeveless', 'thin straps', 'swirl print'], ['name' => 'swirl', 'covers' => 'all']],
+                '2' => [['maxi dress', 'cream', 'off-white', 'thin straps', 'spaghetti straps'], ['covers' => 'none']],
+            ] as $id => [$words, $pattern]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => 'Martha Camisole Dress',
+                    'url' => "https://store.test/p/{$id}", 'price' => 305, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $id, 'title' => $product->title,
+                    'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', (string) $id), 'caption_words' => $words, 'caption_pattern' => $pattern]);
+                CatalogSibling::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'group_key' => 'martha', 'label' => $id === '1' ? 'Green' : 'White']);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $items = collect(json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true)['items'])->keyBy('id');
+
+        $white = ' '.mb_strtolower((string) $items['p:2']['kw']).' ';
+        $this->assertStringContainsString(' sleeveless ', $white, 'what the green one\'s picture says of the model, the white one is too');
+        $this->assertStringNotContainsString('green', $white, 'never the other\'s colour');
+        $this->assertStringNotContainsString('swirl', $white, 'nor its print');
+        $this->assertStringContainsString('spaghetti straps', mb_strtolower((string) $items['p:1']['kw']), 'and the other way round');
+    }
+
     public function test_a_product_whose_variants_name_no_colour_is_filtered_by_the_main_colour_its_picture_shows(): void
     {
         // Me369, 18.11: 5 of 1,185 variants named a colour, the Colour filter held "Pink" alone, and "jackets white" brought
