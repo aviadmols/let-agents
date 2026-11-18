@@ -1196,7 +1196,8 @@ final class SiteQuestionTest extends TestCase
 
         $sent = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['passages']));
         $this->assertNotNull($sent, 'the writer was asked');
-        $this->assertSame('איזו מברגה כדאי לי? לבית', $sent['question'], 'with no topic check to write it alone: searched with the question before it');
+        $this->assertSame('לבית', $sent['question'], 'the shopper\'s own words (v39)');
+        $this->assertSame('איזו מברגה כדאי לי? לבית', $sent['read_as'], 'with no topic check to write it alone: searched with the question before it');
         $this->assertSame([['question' => 'איזו מברגה כדאי לי?', 'answer' => 'יש לנו כמה. לאיזה שימוש אתם מחפשים?']], $sent['conversation']);
         $this->assertSame('answered', $data['outcome']);
         $this->assertArrayNotHasKey('corrected', $data, 'a reply is shown as written, never "הבנתי: …"');
@@ -1219,7 +1220,8 @@ final class SiteQuestionTest extends TestCase
 
         $inputs = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true));
         $this->assertSame([['question' => 'איזו מברגה הכי טובה?', 'answer' => 'מברגה מקיטה 18V.']], $inputs[0]['conversation'], 'the topic check reads it with the conversation');
-        $this->assertSame('כמה פעמים כדאי להשתמש במברגה מקיטה?', $inputs[1]['question'], 'the writer answers the reply as it stands alone');
+        $this->assertSame('כמה פעמים כדאי לקחת אותה?', $inputs[1]['question'], 'the writer reads the reply as typed, with the conversation (v39)');
+        $this->assertSame('כמה פעמים כדאי להשתמש במברגה מקיטה?', $inputs[1]['read_as'], 'and as it stands alone, a help');
         $this->assertCount(1, $inputs[1]['products'], 'about what the answer before showed');
     }
 

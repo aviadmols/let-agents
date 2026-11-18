@@ -157,8 +157,15 @@ final class AnswerSiteQuestion implements TriesQuestions
      * stores the full checker (v35) rewrote 17 answers, mostly in wording and in some for the worse (a right 30-day return
      * window turned into "the team will confirm"), taking 4.0 s at the median; v37 took 2.6 s and stopped one
      * (docs/eval/checker-arms-v35-v36-v37-none.json in Let Agents).
+     *
+     * v39 (answer_site and verify_site), 18.11, as Aviad asked: a reply in a conversation reaches the writer and the checker
+     * as the shopper typed it, beside the conversation; the topic check's rewrite is given as `read_as`, a help only, and
+     * still drives the search. "48 ס"מ" after an answer on shortening a necklace had been rewritten and answered about a
+     * bracelet's wrist (Rocks). On 18 real replies from 9 stores against v35/v37 it did better in 6 (a refund no longer
+     * called store credit, bags up to ₪500 found, silver necklaces for "And in silver?", the necklace's SKU for "48 ס"מ")
+     * and the same in the rest; a 21K bracelet question wavered in both (docs/eval/answers-v39-replies.json in Let Agents).
      */
-    public const PROMPT_VERSION = 37;
+    public const PROMPT_VERSION = 39;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -214,7 +221,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 39], 'verify_site' => [36, 39]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38], 'verify_site' => [36]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
