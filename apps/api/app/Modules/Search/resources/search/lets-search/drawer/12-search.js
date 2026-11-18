@@ -929,7 +929,7 @@
       html += '<div style="margin-top:16px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-q="' + esc(String(turn.price.rest || '').trim() + ' ' + t('priceUpToWords', { max: turn.price.more.max })) + '">' +
         esc(t('morePriced', { n: turn.price.more.count, max: money(turn.price.more.max) })) + '</button></div>';
     }
-    if (!off('ask') && !turn.askShown && !askTop) { html += turn.askBelow ? '<div style="margin-top:20px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
+    if (!off('ask') && !turn.askShown && !askTop) { html += turn.askBelow ? '<div style="margin-top:20px">' + noMatchCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
     html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }

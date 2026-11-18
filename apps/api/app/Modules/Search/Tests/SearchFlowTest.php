@@ -420,6 +420,30 @@ final class SearchFlowTest extends TestCase
         $this->assertArrayNotHasKey('dw', $records['p:981'], 'nothing drawn on a shoe');
     }
 
+    public function test_a_kind_asked_with_what_is_printed_on_it_finds_the_ones_printed_so_and_says_nothing_left_out(): void
+    {
+        // Me369 QA, 18.11: "jackets moon" said "without moon" over the one jacket printed with moons. The kind comes from the
+        // product's own words; what is printed on it says which of them.
+        $this->inShop(function (): void {
+            foreach ([
+                '991' => ['Della Cropped Jacket', ['jacket', 'black', 'cropped'], ['moon', 'stars', 'tigers']],
+                '992' => ['Kiara Belted Jacket', ['jacket', 'brown', 'tweed'], []],
+                '993' => ['Fraya Sand Jacket', ['jacket', 'cream'], []],
+                '994' => ['Luna Graphic Tee', ['t-shirt', 'white'], ['moon']],
+            ] as $id => [$title, $words, $depicted]) {
+                $product = $this->product($id, $title);
+                RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => [...$words, ...$depicted], 'caption_depicted' => $depicted]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($this->shop->id);
+
+        $found = $this->search('jacket moon');
+        $this->assertSame(['991'], array_column($found->json('groups.product'), 'external_id'), 'the jacket printed with moons, not the tee nor the plain jackets');
+        $this->assertNull($found->json('loosened'), 'and nothing said left out');
+        $this->assertEqualsCanonicalizing(['991', '992', '993'], array_column($this->search('jacket')->json('groups.product'), 'external_id'));
+    }
+
     public function test_a_print_asked_for_shows_what_is_covered_in_it_before_what_has_it_on_a_logo(): void
     {
         // Vans: "נעלי משבצות" should show the shoes covered in checks first, and the ones with checks on a logo or a
