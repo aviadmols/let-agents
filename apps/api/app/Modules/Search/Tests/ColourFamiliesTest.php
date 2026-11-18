@@ -267,4 +267,40 @@ final class ColourFamiliesTest extends TestCase
         $tags = collect($data['facets'])->firstWhere('k', 'store_tags');
         $this->assertSame(['Sandals', 'Shoes'], array_column((array) ($tags['v'] ?? []), 'l'), 'never an app\'s tag, a menu\'s heading or a hashtag');
     }
+
+    public function test_a_product_whose_variants_name_no_colour_is_filtered_by_the_main_colour_its_picture_shows(): void
+    {
+        // Me369, 18.11: 5 of 1,185 variants named a colour, the Colour filter held "Pink" alone, and "jackets white" brought
+        // brown and grey jackets. The first colour the description of its picture lists, a colour alone, is the product's.
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'en']);
+        Settings::set('search.photo_match', 'look', $shop->id);
+        $pictures = [
+            '1' => ['Sloane Utility Jacket', ['jacket', 'white', 'off-white', 'embroidery']],
+            '2' => ['Briann EMB Denim', ['denim jacket', 'shirt jacket', 'white', 'denim']],
+            '3' => ['Kiara Belted Jacket', ['jacket', 'gold buttons', 'brown', 'rust brown']],
+            '4' => ['Della Cropped Jacket', ['jacket', 'charcoal grey', 'cream']],
+            '5' => ['Plain Tote', ['tote bag', 'canvas']],
+        ];
+        app(TenantContext::class)->run($shop->id, function () use ($shop, $pictures): void {
+            foreach ($pictures as $id => [$title, $words]) {
+                $product = CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
+                    'url' => "https://store.test/p/{$id}", 'price' => 100, 'in_stock' => true, 'purchasable' => true, 'hash' => "h{$id}", 'payload' => []]);
+                RetrievalImage::query()->create(['shop_id' => $shop->id, 'product_id' => $product->id, 'external_id' => (string) $id, 'title' => $title,
+                    'image_url' => "https://store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', (string) $id), 'caption_words' => $words]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $data = (array) json_decode((string) app(TenantContext::class)->run($shop->id, fn () => SearchIndex::query()->sole()->items), true);
+
+        $at = collect($data['facets'])->search(fn (array $f): bool => $f['k'] === BuildSearchIndex::VARIANT_COLOUR);
+        $this->assertNotFalse($at, 'a Colour filter, from the pictures');
+        $codes = fn (string $id): array => (array) (collect($data['items'])->firstWhere('id', 'p:'.$id)['f'] ?? []);
+        $value = fn (string $key): int => $at * 1000 + (int) collect($data['facets'][$at]['v'])->search(fn (array $v): bool => $v['k'] === $key);
+        $this->assertContains($value('white'), $codes('1'));
+        $this->assertContains($value('white'), $codes('2'), '"denim jacket" is a kind, not the colour blue');
+        $this->assertContains($value('brown'), $codes('3'), 'the gold of its buttons is no colour of the jacket');
+        $this->assertContains($value('grey'), $codes('4'));
+        $this->assertSame([], array_values(array_filter($codes('5'), fn (int $c): bool => intdiv($c, 1000) === $at)), 'a picture that names no colour gives none');
+    }
 }

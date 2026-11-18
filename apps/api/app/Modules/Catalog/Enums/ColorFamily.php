@@ -2,6 +2,8 @@
 
 namespace App\Modules\Catalog\Enums;
 
+use App\Modules\Catalog\Support\ColorWords;
+
 /**
  * The colours a shopper filters by: few and broad, so "כחול" finds navy, light blue and denim
  * alike. A shade belongs to one or two of them (ColorShade::families). The exact shade is kept
@@ -24,6 +26,28 @@ enum ColorFamily: string
     case Gold = 'gold';
     case Silver = 'silver';
     case Multi = 'multi';
+
+    /**
+     * The family of a word that is a colour and nothing else, its shade said or not ("white", "charcoal grey", "כחול
+     * כהה", "off-white"), in any language ColorWords reads; null for a word that names something else beside a colour
+     * ("denim jacket", "gold buttons", "אבן לבנה": the colour of a part, not of the thing).
+     */
+    public static function ofColourWord(string $word): ?self
+    {
+        $word = trim(mb_strtolower($word));
+        $shades = $word === '' ? [] : ColorWords::read($word)['shades'];
+        if ($shades === []) {
+            return null;
+        }
+        foreach (preg_split('/\s+/u', $word) ?: [] as $token) {
+            if (! in_array($token, ['light', 'dark', 'pale', 'deep', 'bright', 'soft', 'warm', 'muted', 'בהיר', 'כהה', 'עמוק', 'רך'], true)
+                && ColorWords::read($token)['shades'] === []) {
+                return null;
+            }
+        }
+
+        return $shades[0]->families()[0] ?? null;
+    }
 
     public function label(): string
     {

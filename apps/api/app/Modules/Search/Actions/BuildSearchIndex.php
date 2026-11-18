@@ -339,7 +339,7 @@ final class BuildSearchIndex
             ->filter(fn (CatalogProductChoice $c): bool => collect((array) $c->fields)->contains(fn ($field): bool => is_array($field) && ! empty($field['required'])))
             ->pluck('product_id')->flip();
         $sized = false;
-        $variants = $this->variantFacets($facets['facets'], $this->locale($shopId));
+        $variants = $this->variantFacets($facets['facets'], $this->locale($shopId), $shopId);
         // Where no variant has a size, the sizes the product pages say are the size filter (a ring of one size each).
         // Every size the page offers it in, a resize away ("הגדלה ל 54"), is one of its sizes too: "מידה 54" finds the ring of 53.
         $offered = CatalogProductChoice::query()->whereNotNull('sizes')->pluck('sizes', 'product_id');
@@ -847,7 +847,55 @@ final class BuildSearchIndex
      * @param  list<array{k: string, l: string, v: list<array{k: string, l: string, h?: string}>}>  $facets  appended to
      * @return array<string, array{f: list<int>, v: list<array{0: list<int>, 1: int}>}> by product id
      */
-    private function variantFacets(array &$facets, string $locale): array
+    /**
+     * Whether the store's own filters already say colours: one whose values are mostly colours ("צבע האבן": כחול, אדום).
+     *
+     * @param  list<array{k: string, l: string, v: list<array{k: string, l: string}>}>  $facets
+     */
+    private static function ownColourFilter(array $facets): bool
+    {
+        foreach ($facets as $facet) {
+            $values = (array) ($facet['v'] ?? []);
+            $colours = count(array_filter($values, fn (array $v): bool => ColorFamily::ofColourWord((string) ($v['l'] ?? '')) !== null));
+            if (count($values) >= 2 && $colours * 2 >= count($values)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The main colour family of each product's picture, by product id: the first word of its description that is a colour
+     * alone (ColorFamily::ofColourWord), from its first picture described.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, string>
+     */
+    private static function pictureColours(array $productIds): array
+    {
+        $out = [];
+        foreach (array_chunk($productIds, 1000) as $ids) {
+            RetrievalImage::query()->whereIn('product_id', $ids)->whereNotNull('caption_words')->orderBy('id')
+                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out): void {
+                    $id = (string) $picture->product_id;
+                    if (isset($out[$id])) {
+                        return;
+                    }
+                    foreach ((array) $picture->caption_words as $word) {
+                        if (is_string($word) && ($family = ColorFamily::ofColourWord($word)) !== null) {
+                            $out[$id] = $family->value;
+
+                            return;
+                        }
+                    }
+                });
+        }
+
+        return $out;
+    }
+
+    private function variantFacets(array &$facets, string $locale, string $shopId = ''): array
     {
         $families = [];
         $sizes = [];
@@ -864,6 +912,35 @@ final class BuildSearchIndex
                 }
                 $rows[] = [$variant->product_id, (array) $variant->color_families, $variant->size_key, $variant->in_stock ? 1 : 0];
             });
+
+        // A product whose variants name no colour: the main colour its picture shows, the first colour the describer lists
+        // (caption v8 lists the colours after the kind, the one most of it is first), read in code. Me369, 18.11: 5 of
+        // 1,185 variants named a colour, the Colour filter held "Pink" alone, and "jackets white" had nothing to filter
+        // by. Only where the look matters (search.photo_match "look": no book's cover colour is a filter), and a store with a
+        // colour filter of its own (a stone's colour) is left with it. A product with no variants (a simple
+        // product) is one variant of itself.
+        $main = [];
+        if (Settings::get('search.photo_match', $shopId) === 'look' && ! self::ownColourFilter($facets)) {
+            $varied = array_flip(array_map(fn (array $row): string => (string) $row[0], $rows));
+            CatalogProduct::query()->whereNull('removed_at')->select(['id', 'in_stock'])->lazyById(2000)
+                ->each(function (CatalogProduct $product) use (&$rows, $varied): void {
+                    if (! isset($varied[(string) $product->id])) {
+                        $rows[] = [$product->id, [], null, $product->in_stock ? 1 : 0];
+                    }
+                });
+            $main = self::pictureColours(array_values(array_unique(array_map(
+                fn (array $row): string => (string) $row[0], array_filter($rows, fn (array $row): bool => $row[1] === []),
+            ))));
+            // a simple product no picture coloured stays out, as before
+            $rows = array_values(array_filter($rows, fn (array $row): bool => isset($varied[(string) $row[0]]) || isset($main[(string) $row[0]])));
+        }
+        foreach ($rows as &$row) {
+            if ($row[1] === [] && isset($main[(string) $row[0]])) {
+                $row[1] = [$main[(string) $row[0]]];
+                $families[$main[(string) $row[0]]] = true;
+            }
+        }
+        unset($row);
 
         if ($families === [] && $sizes === []) {
             return [];
