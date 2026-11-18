@@ -2392,7 +2392,7 @@ final class AnswerSiteQuestion implements TriesQuestions
 
                 // never a sentence cut in its middle ("local travel professio", Gil Travel, 28.10): back to its last whole one
                 // and in the store's own plural, never "אני יכול" (StoreVoice, Rocks 9.11): the answer, its not-found line, each pick's why
-                $answer = StoreVoice::plural(self::endsWhole($answer));
+                $answer = self::listOnItsOwnLines(StoreVoice::plural(self::endsWhole($answer)));
                 // the tap answers stand only while the answer, as checked, still ends with their question
                 $choices = isset($choices) && $refusal === null ? self::choices($answer, $choices) : [];
                 // a "yes" to our own offer goes forward with a question, never to the team (forwardOnYes); a question back
@@ -4881,6 +4881,20 @@ final class AnswerSiteQuestion implements TriesQuestions
      * stop). One that ends as a sentence does (a full stop, a question or exclamation mark, a colon before a list, a
      * closing quote) is as it was.
      */
+    /**
+     * A list starts on a line of its own: "יש כמה רעיונות מקסימים: - שמיכת בייבי…" with the next items each on its own line
+     * showed its first item stuck to the sentence before it (Take Me Home, 18.11). Only where other lines of the answer start
+     * with "- ": a dash inside a sentence is left as it is.
+     */
+    public static function listOnItsOwnLines(string $answer): string
+    {
+        if (preg_match('/\n[ \t]*-\s/u', $answer) !== 1) {
+            return $answer;
+        }
+
+        return (string) preg_replace('/:[ \t]+-[ \t]+(?=\S)/u', ":\n- ", $answer);
+    }
+
     public static function endsWhole(string $answer): string
     {
         $text = rtrim($answer);
@@ -5166,7 +5180,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         $reply = $schema !== null && $this->models instanceof StructuredChatModel
             ? $this->models->structured($role['provider'], $role['model'], $text, $input, $schema, $maxOutput, $effort)
             : $this->models->json($role['provider'], $role['model'], $text, $input, $maxOutput, $effort);
-        $run->usage($role['name'], $role['model'], $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
+        $run->usage($role['name'], $role['model'], $reply->inputTokens, $reply->outputTokens, $reply->cacheReadTokens, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
     }

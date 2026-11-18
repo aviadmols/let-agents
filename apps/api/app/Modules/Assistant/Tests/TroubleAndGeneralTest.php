@@ -23,6 +23,17 @@ final class TroubleAndGeneralTest extends TestCase
         }
     }
 
+    public function test_a_list_starts_on_a_line_of_its_own(): void
+    {
+        // Take Me Home, 18.11: the first gift stuck to the sentence before it
+        $stuck = "יש כמה רעיונות מקסימים: - שמיכת בייבי רכה\n- כרטיסיות חודשי יום הולדת\n- חיתולי במבוק";
+        $this->assertSame("יש כמה רעיונות מקסימים:\n- שמיכת בייבי רכה\n- כרטיסיות חודשי יום הולדת\n- חיתולי במבוק", AnswerSiteQuestion::listOnItsOwnLines($stuck));
+
+        // a dash inside a sentence, with no list in the answer, is left as it is
+        $plain = 'המשלוח: - חינם מעל 300 ₪, ואחרת 30 ₪.';
+        $this->assertSame($plain, AnswerSiteQuestion::listOnItsOwnLines($plain));
+    }
+
     public function test_general_knowledge_is_kept_only_where_it_says_nothing_of_the_store(): void
     {
         $answer = 'GH היא דרגת הצבע של היהלום: כמעט חסר צבע. VS היא דרגת הניקיון: פגמים זעירים שקשה לראות גם בהגדלה של פי 10. רבות מהטבעות שלנו משובצות יהלומים בדרגות האלה.';

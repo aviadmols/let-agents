@@ -146,7 +146,9 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
                     messages: [['role' => 'user', 'content' => $content]],
                     model: $model,
                     outputConfig: $output === [] ? null : $output,
-                    system: $system.self::JSON_ONLY,
+                    // the instructions, the same for every call of a role, are kept in the provider's cache: read back at a
+                    // tenth of the price and sooner (CLAUDE.md 9; the search box's writer prompt is about 10,000 tokens)
+                    system: [['type' => 'text', 'text' => $system.self::JSON_ONLY, 'cacheControl' => ['type' => 'ephemeral']]],
                     thinking: $tune['thinking'] ?? null,
                 );
         } catch (Throwable $e) {
@@ -169,6 +171,7 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
             throw new ModelCallFailed(ModelCallFailed::NOT_JSON);
         }
 
-        return new ModelReply($data, $message->usage->inputTokens, $message->usage->outputTokens);
+        return new ModelReply($data, $message->usage->inputTokens, $message->usage->outputTokens,
+            (int) ($message->usage->cacheReadInputTokens ?? 0), (int) ($message->usage->cacheCreationInputTokens ?? 0));
     }
 }

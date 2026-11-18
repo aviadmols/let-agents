@@ -330,7 +330,7 @@ final class AnswerQuestion
         $reply = $schema !== null && $this->models instanceof StructuredChatModel
             ? $this->models->structured($provider, $model, self::prompt($prompt), $user, $schema, $maxOutput, $effort)
             : $this->models->json($provider, $model, self::prompt($prompt), $user, $maxOutput, $effort);
-        $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
+        $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, $reply->cacheReadTokens, $reply->costUsd($this->price($prices.'_input'), $this->price($prices.'_output')));
 
         return $reply;
     }
