@@ -124,7 +124,8 @@ final class CompleteVocabulary
             return $report + ['outcome' => 'complete'];
         }
 
-        $writer = AgentModel::from('enrichment.reader_provider', 'enrichment.reader_model');
+        // the bank's own writer: the small reader proposed types and values on one run and none on the next (Me369, 18.11)
+        $writer = AgentModel::from('enrichment.schema_writer_provider', 'enrichment.schema_writer_model');
         $auditor = AgentModel::from('enrichment.reviewer_provider', 'enrichment.reviewer_model');
         if ($writer->provider->family() === $auditor->provider->family()) {
             $run->fail('enrichment::runs.completion_same_family');
@@ -133,7 +134,7 @@ final class CompleteVocabulary
         }
 
         try {
-            $proposed = $this->ask($run, $writer, 'reader', 'bank_completion', $this->writerInput($before, $gaps), self::WRITER_TOKENS, $report);
+            $proposed = $this->ask($run, $writer, 'schema_writer', 'bank_completion', $this->writerInput($before, $gaps), self::WRITER_TOKENS, $report);
             [$candidate, $added, $rejected] = self::merge($before, $proposed);
             $report['proposed'] = ['types' => count((array) ($proposed['types'] ?? [])), 'values' => count((array) ($proposed['values'] ?? [])), 'attributes' => count((array) ($proposed['attributes'] ?? []))];
 
