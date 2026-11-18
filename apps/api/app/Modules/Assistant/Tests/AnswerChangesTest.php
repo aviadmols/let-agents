@@ -131,8 +131,9 @@ final class AnswerChangesTest extends TestCase
         $this->assertSame(['להציע לבוא לחנות כשזה עוזר'], AnswerRules::texts($this->shop->id));
         $this->assertFalse(app(CheckAnswerChange::class)->apply($started['id'], $this->shop->id), 'kept once');
 
-        // shoppers are answered by the released writer, which reads the store's rules since v30 (17.11): the rule kept is given
-        $this->assertSame(39, AnswerSiteQuestion::releasedVersion('answer_site'));
+        // shoppers are answered by the released writer, which reads the store's rules since v30 (17.11; v43 since 18.11): the
+        // rule kept is given
+        $this->assertSame(43, AnswerSiteQuestion::releasedVersion('answer_site'));
         $this->assertNotNull(AnswerSiteQuestion::toneKey($this->shop->id), 'saved answers are written again with the rule');
         $this->replies = [['found' => true, 'answer' => 'יש משלוח לכל הארץ.', 'refs' => ['s1']], ['supported' => true, 'on_topic' => true, 'safe' => true]];
         $this->ask('יש משלוחים?');

@@ -164,8 +164,16 @@ final class AnswerSiteQuestion implements TriesQuestions
      * bracelet's wrist (Rocks). On 18 real replies from 9 stores against v35/v37 it did better in 6 (a refund no longer
      * called store credit, bags up to ₪500 found, silver necklaces for "And in silver?", the necklace's SKU for "48 ס"מ")
      * and the same in the rest; a 21K bracelet question wavered in both (docs/eval/answers-v39-replies.json in Let Agents).
+     *
+     * v43 (answer_site only; verify_site stays v39), 18.11, as Aviad approved: Aviad's compact prompt (a third of v39's length,
+     * for any kind of store), with a stronger protection section, a service-minded salesperson's voice (the request met
+     * first, the best match first, one specific follow-up that leads somewhere), a SKU or a certificate line only where
+     * relevant, the shopper addressed in the singular in forms that fix no gender, and what is not among the products said
+     * as "not found by that name" with the closest alternatives, never "we don't have". Graded blind on 51 real questions
+     * from 7 stores by a model of the other family (v39 / v41 / v43): correct 21 / 31 / 34, wrong 7 / 6 / 5, missed 6 / 2 / 2,
+     * best for the shopper 8 / 15 / 28; the same latency, a third less writer input. Rolled back by setting this to 39.
      */
-    public const PROMPT_VERSION = 39;
+    public const PROMPT_VERSION = 43;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -221,7 +229,8 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38], 'verify_site' => [36]];
+    // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
