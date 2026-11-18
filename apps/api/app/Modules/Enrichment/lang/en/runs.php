@@ -54,4 +54,10 @@ return [
     'colour_names_stopped' => 'Placing colour names stopped: the monthly spending cap was reached. It tries again when there is room.',
     'colour_names_failed' => 'Placing colour names failed: the model did not answer. It tries again next night.',
     'colour_names_same_family' => 'The colour names\' placer and checker are from the same model family: nothing was asked.',
+    'completion_no_vocabulary' => 'The store has no active attribute bank to complete.',
+    'completion_nothing' => 'The bank covers every product: nothing to complete.',
+    'completion_same_family' => 'Bank completion did not run: the writer and the checker are of the same model family.',
+    'completion_stopped' => 'Bank completion stopped at the spending cap. It goes on when there is room.',
+    'completion_failed' => 'Bank completion failed: the model did not answer.',
+    'completion_done' => 'Bank completion: :types new types and :values new values, :products products changed.',
 ];

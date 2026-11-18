@@ -1,0 +1,19 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["verdicts"],
+    "properties": {
+        "verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "verdict"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "verdict": {"type": "string", "enum": ["correct", "incorrect", "unsure"]}
+                }
+            }
+        }
+    }
+}

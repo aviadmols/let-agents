@@ -1,0 +1,68 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["types", "values", "attributes"],
+    "properties": {
+        "types": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "label_he", "label_en", "patterns", "same_as", "groups"],
+                "properties": {
+                    "key": {"type": "string"},
+                    "label_he": {"type": "string"},
+                    "label_en": {"type": "string"},
+                    "patterns": {"type": "array", "items": {"type": "string"}},
+                    "same_as": {"type": "string"},
+                    "groups": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        },
+        "values": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["attribute", "key", "label_he", "label_en", "patterns", "same_as"],
+                "properties": {
+                    "attribute": {"type": "string"},
+                    "key": {"type": "string"},
+                    "label_he": {"type": "string"},
+                    "label_en": {"type": "string"},
+                    "patterns": {"type": "array", "items": {"type": "string"}},
+                    "same_as": {"type": "string"}
+                }
+            }
+        },
+        "attributes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "label_he", "label_en", "applies_to", "visible", "values"],
+                "properties": {
+                    "key": {"type": "string"},
+                    "label_he": {"type": "string"},
+                    "label_en": {"type": "string"},
+                    "applies_to": {"type": "array", "items": {"type": "string"}},
+                    "visible": {"type": "boolean"},
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["key", "label_he", "label_en", "patterns"],
+                            "properties": {
+                                "key": {"type": "string"},
+                                "label_he": {"type": "string"},
+                                "label_en": {"type": "string"},
+                                "patterns": {"type": "array", "items": {"type": "string"}}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

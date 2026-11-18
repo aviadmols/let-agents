@@ -10,6 +10,7 @@ use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\BuildCards;
 use App\Modules\Enrichment\Actions\BuildStructure;
 use App\Modules\Enrichment\Actions\CollectProviderBatches;
+use App\Modules\Enrichment\Actions\CompleteVocabulary;
 use App\Modules\Enrichment\Actions\ComputeProductRelations;
 use App\Modules\Enrichment\Actions\ComputeRankings;
 use App\Modules\Enrichment\Actions\CreateTaskFile;
@@ -51,7 +52,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, collect, vocabulary, schema, structure, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, complete, collect, vocabulary, schema, structure, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results}
         {--template= : vocabulary template name}
@@ -63,6 +64,7 @@ final class EnrichmentCommand extends Command
         {--limit= : maximum requests}
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
+        {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only)}
         {--force : structure: also when a vocabulary already covers the whole catalog}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
         {--include-done : ask again about products already read with the same input}
@@ -95,6 +97,8 @@ final class EnrichmentCommand extends Command
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),
             'relations' => $this->shopStep(fn (Shop $shop): Run => app(ComputeProductRelations::class)->handle($shop->id)),
+            // Bank completion: what the active bank does not cover, from every product; a report, or with --activate a new version.
+            'complete' => $this->completeBank(),
             'rules' => $this->rules(),
             default => $this->failWith('Unknown step.'),
         });
@@ -164,6 +168,19 @@ final class EnrichmentCommand extends Command
         if ($proposal !== null) {
             $this->line("Proposal {$proposal->id}: {$proposal->status}");
         }
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function completeBank(): int
+    {
+        $shop = $this->shop();
+        if (! $shop) {
+            return $this->failWith('Shop not found.');
+        }
+        $run = app(CompleteVocabulary::class)->handle($shop->id, (bool) $this->option('activate'), $report);
+        $this->line((string) $run->summary());
+        $this->line((string) json_encode($report, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
     }

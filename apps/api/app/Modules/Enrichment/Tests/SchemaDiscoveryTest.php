@@ -277,7 +277,7 @@ final class SchemaDiscoveryTest extends TestCase
         $facts = $ring();
 
         $this->assertSame('ring', $facts['type:type']->value_text);
-        $this->assertSame(['source' => 'field'], $facts['type:type']->evidence, 'the store\'s own type field');
+        $this->assertSame(['source' => 'store_type'], $facts['type:type']->evidence, 'the store\'s own type field, read alone before its other fields');
         $this->assertSame('yellow_gold', $facts['choice:metal']->value_text);
         $this->assertSame('field', $facts['choice:metal']->evidence['source'], 'from the tags, before the title or the description');
         $this->assertSame(0.95, $facts['choice:metal']->confidence);
