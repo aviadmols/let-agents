@@ -34,6 +34,7 @@ use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Search\Support\StoreFamilies;
 use App\Modules\Search\Support\Transliterate;
+use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1903,6 +1904,14 @@ final class BuildSearchIndex
      */
     private function brandFacet(array &$facets, string $locale): array
     {
+        // A Shopify store's brand is its products' Vendor, where many stores keep their suppliers: a filter only where the
+        // store turns search.vendor_filter on (off by default; Aviad, 18.11: Rocks showed its consignors' names, Aeraj,
+        // Sivan, "לא ידוע", as brands). A WooCommerce store's brand is its own brand field, a real brand (Stanley, Makita).
+        $platform = Shop::query()->whereKey($this->tenant->id())->value('platform');
+        $platform = $platform instanceof ShopPlatform ? $platform : ShopPlatform::tryFrom((string) $platform);
+        if ($platform === ShopPlatform::Shopify && ! Settings::get('search.vendor_filter', $this->tenant->id())) {
+            return [];
+        }
         $byBrand = [];
         $names = [];
         $total = 0;

@@ -142,9 +142,15 @@ final class ColourFamiliesTest extends TestCase
     public function test_one_brand_under_its_names_is_no_brand_filter_two_brands_are(): void
     {
         // Naot QA, 16.11: "Naot Footwear Australia" and "Naot Footwear Industries", one brand, a filter that narrows nothing
-        foreach ([[['Naot Footwear Australia', 'Naot Footwear Industries'], false], [['Stanley', 'Makita'], true]] as [$brands, $filter]) {
+        // and a Shopify store's brand is its Vendor, where it may keep its suppliers: a filter only where the store turns
+        // it on (Rocks, 18.11)
+        foreach ([[['Naot Footwear Australia', 'Naot Footwear Industries'], false, 'woocommerce', false], [['Stanley', 'Makita'], true, 'woocommerce', false],
+            [['Aeraj', 'Sivan'], false, 'shopify', false], [['Stanley', 'Makita'], true, 'shopify', true]] as [$brands, $filter, $platform, $vendorOn]) {
             LoadedIndex::forget();
-            $shop = Shop::factory()->create(['content_locale' => 'en']);
+            $shop = Shop::factory()->create(['content_locale' => 'en', 'platform' => $platform]);
+            if ($vendorOn) {
+                Settings::set('search.vendor_filter', true, $shop->id);
+            }
             app(TenantContext::class)->run($shop->id, function () use ($shop, $brands): void {
                 foreach (range(1, 6) as $i) {
                     CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $i, 'type' => 'simple', 'status' => 'publish', 'title' => 'Model '.$i,
