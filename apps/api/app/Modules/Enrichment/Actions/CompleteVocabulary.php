@@ -136,6 +136,7 @@ final class CompleteVocabulary
         try {
             $proposed = $this->ask($run, $writer, 'schema_writer', 'bank_completion', $this->writerInput($before, $gaps), self::WRITER_TOKENS, $report);
             [$candidate, $added, $rejected] = self::merge($before, $proposed);
+            $report['proposal'] = $proposed;
             $report['proposed'] = ['types' => count((array) ($proposed['types'] ?? [])), 'values' => count((array) ($proposed['values'] ?? [])), 'attributes' => count((array) ($proposed['attributes'] ?? []))];
 
             // read every product with the candidate, and keep what reads products and takes nothing from them
@@ -191,7 +192,7 @@ final class CompleteVocabulary
         $report['outcome'] = $added === [] ? 'nothing_kept' : ($activated !== null ? 'activated' : 'ready');
         $report['version'] = $activated;
 
-        $run->output(array_diff_key($report, ['changes' => 1]) + ['changed_products' => $report['changes']['products']])->summary('enrichment::runs.completion_done', [
+        $run->output(array_diff_key($report, ['changes' => 1, 'proposal' => 1]) + ['changed_products' => $report['changes']['products']])->summary('enrichment::runs.completion_done', [
             'types' => (string) count(array_filter($added, fn (array $a): bool => $a['kind'] === 'type')),
             'values' => (string) count(array_filter($added, fn (array $a): bool => $a['kind'] !== 'type')),
             'products' => (string) $report['changes']['products'],
