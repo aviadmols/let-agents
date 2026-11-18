@@ -1391,11 +1391,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         // What is kept goes first, as the store's word (assistant.knowledge_by_search).
         $bySearch = (bool) Settings::get('assistant.knowledge_by_search', $shopId)
             && ! self::asksOfTheStore($question) && ! self::asksIfOpen($question) && ! self::asksAboutVisit($question);
-        $near = function (CatalogContent $entry) use ($found): string {
+        $nearOfEntry = function (CatalogContent $entry) use ($found): string {
             return implode("\n", array_map(fn (array $p): string => (string) $p['text'], array_filter($found,
                 fn (array $p): bool => ($p['source'] ?? null) === 'content' && (string) ($p['source_id'] ?? '') === (string) $entry->id)));
         };
-        $relevant = function (string $row, string $near) use ($speaks): bool {
+        $relevantRow = function (string $row, string $near) use ($speaks): bool {
             $line = trim((string) preg_replace('/^\s*-\s*/u', '', $row));
 
             return $line !== '' && ($speaks($line) || ($near !== '' && mb_strpos($near, mb_substr($line, 0, 60)) !== false));
@@ -1472,8 +1472,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $said = [];
                 }
                 if ($bySearch) {
-                    $nearText = $near($entry);
-                    $rows = array_values(array_filter($rows, fn (string $row): bool => $relevant($row, $nearText)));
+                    $nearText = $nearOfEntry($entry);
+                    $rows = array_values(array_filter($rows, fn (string $row): bool => $relevantRow($row, $nearText)));
                     $said = [];
                 }
                 if ($said !== [] && count($said) < count($rows)) {
@@ -1492,8 +1492,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // and only what tells of its service: a heading or a line of its screens, read before, is not its word
                 $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line) && RepeatedText::fact($line)));
                 if ($bySearch) {
-                    $nearText = $near($entry);
-                    $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => $relevant($line, $nearText)));
+                    $nearText = $nearOfEntry($entry);
+                    $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => $relevantRow($line, $nearText)));
                 }
             }
 

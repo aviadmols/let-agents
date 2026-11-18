@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
@@ -153,6 +154,31 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertSame('- '.$parking, $passages[0]['text'], 'the row that speaks of it, a passage of its own, first');
         $this->assertSame('store_team', $passages[1]['from'], 'the others after it');
         $this->assertStringEndsWith('החזרות', trim($passages[1]['text']), 'and no row cut in its middle');
+    }
+
+    public function test_with_knowledge_by_search_the_team_text_goes_only_where_it_speaks_of_the_question_and_first(): void
+    {
+        // Aviad, 18.11: the same certificate and installments lines under every answer. With the setting on, a row goes only
+        // where the question's words name it or the search by meaning found it near; a question about a visit reads it all
+        $this->shop = Shop::factory()->create(['name' => 'Rocks and Gold', 'content_locale' => 'he']);
+        $certificate = 'כל התכשיטים מגיעים עם תעודת הערכה לביטוח.';
+        $diamonds = 'כל היהלומים באתר שלנו הם יהלומים טבעיים לחלוטין.';
+        $address = 'שבזי 31 תל אביב. שעות פתיחה: ראשון עד חמישי 10.30 עד 18.30.';
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->own(implode("\n", [$certificate, $diamonds, $address])));
+        Settings::set('assistant.knowledge_by_search', true, $this->shop->id);
+        $own = (string) $this->inShop(fn () => CatalogContent::query()->where('external_id', BuildShopKnowledge::OWN)->value('id'));
+        $knowledge = fn (string $question, array $found = []): array => $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), $question, $this->shop->id, $found));
+        $team = fn (array $passages): string => implode("\n", array_column(array_filter($passages, fn (array $p): bool => ($p['from'] ?? null) === 'store_team'), 'text'));
+
+        $said = $team($knowledge('יש לכם יהלומי מעבדה?'));
+        $this->assertStringContainsString($diamonds, $said, 'the row its words name');
+        $this->assertStringNotContainsString($certificate, $said, 'never the certificate under an answer that is not about it');
+
+        $found = [['source' => 'content', 'source_id' => $own, 'external_id' => null, 'title' => '', 'text' => $certificate, 'similarity' => 0.6]];
+        $this->assertStringContainsString($certificate, $team($knowledge('מה מקבלים עם הטבעת?', $found)), 'a row the search by meaning found near the question');
+
+        $this->assertStringContainsString($certificate, $team($knowledge('אפשר לבוא למדוד אצלכם את המוצר?')), 'a visit still reads all of it');
     }
 
     public function test_a_visit_brings_the_address_and_hours_however_much_the_team_wrote_and_a_no_opens_with_what_the_store_sells(): void
