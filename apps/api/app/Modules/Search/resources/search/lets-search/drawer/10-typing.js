@@ -94,6 +94,9 @@
       var localWhom = whomAlone(q, local.map(function (r) { return r.id; }));
       if (localWhom) { local = localWhom.map(rec).filter(Boolean); }
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
+      // the results the shopper left through a product, typed again by the opening: their filters and how far they were opened
+      var bl = S.backLive;
+      if (bl && bl.q === q && !was) { if (bl.c) { S.live.c = bl.c; } if (bl.more) { S.live.more = bl.more; } } else if (bl && bl.q !== q) { S.backLive = null; }
       readTags(S.live);
       S.live.waiting = true;
       clearTimeout(liveTimer); clearTimeout(pauseTimer); clearTimeout(meaningTimer); clearTimeout(holdTimer);
@@ -221,6 +224,7 @@
     // a new search starts with nothing highlighted (Enter searches); the highlight never jumps down the list
     var keepOpt = isNew ? -1 : S.active, wasOn = SUG.classList.contains('is-on');
     if (isNew) { BODY.scrollTop = 0; }
+    var backAt = S.backLive && S.backLive.q === lv.q ? S.backLive : null;
     // the same results drawn again (the server agreeing with the index, the meaning adding nothing): left as they are,
     // so no card blinks
     var html = liveHtml(lv);
@@ -239,6 +243,14 @@
     opts.forEach(function (o, i) { o.id = 'ls-opt-' + i; o.setAttribute('role', 'option'); });
     S.active = isQuestion(lv.q) ? (isNew || keepOpt < 0 ? 0 : Math.min(keepOpt, opts.length - 1)) : Math.min(keepOpt, opts.length - 1);
     mark_active();
+    // back where the shopper left these results: at the product they opened (as Aviad asked, 18.11), once it is drawn;
+    // the server's answer may draw it a moment after the index's own
+    if (backAt) {
+      var cd = backAt.card ? SUG.querySelector('[data-card="' + String(backAt.card).replace(/["\\]/g, '') + '"]') : null;
+      if (cd && cd.scrollIntoView) { cd.scrollIntoView({ block: 'center' }); S.backLive = null; }
+      else if (!backAt.card && backAt.y) { BODY.scrollTop = backAt.y; S.backLive = null; }
+      else if (Date.now() - (backAt.seen || (backAt.seen = Date.now())) > 6000) { S.backLive = null; }
+    }
   }
   // re-draw whichever view holds this turn
   function refresh(turn) { if (turn === S.live) { renderLive(false); } else { persist(); render(); } }

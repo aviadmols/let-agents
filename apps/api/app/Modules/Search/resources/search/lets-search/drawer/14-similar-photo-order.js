@@ -2,7 +2,13 @@
   // size: { value, shown } from size help: only the similar items that have it in stock now
   // oos: from the product page's row for a product or a variant sold out ({ whole, want: [{ value, shown, size }], size }):
   // only the similar ones in stock, and in the option that is gone (the variant filters, asked of one variant in stock)
-  function similarTurn(id, size, oos, otherColour, asked) {
+  // from: the results the product was shown in. What the shopper filtered them by stays on its like (QA, 18.11: size M was
+  // chosen, and "Similar" showed every size); where none of its like is all of it, the last chosen is let go, one at a
+  // time, and the line above them says which
+  function similarTurn(id, size, oos, otherColour, asked, from) {
+    var fromC = from && from.c && !oos ? C(from) : null, kept = fromC ? codesOn(fromC) : [], keptC = blankC();
+    kept.forEach(function (code) { keptC.f[code] = true; });
+    if (fromC) { keptC.stock = onStock(fromC); keptC.sale = onSale(fromC); }
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
     S.tab = 'chat'; S.wide = null;
     // the similar items stand alone at the top; the search they came from waits behind the dashed line
@@ -10,10 +16,10 @@
     // the field leaves the words of the search before: it says whose like these are (renderCtx), and typing starts anew
     // (QA, 16.11: "black sandals" stayed in the field over the like of a product)
     S.showPrev = false; hideLive(); keepInField('');
-    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: blankC(), size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
+    var turn = addTurn({ kind: 'similar', of: String(id), loading: true, c: keptC, size: size || (oos && oos.size) || null, oos: oos ? { whole: !!oos.whole, want: oos.want || [] } : null, other: !!otherColour, asked: asked || null });
     if (!isPhone()) { S.wide = turn.id; turn.limit = 24; render(); }
     toTurn(turn.id);
-    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : ''))
+    json(API + '/search/' + SITE + '/similar?id=' + encodeURIComponent(id) + (size || oos || kept.length ? '&limit=24' : '') + (oos ? '&for=oos' : '') + (otherColour ? '&colour=other' : '') + (asked ? '&q=' + encodeURIComponent(String(asked).slice(0, 200)) : ''))
       // the alike are kept by the index's records: an answer that came before the index (the drawer just opened on a
       // new page) waits for it, or every one of them went and "0 similar items" stood (Gil Travel, 30.10)
       .then(function (r) { return loadIndex().then(function () { return r; }, function () { return r; }); }).then(function (r) {
@@ -23,7 +29,15 @@
       return products(ids.slice(0, 24).map(pid).concat(others.map(pid))).then(function () {
         if (oos) { update(turn, oosPatch(turn, ids, oos)); toTurn(turn.id); return; }
         var inSize = size ? ids.filter(function (x) { return hasSize(x, size); }) : ids;
-        update(turn, { loading: false, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others, othersOf: (r.body && r.body.others_of) || null });
+        var gone = [];
+        if (kept.length && inSize.length) {
+          turn.ids = inSize;
+          var c = C(turn), label = function (code) { var f = S.facets[Math.floor(code / 1000)], v = f && f.v ? f.v[code % 1000] : null; return v ? String(v.l) : ''; };
+          for (var k = kept.length - 1; k >= 0 && !filtered(turn).length; k--) { delete c.f[kept[k]]; gone.push(label(kept[k])); }
+          if (!filtered(turn).length && c.sale) { c.sale = false; gone.push(t('onSale')); }
+          if (!filtered(turn).length && c.stock) { c.stock = false; gone.push(t('inStock')); }
+        }
+        update(turn, { loading: false, without: gone.filter(Boolean).join(', ') || null, ids: size && !inSize.length ? ids.slice(0, 8) : inSize, sizeNone: !!(size && !inSize.length), wants: wantsOf(r.body && r.body.asked), others: others, othersOf: (r.body && r.body.others_of) || null });
         toTurn(turn.id);
       });
     }).catch(function () { update(turn, { loading: false, error: true }); });
@@ -83,7 +97,7 @@
     var head = '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>' + chipRow(turn);
     if (!list.length) { return head + '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '<div style="margin-top:10px"><button class="ls-btn ls-btn--secondary ls-btn--sm" data-clear-filters="' + turn.id + '">' + esc(t('clearAll')) + '</button></div></div>'; }
-    return oosNote(turn) + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
+    return oosNote(turn) + (turn.without ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarWithout', { w: turn.without })) + '</p>' : '') + (turn.wants ? '<p class="ls-noanswer__text" style="margin:0 0 8px">' + esc(t('similarAsked', { w: turn.wants })) + '</p>' : '') + (turn.sizeNone ? '<p class="ls-noanswer__text">' + esc(sizeWord('size_similar_none', { size: turn.size.shown })) + '</p><div class="ls-block__title">' + esc(sizeWord('size_similar_more')) + '</div>' : '') + head + '<div class="ls-grid">' + list.slice(0, n).map(card).join('') + '</div>' +
       (list.length > n ? allBtn(turn, t('allSimilar', { n: list.length })) : '') + othersHtml(turn, null);
   }
   // those of its kind that do not look like it, apart and said to be so: a line when none is alike, a title when few are

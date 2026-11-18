@@ -268,7 +268,7 @@
     if (d.rate) { e.preventDefault(); rate(turnById(d.turn), d.rate === 'down' ? 'down' : 'up'); return; }
     if (d.add) { e.preventDefault(); if (el.dataset.state === 'done') { win.location.href = CFG.cartUrl; return; } addToCart(el, d.add, null, S.pressQ); return; }
     if (d.options) { e.preventDefault(); optionsLayer(d.options, S.pressQ); return; }
-    if (d.similar) { e.preventDefault(); similarTurn(d.similar); return; }
+    if (d.similar) { e.preventDefault(); similarTurn(d.similar, null, null, false, null, turnOf(el)); return; }
     if (d.more) {
       // the next few results, right under the ones seen, once they arrived: never the whole list at once,
       // and the Lets mark turns in the button while they come; nothing moves, nothing jumps to the top

@@ -10,7 +10,9 @@
   function keepBack(q, tid, wide) {
     store('local', 'ls_back', q && !isQuestion(q) ? { q: q, tid: tid || null, wide: !!wide, at: Date.now() } : null);
   }
-  function keepBackTo(turn, card) { store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, wide: S.wide === turn.id, card: card || null, at: Date.now() }); }
+  // (results only typed are no kept turn: how far their list was opened and what was chosen in their filters is kept here,
+  // and given back to them when they are drawn again: backLive)
+  function keepBackTo(turn, card) { store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, wide: S.wide === turn.id, card: card || null, more: turn.more || null, c: turn === S.live ? turn.c || null : null, y: BODY.scrollTop, at: Date.now() }); }
   function backTo() {
     var b = store('local', 'ls_back');
     return b && b.at && Date.now() - b.at < BACK_MS && (b.q || b.tid) ? b : null;
@@ -47,7 +49,7 @@
           // a search comes back with its words in the field, as they were left
           if (bt.kind === 'results' && bt.q) { keepInField(bt.q); restored = true; }
         }
-        else if (back.q) { opts.text = back.q; restored = true; }
+        else if (back.q) { opts.text = back.q; restored = true; S.backLive = back; }
       }
       // "about this product" only from the product page's own search row; the header's search is the store's search
       if (opts.about && S.ctx && productAsks() && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
