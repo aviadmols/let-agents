@@ -159,6 +159,10 @@ return [
         'label' => 'The store\'s general text only when it speaks of the question',
         'description' => 'What the store\'s team wrote and the lines every product page repeats go to the answer\'s writer only when they speak of the question, by its words or by the search by meaning, and then first. A question about the store itself (address, hours, a visit) is given all of it, as before.',
     ],
+    'check_ignores_incomplete' => [
+        'label' => 'The checker takes no sentence out only for a detail left out',
+        'description' => 'A sentence the checker marked only "incomplete" stays in the answer and is logged. Measured 18.11: in 68 of 70 such answers the sentence was right. Off brings the earlier behaviour back at once.',
+    ],
     'products_by_search' => [
         'label' => 'A question\'s products from the store\'s search',
         'description' => 'For each question, the products the store\'s search finds by its words and its meaning go to the topic check and to the answer\'s writer, before those shown on the screen while it was typed.',

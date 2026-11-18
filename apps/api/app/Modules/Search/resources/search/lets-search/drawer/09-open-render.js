@@ -53,7 +53,9 @@
           var conv = (back.tids || []).map(turnById).filter(function (x) { return x && x !== bt; });
           if (bt.kind === 'answer') { conv.concat([bt]).forEach(function (x) { x.earlier = false; }); }
           conv.forEach(function (x) { x.prev = false; });
-          bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt && conv.indexOf(x) < 0; }).concat(conv, [bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
+          // in the order they were asked, whichever of them the product was left through
+          var back2 = S.turns.filter(function (x) { return x === bt || conv.indexOf(x) >= 0; });
+          bt.prev = false; S.turns = S.turns.filter(function (x) { return back2.indexOf(x) < 0; }).concat(back2); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
           // a search comes back with its words in the field, as they were left
           if (bt.kind === 'results' && bt.q) { keepInField(bt.q); restored = true; }
         }

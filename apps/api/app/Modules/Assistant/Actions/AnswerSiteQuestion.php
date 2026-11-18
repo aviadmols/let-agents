@@ -2427,7 +2427,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $checked['ran'] = true;
 
                         $offered = $picks;
-                        $applied = self::applyCheck($check->data, $answer, $picks);
+                        $applied = self::applyCheck($check->data, $answer, $picks, (bool) Settings::get('assistant.check_ignores_incomplete', $shopId));
                         ['answer' => $answer, 'picks' => $picks, 'refusal' => $refusal] = $applied;
                         // the products a kept answer offers instead of what is not here keep their cards (Rocks, 11.11)
                         $picks = self::offeredInstead($answer, $cited, $byRef, $offered, $picks, $prepared['productsByRef']);
@@ -3635,10 +3635,10 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array<string, mixed>>  $picks
      * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string}
      */
-    public static function applyCheck(array $check, string $answer, array $picks): array
+    public static function applyCheck(array $check, string $answer, array $picks, bool $ignoreIncomplete = false): array
     {
         if (isset($check['decision'])) {
-            return self::applyDecision($check, $answer, $picks);
+            return self::applyDecision($check, $answer, $picks, $ignoreIncomplete);
         }
 
         $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
@@ -3682,7 +3682,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array<string, mixed>>  $picks
      * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string, decision: string, issues: list<array{text: string, kind: string, severity: string, pick?: string}>, revised: bool}
      */
-    private static function applyDecision(array $check, string $answer, array $picks): array
+    private static function applyDecision(array $check, string $answer, array $picks, bool $ignoreIncomplete = false): array
     {
         $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
         $decision = in_array($check['decision'], ['approve', 'revise', 'reject'], true) ? (string) $check['decision'] : 'reject';
@@ -3698,6 +3698,17 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         if (! $safe || $injection || in_array('critical', array_column($issues, 'severity'), true) && in_array('safety', array_column($issues, 'kind'), true)) {
             return ['answer' => '', 'picks' => [], 'safe' => $safe && ! $injection, 'injection' => $injection, 'refusal' => 'check_'.($injection ? 'injection' : 'unsafe'), 'verdict' => 'rejected', 'decision' => 'reject', 'issues' => $issues, 'revised' => false];
+        }
+
+        // "incomplete" (a detail left out) is no reason to stop an answer (verify_site v39: "Never an issue: … a detail
+        // left out"), yet the checker gives it: in 68 of 70 answers stopped only for it the sentence was right by the
+        // evidence the checker had (blind grading by Claude, 18.11). Logged, never acted on (assistant.check_ignores_incomplete).
+        $acting = $issues;
+        if ($ignoreIncomplete) {
+            $acting = array_values(array_filter($issues, fn (array $i): bool => ($i['kind'] ?? '') !== 'incomplete'));
+            if ($acting === [] && $issues !== [] && $decision !== 'approve') {
+                $decision = 'approve';
+            }
         }
 
         // Each pick judged apart: one that does not fit goes, a wrong reason is the checker's from its description.
@@ -3729,12 +3740,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($fix !== '' && mb_strlen($fix) <= mb_strlen($answer) * self::REVISED_GROWTH + 80) {
                 $answer = $fix;
                 $revised = true;
-            } elseif (array_diff(array_column($issues, 'severity'), ['minor']) !== []) {
+            } elseif (array_diff(array_column($acting, 'severity'), ['minor']) !== []) {
                 // A material issue and no fix to put in its place: only the sentences the issues name go, and the
                 // rest stays, however short, while a sentence of it is left beside its offer: the checker said the
                 // answer stands in the main (a revise, not a reject). "עד 500" kept its necklace, not an empty answer
                 // beside its card (Miss Nori, 16.11). Else the answer goes, the fitting picks stay.
-                $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $issues), fn (string $t): bool => mb_strlen($t) >= 4));
+                $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $acting), fn (string $t): bool => mb_strlen($t) >= 4));
                 $answer = $faulty === [] ? '' : self::withoutSentences($answer, function (string $sentence) use ($faulty): bool {
                     $sentence = mb_strtolower($sentence);
                     foreach ($faulty as $text) {
