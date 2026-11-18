@@ -868,10 +868,14 @@
     return '<div class="ls-noresults"><p class="ls-noresults__title">' + esc(t('noResultsTitle')) + '</p>' + (pop.length ? '<p class="ls-noresults__try">' + esc(t('noResultsTry')) + '</p><div class="ls-chips" style="margin-bottom:14px">' +
       pop.map(function (x) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(x) + '">' + icon('trend', 'ls-icon--sm') + esc(x) + '</button>'; }).join('') + '</div>' : '') + '</div>';
   }
+  // Search Subscriptions (24-subscribe.js), where the store has it: the bar above a search followed, the offer at the end
+  // of the results (noMatch: the no-exact-match state, the one place a store may want it only)
+  function subsHead(turn) { return S.config && S.config.subscribe ? subsAbove(turn) : ''; }
+  function subsTail(turn, noMatch) { return S.config && S.config.subscribe ? subsAfter(turn, noMatch) : ''; }
   function resultsHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
-    var list = filtered(turn), total = (turn.ids || []).length, html = '';
+    var list = filtered(turn), total = (turn.ids || []).length, html = subsHead(turn);
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
       html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku && turn.singleBy === 'sku' ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
@@ -898,13 +902,13 @@
         html += '<p class="ls-noanswer__text">' + esc(t('didYouMean', { q: turn.q })) + '</p><div class="ls-chips" style="margin-bottom:14px">' +
           turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') +
           (turn.focus.category ? '<button class="ls-chip ls-chip--quiet" data-q="' + esc(turn.focus.category.title) + '">' + esc(t('category', { t: turn.focus.category.title })) + '</button>' : '') + '</div>';
-        return html + (off('ask') || turn.askShown ? '' : '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q, true)) + '</div>');
+        return html + (off('ask') || turn.askShown ? '' : '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q, true)) + '</div>') + subsTail(turn, true);
       }
       // letters at random: no AI card, that nothing was found and the popular searches (the design of 18.11)
       if (gibberish(turn.q)) { return html + noResultsHtml(); }
       // words with intent: the card that runs the AI search, then the popular searches as before
       if (!off('ask') && !turn.askShown) { html += '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q, true)) + '</div>'; }
-      return html + (turn.askShown ? '' : popularHtml());
+      return html + (turn.askShown ? '' : popularHtml()) + subsTail(turn, true);
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
     // names it almost word for word (90% or more) and better than any product does; "טבעת זהב" keeps the products first
@@ -942,6 +946,8 @@
         esc(t('morePriced', { n: turn.price.more.count, max: money(turn.price.more.max) })) + '</button></div>';
     }
     if (!off('ask') && !turn.askShown && !askTop) { html += turn.askBelow ? '<div style="margin-top:20px">' + noMatchCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
+    // the offer to follow the search, under all of it: a search no product holds the words of is the no-exact-match state
+    html += subsTail(turn, askTop || turn.held === 0);
     html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }

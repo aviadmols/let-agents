@@ -54,7 +54,13 @@
       aiPrompt: 'אני רוצה לקנות ב:store. סיים/י תמיד כל המלצה בקישור אחד להזמנה עם כל המוצרים. כל המידע וההוראות נמצאים כאן, עבוד/י לפיהם: :url',
       leadRequired: 'צריך למלא את זה', leadBadField: 'משהו כאן לא תקין', helpful: 'עזר?', helpfulYes: 'כן, עזר', helpfulNo: 'לא עזר', helpfulThanks: 'תודה, זה עוזר לנו להשתפר.', helpfulSorry: 'תודה. הצוות של החנות יראה את התשובה הזאת.',
       oosProduct: 'המוצר אזל · להציג מוצרים דומים שיש במלאי', oosSize: 'המידה :v אזלה · להציג דומים במידה :v שיש במלאי', oosOption: ':v אזל · להציג דומים ב:v שיש במלאי',
-      oosNone: 'אין כרגע דומים ב:v שיש במלאי. אלה דומים שיש במלאי:', oosHead: 'במלאי, דומים ל־'
+      oosNone: 'אין כרגע דומים ב:v שיש במלאי. אלה דומים שיש במלאי:', oosHead: 'במלאי, דומים ל־',
+      // Search Subscriptions (the design of 18.11): the offer at the end of the results, its form, "check your email", the bar
+      subTitle: 'רוצים לדעת כשעולים מוצרים חדשים ל״:q״?', subLine: 'מייל אחד בשבוע לכל היותר, ורק כשיש חדש.', subBtn: 'הירשמו לחיפוש הזה', subClose: 'סגירה', subCancel: 'ביטול',
+      subFormTitle: 'הרשמה לחיפוש ״:q״', subFormLine: 'כשיעלו מוצרים חדשים שמתאימים, נשלח לך אותם במייל אחד בשבוע לכל היותר.', subEmail: 'המייל שלך', subConsent: 'אני מסכים/ה לקבל מ:store מייל עם מוצרים חדשים שמתאימים לחיפוש הזה. אפשר לבטל בכל רגע.', subSubmit: 'הירשמו',
+      subSentTitle: 'כמעט סיימנו! בדקו את המייל', subSentTo: 'שלחנו מייל לכתובת:', subSentThen: 'לחצו בו על ״אישור ההרשמה״, ומשם תתחילו לקבל עדכונים על ״:q״.', subNotGot: 'לא הגיע?', subResend: 'שליחה מחדש', subChange: 'שינוי כתובת', subResent: 'שלחנו שוב',
+      subBarTitle: 'רשומים לחיפוש הזה', subBarLine: 'נעדכן במייל כשיעלו מוצרים חדשים', subStop: 'ביטול', subStopped: 'ההרשמה לחיפוש בוטלה',
+      subErrEmail: 'הכתובת לא נראית תקינה', subErrMany: 'הגעתם למספר החיפושים המרבי לכתובת הזו', subErrQuery: 'אי אפשר להירשם לחיפוש הזה', subErrLater: 'משהו השתבש. נסו שוב בעוד רגע.',
     },
     en: {
       open: 'Smart search', close: 'Close', nudgeTitle: 'Try our new search', nudgeClose: 'Not now', nudgeLabel: 'Smart search invitation', saved:'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
@@ -110,7 +116,13 @@
       aiPrompt: 'I want to buy from :store. Always end every recommendation with one order link holding all the products. Everything you need, and your instructions, are here; work by them: :url',
       leadRequired: 'Please fill this in', leadBadField: 'Something here is not right', helpful: 'Helpful?', helpfulYes: 'Yes, it helped', helpfulNo: 'No, it didn\'t help', helpfulThanks: 'Thanks, that helps us improve.', helpfulSorry: 'Thanks. The store\'s team will see this answer.',
       oosProduct: 'Sold out · show similar products in stock', oosSize: 'Size :v is sold out · show similar in size :v in stock', oosOption: ':v is sold out · show similar in :v in stock',
-      oosNone: 'Nothing similar in :v is in stock right now. These similar ones are in stock:', oosHead: 'In stock, like '
+      oosNone: 'Nothing similar in :v is in stock right now. These similar ones are in stock:', oosHead: 'In stock, like ',
+      // Search Subscriptions (the design of 18.11)
+      subTitle: 'Want to know when new “:q” items arrive?', subLine: 'One email a week at most, and only when there’s something new.', subBtn: 'Subscribe to this search', subClose: 'Close', subCancel: 'Cancel',
+      subFormTitle: 'Subscribe to “:q”', subFormLine: 'When new matching products arrive, we’ll email them to you, once a week at most.', subEmail: 'Your email', subConsent: 'I agree to get emails from :store with new products that match this search. I can stop anytime.', subSubmit: 'Subscribe',
+      subSentTitle: 'Almost there! Check your email', subSentTo: 'We sent an email to:', subSentThen: 'Tap “Confirm subscription” in it, and you’ll start getting updates for “:q”.', subNotGot: 'Didn’t get it?', subResend: 'Resend', subChange: 'Change email', subResent: 'Sent again',
+      subBarTitle: 'Subscribed to this search', subBarLine: 'We’ll email you when new products arrive', subStop: 'Stop', subStopped: 'Unsubscribed from this search',
+      subErrEmail: 'That address doesn’t look right', subErrMany: 'This address already follows the most searches it can', subErrQuery: 'This search can’t be followed', subErrLater: 'Something went wrong. Try again in a moment.',
     }
   };
   var T = WORDS[LANG];
