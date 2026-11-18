@@ -253,15 +253,16 @@ final class BuildSearchIndex
     }
 
     /**
-     * What is only drawn, printed or written on the product, as one text: its picture's words that shown() leaves out.
-     * Null when nothing is.
+     * What is only drawn, printed or written on the product, as one text: its picture's words that shown() leaves out, and
+     * what the describer listed apart as drawn (caption_depicted), whether or not its words say it too: "moon phases" on a
+     * jacket was in its list alone, and "jackets moon" found no moon (Me369 QA, 18.11). Null when nothing is.
      */
     private static function drawn(?RetrievalImage $picture): ?string
     {
         if ($picture === null) {
             return null;
         }
-        $drawn = array_diff(array_map('strval', (array) $picture->caption_words), self::shown($picture));
+        $drawn = [...array_diff(array_map('strval', (array) $picture->caption_words), self::shown($picture)), ...array_filter((array) ($picture->caption_depicted ?? []), 'is_string')];
 
         return $drawn === [] ? null : mb_substr(implode(' ', array_unique(array_filter(array_map('trim', $drawn)))), 0, self::MAX_KEYWORDS);
     }
@@ -866,25 +867,35 @@ final class BuildSearchIndex
     }
 
     /**
-     * The main colour family of each product's picture, by product id: the first word of its description that is a colour
-     * alone (ColorFamily::ofColourWord), from its first picture described.
+     * The colour families of each product whose variants name none, by product id: every colour its own name says
+     * ("Kinsley Emb Black Wool Jacket" is black, whatever its picture's charcoal), and the main colour its picture shows,
+     * the first word of the picture's description that is a colour alone (ColorFamily::ofColourWord). Me369 QA, 18.11:
+     * the black wool jacket was filed under Grey alone. The store's description is not read: it names the colours of
+     * what goes with the piece too.
      *
      * @param  list<string>  $productIds
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
-    private static function pictureColours(array $productIds): array
+    private static function productColours(array $productIds): array
     {
         $out = [];
         foreach (array_chunk($productIds, 1000) as $ids) {
+            CatalogProduct::query()->whereIn('id', $ids)->get(['id', 'title'])->each(function (CatalogProduct $product) use (&$out): void {
+                foreach (self::colourWordsOf((string) $product->title) as $family) {
+                    $out[(string) $product->id][$family] = $family;
+                }
+            });
+            $pictured = [];
             RetrievalImage::query()->whereIn('product_id', $ids)->whereNotNull('caption_words')->orderBy('id')
-                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out): void {
+                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out, &$pictured): void {
                     $id = (string) $picture->product_id;
-                    if (isset($out[$id])) {
+                    if (isset($pictured[$id])) {
                         return;
                     }
                     foreach ((array) $picture->caption_words as $word) {
                         if (is_string($word) && ($family = ColorFamily::ofColourWord($word)) !== null) {
-                            $out[$id] = $family->value;
+                            $out[$id][$family->value] = $family->value;
+                            $pictured[$id] = true;
 
                             return;
                         }
@@ -892,7 +903,29 @@ final class BuildSearchIndex
                 });
         }
 
-        return $out;
+        return array_map('array_values', $out);
+    }
+
+    /**
+     * The colour families a product's name says, each word or pair of words that is a colour alone ("Black", "Light
+     * Blue", "שחור"), in the order said.
+     *
+     * @return list<string>
+     */
+    private static function colourWordsOf(string $title): array
+    {
+        $words = preg_split('/[\s,|\/()\-–]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $found = [];
+        for ($i = 0; $i < count($words); $i++) {
+            $pair = isset($words[$i + 1]) ? ColorFamily::ofColourWord($words[$i].' '.$words[$i + 1]) : null;
+            $one = $pair ?? ColorFamily::ofColourWord($words[$i]);
+            if ($one !== null) {
+                $found[$one->value] = $one->value;
+                $i += $pair !== null ? 1 : 0;
+            }
+        }
+
+        return array_values($found);
     }
 
     private function variantFacets(array &$facets, string $locale, string $shopId = ''): array
@@ -913,8 +946,9 @@ final class BuildSearchIndex
                 $rows[] = [$variant->product_id, (array) $variant->color_families, $variant->size_key, $variant->in_stock ? 1 : 0];
             });
 
-        // A product whose variants name no colour: the main colour its picture shows, the first colour the describer lists
-        // (caption v8 lists the colours after the kind, the one most of it is first), read in code. Me369, 18.11: 5 of
+        // A product whose variants name no colour: the colours its own name says, and the main colour its picture shows (the
+        // first colour the describer lists: caption v8 lists the colours after the kind, the one most of it first), read in
+        // code (productColours). Me369, 18.11: 5 of
         // 1,185 variants named a colour, the Colour filter held "Pink" alone, and "jackets white" had nothing to filter
         // by. Only where the look matters (search.photo_match "look": no book's cover colour is a filter), and a store with a
         // colour filter of its own (a stone's colour) is left with it. A product with no variants (a simple
@@ -928,7 +962,7 @@ final class BuildSearchIndex
                         $rows[] = [$product->id, [], null, $product->in_stock ? 1 : 0];
                     }
                 });
-            $main = self::pictureColours(array_values(array_unique(array_map(
+            $main = self::productColours(array_values(array_unique(array_map(
                 fn (array $row): string => (string) $row[0], array_filter($rows, fn (array $row): bool => $row[1] === []),
             ))));
             // a simple product no picture coloured stays out, as before
@@ -936,8 +970,10 @@ final class BuildSearchIndex
         }
         foreach ($rows as &$row) {
             if ($row[1] === [] && isset($main[(string) $row[0]])) {
-                $row[1] = [$main[(string) $row[0]]];
-                $families[$main[(string) $row[0]]] = true;
+                $row[1] = $main[(string) $row[0]];
+                foreach ($row[1] as $family) {
+                    $families[$family] = true;
+                }
             }
         }
         unset($row);

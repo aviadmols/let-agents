@@ -480,10 +480,14 @@ final class SearchCatalog
             return null;
         }
         $result = $loose['result'];
+        // every word left out, in any of its forms ("jackets" for "Jacket"), said by the product: printed on it, or, where
+        // the loosening kept the printed word ("moon") and left out the kind, in its own name and words
         $carries = function (string $id) use ($records, $left): bool {
             $drawn = (string) ($records[$id]['dw'] ?? '');
+            $text = HebrewSearch::normalize((string) ($records[$id]['title'] ?? '').' '.(string) ($records[$id]['kw'] ?? '').' '.$drawn);
+            $forms = array_flip(array_map(fn (string $t): string => HebrewSearch::formKey($t), array_filter(explode(' ', $text))));
 
-            return $drawn !== '' && array_all($left, fn (string $w): bool => HebrewSearch::holdsAny($drawn, [$w]));
+            return $drawn !== '' && array_all($left, fn (string $w): bool => isset($forms[HebrewSearch::formKey($w)]) || HebrewSearch::holdsAny($text, [$w]));
         };
         $ids = array_values(array_filter(array_map('strval', (array) ($result['ids'] ?? [])), fn (string $id): bool => str_starts_with($id, 'p:') && $carries($id)));
         if ($ids === []) {

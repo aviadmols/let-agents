@@ -281,6 +281,7 @@ final class ColourFamiliesTest extends TestCase
             '3' => ['Kiara Belted Jacket', ['jacket', 'gold buttons', 'brown', 'rust brown']],
             '4' => ['Della Cropped Jacket', ['jacket', 'charcoal grey', 'cream']],
             '5' => ['Plain Tote', ['tote bag', 'canvas']],
+            '6' => ['Kinsley Emb Black Wool Jacket', ['jacket', 'charcoal', 'black', 'wool']],
         ];
         app(TenantContext::class)->run($shop->id, function () use ($shop, $pictures): void {
             foreach ($pictures as $id => [$title, $words]) {
@@ -301,6 +302,8 @@ final class ColourFamiliesTest extends TestCase
         $this->assertContains($value('white'), $codes('2'), '"denim jacket" is a kind, not the colour blue');
         $this->assertContains($value('brown'), $codes('3'), 'the gold of its buttons is no colour of the jacket');
         $this->assertContains($value('grey'), $codes('4'));
+        $this->assertContains($value('black'), $codes('6'), 'its name says black: black, whatever its picture says first');
+        $this->assertContains($value('grey'), $codes('6'), 'and the charcoal its picture shows');
         $this->assertSame([], array_values(array_filter($codes('5'), fn (int $c): bool => intdiv($c, 1000) === $at)), 'a picture that names no colour gives none');
     }
 }

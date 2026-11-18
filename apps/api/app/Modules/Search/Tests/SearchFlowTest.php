@@ -415,7 +415,8 @@ final class SearchFlowTest extends TestCase
         $this->assertSame('איור נעל ספורט', $records['p:983']['dw'] ?? null, 'the drawing, kept apart');
         $this->assertSame('נעלי ספורט משבצות', $records['p:984']['dw'] ?? null, 'as the describer listed it');
         $this->assertStringNotContainsString('נעל', (string) $records['p:985']['kw'], 'a word inside what is listed apart ("נעל ספורט" in "איור נעל ספורט") is drawn too');
-        $this->assertSame('משבצות נעל ספורט', $records['p:985']['dw'] ?? null);
+        $this->assertStringStartsWith('משבצות נעל ספורט', (string) ($records['p:985']['dw'] ?? ''));
+        $this->assertStringContainsString('לוגו VANS', (string) ($records['p:985']['dw'] ?? ''), 'and what the describer listed apart as drawn, whether or not its words say it');
         $this->assertStringContainsString('לוגו', (string) $records['p:985']['kw'], 'and "לוגו" alone stays its own');
         $this->assertArrayNotHasKey('dw', $records['p:981'], 'nothing drawn on a shoe');
     }
@@ -426,21 +427,26 @@ final class SearchFlowTest extends TestCase
         // product's own words; what is printed on it says which of them.
         $this->inShop(function (): void {
             foreach ([
-                '991' => ['Della Cropped Jacket', ['jacket', 'black', 'cropped'], ['moon', 'stars', 'tigers']],
+                '991' => ['Della Cropped Jacket', ['jacket', 'black', 'cropped'], ['moon phases', 'star motifs', 'tigers']],
                 '992' => ['Kiara Belted Jacket', ['jacket', 'brown', 'tweed'], []],
                 '993' => ['Fraya Sand Jacket', ['jacket', 'cream'], []],
                 '994' => ['Luna Graphic Tee', ['t-shirt', 'white'], ['moon']],
             ] as $id => [$title, $words, $depicted]) {
-                $product = $this->product($id, $title);
+                $product = $this->product($id, $title, str_contains($title, 'Jacket') ? ['payload' => ['tags' => ['Jackets']]] : []);
                 RetrievalImage::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'external_id' => $id, 'title' => $title,
-                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => [...$words, ...$depicted], 'caption_depicted' => $depicted]);
+                    'image_url' => "https://www.store.test/i/{$id}.jpg", 'url_hash' => hash('sha256', $id), 'caption_words' => $words, 'caption_depicted' => $depicted]);
             }
         });
         app(BuildSearchIndex::class)->handle($this->shop->id);
 
-        $found = $this->search('jacket moon');
-        $this->assertSame(['991'], array_column($found->json('groups.product'), 'external_id'), 'the jacket printed with moons, not the tee nor the plain jackets');
-        $this->assertNull($found->json('loosened'), 'and nothing said left out');
+        foreach (['jacket moon', 'jackets moon'] as $q) {
+            $found = $this->search($q);
+            $this->assertSame(['991'], array_column($found->json('groups.product'), 'external_id'), $q.': the jacket printed with moons, not the tee nor the plain jackets');
+            $this->assertNull($found->json('loosened'), $q.': and nothing said left out');
+            // as the drawer asks while typing (no meaning)
+            $typing = $this->getJson('/api/v1/search/'.$this->site.'?q='.rawurlencode($q).'&typing=1', ['Origin' => 'https://www.store.test']);
+            $this->assertNull($typing->json('loosened'), $q.' while typing');
+        }
         $this->assertEqualsCanonicalizing(['991', '992', '993'], array_column($this->search('jacket')->json('groups.product'), 'external_id'));
     }
 
