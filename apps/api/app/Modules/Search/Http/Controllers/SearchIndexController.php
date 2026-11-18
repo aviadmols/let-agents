@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
+use App\Modules\Search\Contracts\DrawerConfig;
 use App\Modules\Search\Http\StorefrontSite;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchTerm;
@@ -124,7 +125,7 @@ final class SearchIndexController
             // where each AI opens with them. Ready here, so the press opens at once with no request.
             'aiAsk' => Features::enabled('search.ai_share', $shopId) && Features::enabled('search.agent_connector', $shopId)
                 ? self::aiAsk((string) (Shop::query()->whereKey($shopId)->value('name') ?? ''), AgentCatalog::publicUrl('c/'.$site).'?format=json', $locale) : null,
-        ] + self::lookFor($tenant, $shopId);
+        ] + self::lookFor($tenant, $shopId) + self::fromModules($shopId);
         $etag = '"'.substr(hash('sha256', $index->hash.json_encode($config).$locale), 0, 24).'"';
         $headers = ['ETag' => $etag, 'Cache-Control' => 'public, max-age=300'];
 
@@ -228,6 +229,21 @@ final class SearchIndexController
             // the saved list's heart in the site's header, beside the search (off unless the shop turns it on)
             'heart' => (bool) Settings::get('search.header_heart', $shopId),
         ];
+    }
+
+    /**
+     * What other modules add to the drawer's config (DrawerConfig), each only its own keys: never one of ours replaced.
+     *
+     * @return array<string, mixed>
+     */
+    private static function fromModules(string $shopId): array
+    {
+        $added = [];
+        foreach (app()->tagged(DrawerConfig::TAG) as $source) {
+            $added += $source->forDrawer($shopId);
+        }
+
+        return $added;
     }
 
     /**

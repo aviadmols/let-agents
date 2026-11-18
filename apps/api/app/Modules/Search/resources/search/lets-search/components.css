@@ -521,3 +521,45 @@ a.ls-pick__media { display: block; }
 .ls-noresults { margin: 4px 4px 10px; }
 .ls-noresults__title { margin: 0 0 6px; font-size: 17px; font-weight: 600; line-height: 1.45; color: var(--ls-fg); }
 .ls-noresults__try { margin: 0 0 12px; font-size: 14px; color: var(--ls-fg-muted); }
+/* Search Subscriptions (the design of 18.11, docs: lets-search-subscriptions): the offer at the end of the results and in
+   the no-exact-match state, the same card opened in place into its form, "check your email", and the bar above the
+   results of a search already followed. Light cards like the no-match card, a lime tile, the bell that rings now and then. */
+.ls-sub { position: relative; margin: 14px 4px 10px; padding: 20px; border-radius: 22px; background: #f4f4f5; color: #0b0b0c; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.ls-sub--form { align-items: stretch; gap: 16px; margin: 14px 4px 10px; }
+.ls-sub__x { position: absolute; top: 10px; inset-inline-end: 10px; width: 32px; height: 32px; padding: 0; border: 0 !important; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 2px rgba(11,11,12,.08); display: grid; place-items: center; cursor: pointer; color: #0b0b0c; }
+.ls-sub__x:focus-visible, .ls-sub__btn:focus-visible, .ls-sub__go:focus-visible, .ls-sub__link:focus-visible, .ls-subbar__stop:focus-visible { outline: 2px solid #0b0b0c; outline-offset: 3px; }
+.ls-sub__tile { width: 44px; height: 44px; flex: none; border-radius: 14px; background: #e2ff78; display: grid; place-items: center; }
+.ls-sub__text { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-inline-end: 28px; }
+.ls-sub__title { margin: 0; font-size: 17px; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ls-sub__line { margin: 0; font-size: 13.5px; line-height: 1.5; color: #5f5f67; }
+.ls-sub__btn { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border: 0 !important; border-radius: 999px; background: #ffffff; color: #0b0b0c; font: inherit; font-size: 15px; font-weight: 600; line-height: 1; cursor: pointer; box-shadow: 0 1px 2px rgba(11,11,12,.06), 0 6px 18px rgba(11,11,12,.08); transition: box-shadow .2s ease; }
+.ls-sub__btn:hover { box-shadow: 0 1px 2px rgba(11,11,12,.08), 0 10px 26px rgba(11,11,12,.12); }
+.ls-sub__arr { flex: none; transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.ls-sub__btn:hover .ls-sub__arr, .ls-sub__go:not([disabled]):hover .ls-sub__arr { transform: translateX(4px); }
+[dir="rtl"] .ls-sub__btn:hover .ls-sub__arr, [dir="rtl"] .ls-sub__go:not([disabled]):hover .ls-sub__arr { transform: translateX(-4px); }
+.ls-sub__bell { display: block; transform-box: fill-box; transform-origin: 50% 12%; animation: ls-sub-bell 3.6s ease-in-out infinite; }
+@keyframes ls-sub-bell { 0%, 62%, 100% { transform: rotate(0); } 66% { transform: rotate(16deg); } 71% { transform: rotate(-13deg); } 76% { transform: rotate(9deg); } 81% { transform: rotate(-5deg); } 86% { transform: rotate(2deg); } 90% { transform: rotate(0); } }
+.ls-sub__field { display: flex; flex-direction: column; gap: 6px; }
+.ls-sub__label { font-size: 13px; color: #5f5f67; }
+.ls-sub__input { width: 100%; height: 48px; box-sizing: border-box; border: 1px solid #dcdce0 !important; border-radius: 14px; padding: 0 14px; font: inherit; font-size: 16px; background: #ffffff; color: #0b0b0c; text-align: left; outline: 0; box-shadow: none; }
+.ls-sub__input:focus { border-color: #0b0b0c !important; }
+.ls-sub__input[aria-invalid="true"] { border-color: #b42318 !important; }
+.ls-sub__check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.ls-sub__check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: #0b0b0c; }
+.ls-sub__check span { font-size: 13px; line-height: 1.55; color: #3a3a40; }
+.ls-sub__go { height: 48px; border: 0 !important; border-radius: 999px; background: #0b0b0c; color: #ffffff; font: inherit; font-size: 15px; font-weight: 600; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .2s ease; }
+.ls-sub__go[disabled] { opacity: .35; cursor: default; }
+.ls-sub__err { margin: -6px 0 0; font-size: 13px; line-height: 1.45; color: #b42318; }
+.ls-sub__sent { margin: 0; font-size: 14px; line-height: 1.55; color: #3a3a40; }
+.ls-sub__mail { display: block; margin: 4px 0 6px; text-align: left; font-weight: 500; color: #0b0b0c; overflow-wrap: anywhere; }
+[dir="rtl"] .ls-sub__mail { text-align: right; }
+.ls-sub__links { margin: 0; font-size: 13px; color: #5f5f67; }
+.ls-sub__link { padding: 0; border: 0 !important; background: none; font: inherit; color: #0b0b0c; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ls-sub__link[disabled] { color: #5f5f67; cursor: default; text-decoration: none; }
+.ls-subbar { display: flex; align-items: center; gap: 12px; margin: 0 4px 14px; padding: 12px 14px; border-radius: 18px; background: #f4f4f5; color: #0b0b0c; }
+.ls-subbar__tile { width: 34px; height: 34px; flex: none; border-radius: 11px; background: #e2ff78; display: grid; place-items: center; }
+.ls-subbar__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ls-subbar__title { margin: 0; font-size: 14.5px; font-weight: 600; }
+.ls-subbar__line { margin: 0; font-size: 12.5px; color: #5f5f67; }
+.ls-subbar__stop { flex: none; padding: 0; border: 0 !important; background: none; font: inherit; font-size: 13px; color: #5f5f67; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .ls-sub__bell { animation: none; } .ls-sub__arr, .ls-sub__btn { transition: none; } }
