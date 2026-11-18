@@ -755,7 +755,9 @@
     if (!typed.length || (typed.length < 2 && wordsOf(q).length < 2)) { return []; }
     var said = {}, heard = {};
     var hear = function (w) { return E.sound ? E.sound(w) : ''; };
-    list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; var h = f.length >= 4 && hear(f); if (h) { heard[h] = 1; } }); }); });
+    // and what is drawn or printed on it (dw), as the server reads it: a dress whose pocket says "FLY ME TO THE MOON" was
+    // told "without moon" (Me369, 18.11)
+    list.forEach(function (r) { E.normalize(decode(r.title || '') + ' ' + (r.kw || '') + ' ' + (r.dw || '')).split(' ').forEach(function (w) { wordForms(w).forEach(function (f) { said[f] = 1; var h = f.length >= 4 && hear(f); if (h) { heard[h] = 1; } }); }); });
     return typed.filter(function (w) {
       var n = E.normalize(w), whom = whomOf(n);
       if (whom) {

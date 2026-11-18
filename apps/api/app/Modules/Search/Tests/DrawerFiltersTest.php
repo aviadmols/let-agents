@@ -184,6 +184,13 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([[], ['ירוקים']], $left, 'ח as כ is the same word; a colour none says is still said missing');
     }
 
+    public function test_what_is_drawn_on_a_product_is_said_by_it(): void
+    {
+        // Me369, 18.11: "dress MOON" showed the dress whose pocket reads "FLY ME TO THE MOON" and said "without moon"
+        $left = self::drawer("(function () { var list = [{ title: 'Nova Kimono Magic Dress', kw: 'dress kimono black', dw: 'moon and stars sun butterfly' }]; return [T.unsaid('dress moon', list, [], []), T.unsaid('dress unicorn', list, [], [])]; })()");
+        $this->assertSame([[], ['unicorn']], $left, 'the moon drawn on it is said; a unicorn none shows is still missing');
+    }
+
     public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void
     {
         // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"
