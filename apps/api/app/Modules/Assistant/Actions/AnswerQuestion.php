@@ -55,7 +55,11 @@ final class AnswerQuestion
     // bank of terms (`terms`): in plain words, where it stands on its scale, this piece's details, and one closing sentence.
     // Compared on 16 term questions and 6 others from Rocks, Gueta, Naot and Vans, twice each: every term answer explained
     // and placed, shown 31 of 32 against 30; the others the same (docs/eval/answers-product-v9-vs-v8.json in Let Agents).
-    public const PROMPT_VERSION = 9;
+    // v10 (18.11): the writer is given what the product's picture shows (`picture`), and a word of the product's own name
+    // that says how it is built or worn ("מה הכוונה שני חלקים?") is told as one explanation: what the parts are, where each
+    // sits, what it gives. The answer had said the phrase again in other words, in three labelled lines. Compared on 25
+    // questions from Rocks, Gueta, Naot, Vans and Take Me Home (docs/eval/answers-product-v10-vs-v9.json in Let Agents).
+    public const PROMPT_VERSION = 10;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;

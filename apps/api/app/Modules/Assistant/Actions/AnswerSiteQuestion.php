@@ -33,6 +33,7 @@ use App\Modules\Assistant\Support\DailyQuestions;
 use App\Modules\Assistant\Support\Dated;
 use App\Modules\Assistant\Support\NoAnswer;
 use App\Modules\Assistant\Support\Offenders;
+use App\Modules\Assistant\Support\PictureOf;
 use App\Modules\Assistant\Support\Privacy;
 use App\Modules\Assistant\Support\Question;
 use App\Modules\Assistant\Support\QuestionGuard;
@@ -143,8 +144,15 @@ final class AnswerSiteQuestion implements TriesQuestions
      * and a carat spelled "קארט" known to code: a term is said in plain words, where it stands on its scale, and the answer
      * ends on the piece; its last sentence, about the piece, had been taken out by code in every answer on a term. Compared on
      * 14 real term questions and 8 others from 6 stores, twice each (docs/eval/answers-v34-vs-v33.json in Let Agents).
+     *
+     * v35 (answer_site and verify_site), 18.11, after Aviad set two answers beside the store's other chat: a word of a
+     * product's own name that says how it is built ("מה הכוונה שני חלקים?") is explained as one telling, its parts and where
+     * each sits, from the picture's description, which the writer is now given ("Picture:" in `about`); and the product alone
+     * on the screen is the one asked about. With it, in code: the store's own search feeds the writer first, and a karat is
+     * one thing however it is written ("21 קארט" is 21K). Compared on 35 questions from 6 stores
+     * (docs/eval/answers-v35-vs-v34.json in Let Agents).
      */
-    public const PROMPT_VERSION = 34;
+    public const PROMPT_VERSION = 35;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -335,6 +343,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** @var list<string> the product others are asked to be like ("מה עוד דומה?"), never one of them (prepare()), external ids */
     private array $anchors = [];
+
+    /** The one product on the shopper's screen when a question is asked with it alone: read whole whatever is found beside it. */
+    private ?string $alone = null;
 
     /** Asks for products like another: "מה עוד דומה?", "הכי קרוב ל…", "something like this", "alternatives". */
     private const ASKS_SIMILAR = '/(?:^|[^\p{L}])(?:[והכלמש]?דומ(?:ה|ים|ות|י)|(?:עוד|משהו|ספרים|מוצרים|אחרים|אחר|אחרות)\s+(?:כמו|בסגנון)|בסגנון\s+(?:הזה|הזאת|דומה)|(?:ה?כי\s+)?קרוב(?:ים|ות|ה)?\s+(?:ל|אל)|חלופ(?:ה|ות|י)|similar|alternatives?|(?:more|others?|something|anything)\s+like|like\s+(?:this|that|it)|closest\s+to)(?:[^\p{L}]|$)/iu';
@@ -1654,6 +1665,14 @@ final class AnswerSiteQuestion implements TriesQuestions
             && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 21) {
             $viewing = (string) $shown[0];
         }
+        // ...or asking what a word of its own name means ("מה הכוונה שני חלקים?" under the earrings named "…שני חלקים, חלק
+        // אחורי מניפה…", Rocks 18.11): what the store's search finds for those words is other products, and the answer
+        // turned to jewellery at large (v35 on)
+        if ($viewing === null && count($shown) === 1 && ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 35
+            && ($asked = BuildTradeGlossary::askedTerms($question)) !== []
+            && self::saysWordOf(implode(' ', $asked), (string) CatalogProduct::query()->whereNull('removed_at')->where('external_id', (string) $shown[0])->value('title'))) {
+            $viewing = (string) $shown[0];
+        }
         // A question about a product it names ("על מה הספר החטוף?"): that product, when the search before it
         // showed none of those it names; a question about what was shown stays about what was shown.
         // "מה עוד דומה?", "מה הכי קרוב ל'עקידה'?": the product named or alone on the screen is what the others are measured
@@ -1670,6 +1689,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
         // nothing on the shopper's screen: asked in the box, no search before it
         $nothingShown = $shown === [];
+        $this->alone = $viewing ?? (count($shown) === 1 ? (string) $shown[0] : null);
         $named = $viewing === null && $this->anchors === [] ? $this->namedProducts($question) : [];
         // A question that asks for products ("מתנה לאמא עד 1,500") and happens to say a product's name (the gift card, by the
         // word "מתנה") is still about the products found: that one first, the rest kept. Alone, it was all the writer had, and
@@ -1718,7 +1738,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             $byText = array_map(fn (array $p): string => (string) $p['external_id'], array_filter($found, fn (array $p): bool => $p['source'] === 'product' && (string) ($p['external_id'] ?? '') !== ''));
             // and what the store's own search finds for the question, by its words and by meaning (assistant.products_by_search):
             // the products on the screen were those the words found while it was typed, "מתאמים" for "מה מתאים…" (Gueta, 17.11)
-            $shown = array_values(array_unique([...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$this->bySearch($shopId, $question), ...$shown]));
+            // The search first: it reads the question as the store's search box does, its filters and every word ("תליונים ב 21
+            // קארט": the two pendants of 21K gold), where meaning and the screen brought sixteen pendants of 14K and the answer
+            // said the store had none (Rocks, 18.11).
+            $shown = array_values(array_unique([...(self::aboutProducts($question) ? $this->bySearch($shopId, $question) : []), ...array_slice(array_values(array_unique($byText)), 0, self::FROM_PASSAGES), ...$shown]));
         }
         // Nothing on the screen and the question asks for products ("איזו מתנה מתאימה לאשתי עד 1500 ש"ח, משהו עדין עם יהלום"):
         // what the store's own search finds for it, in its budget, is what the shopper would have had in front of them, after
@@ -1749,6 +1772,12 @@ final class AnswerSiteQuestion implements TriesQuestions
         // typed in the box runs no product search, and meaning brought white gold and platinum, so "we have no silver".
         if ($this->codeRules() && $viewing === null && ! $followUp && $named === [] && self::aboutProducts($question)) {
             $shown = array_values(array_unique([...$this->ownWordProducts($question), ...$shown]));
+        }
+        // and before them all, what the store's own search found for the question: it read every word and every filter of it,
+        // where a word alone ("תליוני", "קארט") brought a bracelet with charms and rings of 0.40 carat ahead of the two
+        // pendants of 21K gold (Rocks, 18.11)
+        if ($viewing === null && ! $followUp && $named === [] && self::aboutProducts($question) && ($searched = $this->bySearch($shopId, $question)) !== []) {
+            $shown = array_values(array_unique([...$searched, ...$shown]));
         }
         // A wish with a price that names no product ("אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500"): the store's
         // range inside the price, of every kind, what its customers choose first, for the writer to choose from. Its words
@@ -2475,7 +2504,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     public function replay(string $shopId, string $question, array $products, ?int $answerVersion = null, string $locale = 'he', ?array $frozen = null, array $thread = [], array $versions = []): array
     {
         // the writer's version, and any other prompt's (scope_site, verify_site): each must exist
-        $versions = array_filter(['answer_site' => $answerVersion] + $versions, fn ($v): bool => $v !== null);
+        // (the writer's own argument first only when it is given: as null it hid the writer's version in $versions, and a
+        // comparison of "v35" ran the released writer with the new checker, 18.11)
+        $versions = array_filter(($answerVersion === null ? [] : ['answer_site' => $answerVersion]) + $versions, fn ($v): bool => $v !== null);
         foreach ($versions as $prompt => $version) {
             if (! in_array((int) $version, self::promptVersions((string) $prompt), true)) {
                 throw new \InvalidArgumentException("{$prompt} v{$version} does not exist.");
@@ -2915,7 +2946,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                 continue;
             }
 
-            if (preg_match(self::STORE_FACT, $sentence) === 1) {
+            // A price with no sum beside it is how one grade stands by another ("ולכן המחיר נוח יותר מדרגות SI ומעלה"): the
+            // trade's knowledge, as the store's bank of terms and the prompt say it. Read as the store's word, the whole line
+            // on I1 left the answer to "מה זה FG I1?" (Rocks, 18.11). A sum, or anything else of the store, still goes.
+            $priced = preg_match('/(?:מחיר|מחירים|prices?)\D{0,30}\d|\d[\d,.]*\D{0,6}(?:מחיר|prices?)/iu', $sentence) === 1;
+            $read = $priced ? $sentence : (string) preg_replace('/(?<![\p{L}])[ובהלמש]?(?:מחיר|מחירים)(?![\p{L}])|\bprices?\b/iu', ' ', $sentence);
+
+            if (preg_match(self::STORE_FACT, $read) === 1) {
                 $answer = trim((string) preg_replace('/[ \t]*'.preg_quote($sentence, '/').'[ \t]*/u', ' ', $answer, 1));
                 $answer = trim((string) preg_replace('/ {2,}/u', ' ', $answer));
 
@@ -3701,6 +3738,27 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** A least price is read only from this much: below it, "10%" or a small fee is no price a product is held to. */
     private const MINIMUM_FROM = 50;
+
+    /**
+     * Whether a question says a word of a product's name, as a word: three letters or more, as written or after the one
+     * letter Hebrew puts before a word ("בחלקים": "חלקים"). Numbers are no word of a name here.
+     */
+    public static function saysWordOf(string $question, string $title): bool
+    {
+        $words = function (string $text): array {
+            $text = strtr(mb_strtolower($text), ['ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ']);
+
+            return array_values(array_filter(preg_split('/[^\p{L}]+/u', $text) ?: [], fn (string $w): bool => mb_strlen($w) >= 3));
+        };
+        $named = array_flip($words($title));
+        foreach ($words($question) as $word) {
+            if (isset($named[$word]) || (mb_strlen($word) >= 4 && preg_match('/^[והבלמשכ]/u', $word) === 1 && isset($named[mb_substr($word, 1)]))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private const MINIMUMS = 3;
 
@@ -4507,8 +4565,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         // whole, the short and the full, to the questions and answers at their end; a list of results needs a line each.
         // "איך לשמור על המוצר הזה?" under a ladder whose page answers "איך מאחסנים את הסולם?" was told "no instructions":
         // the writer had its one-line short description only (Gueta, 17.11).
-        $whole = count($shown) <= 2;
-        $aboutChars = $whole ? self::WHOLE_ABOUT_CHARS : 300;
+        $few = count($shown) <= 2;
+        // and what its picture shows, a last line of its own ("Picture: …"), for a prompt that reads it (answer_site v35 on):
+        // "מה הכוונה שני חלקים?" was answered with the phrase said again, while the picture's description told which part is
+        // the stud and which the fan (Rocks, 18.11)
+        $reads = ($this->promptVersions['answer_site'] ?? self::PROMPT_VERSION) >= 35;
         $out = [];
 
         foreach ($shown as $id) {
@@ -4517,13 +4578,19 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($product === null) {
                 continue;
             }
+            // the one product that was alone on the shopper's screen is read whole whatever was found beside it: the store's
+            // search brought five more for the words "שני חלקים", and the earrings asked about were down to a line
+            $whole = $few || ($reads && (string) $id === $this->alone);
+            $aboutChars = $whole ? self::WHOLE_ABOUT_CHARS : 300;
+            $pictured = $whole && $reads;
 
             $out[] = [
                 'external_id' => (string) $product->external_id,
                 'title' => (string) $product->title,
                 // what its page says of changing its size, in its words, first: "לא ניתן לשנות את המידה" under a ring of 59 was
                 // not read, and the answer said it can be enlarged, from a guide on rings in general (Rocks, 17.11)
-                'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product, $whole)), 0, $aboutChars),
+                'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product, $whole)), 0, $aboutChars)
+                    .($pictured && ($picture = PictureOf::product($product)) !== null ? "\nPicture: ".$picture : ''),
                 'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
                 'brand' => $product->brand,
                 'in_stock' => (bool) $product->in_stock,
@@ -5262,7 +5329,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @return list<array{title: string, text: string}>
      */
     /** The products the store's search finds for a question are read by the topic check and offered to the writer, this many. */
-    private const BY_SEARCH = 3;
+    private const BY_SEARCH = 6;
 
     /** @var array<string, list<string>> the store's search for a question, asked once an answer */
     private array $searched = [];

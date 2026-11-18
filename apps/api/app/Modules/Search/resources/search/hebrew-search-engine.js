@@ -40,14 +40,19 @@
   var RELATIVE_FLOOR = 0.8;
 
   function normalize(text) {
-    return dates(String(text == null ? '' : text)
+    return karats(dates(String(text == null ? '' : text)
       .toLowerCase()
       .replace(/[֑-ׇ]/g, '')
       .replace(/[׳״'"`]/g, '')
-      .replace(/[ךםןףץ]/g, function (letter) { return FINALS[letter]; }))
+      .replace(/[ךםןףץ]/g, function (letter) { return FINALS[letter]; })))
       .replace(/[^\p{L}\p{N}]+/gu, ' ')
       .trim();
   }
+
+  // A karat is one thing however it is written: "21 קראט", "21 קארט", "21 karat" and "21 K" are all "21k", as a title's
+  // "זהב 21K" is; a whole number only ("0.21 קראט" stays a weight). The same on the server (HebrewSearch::karats); change both.
+  var KARAT = /(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])/gu;
+  function karats(text) { return text.replace(KARAT, '$1$2k'); }
 
   // A date is one thing however it is written: "7.10", "7/10", "ה-7 באוקטובר", "השביעי באוקטובר" and "שבעה באוקטובר" are
   // all "7 אוקטובר"; a number before a point followed by a measure ("4.5 ממ") is a size. The same on the server

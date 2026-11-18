@@ -13,6 +13,7 @@ use App\Modules\Assistant\Actions\AnswerSiteQuestion;
 use App\Modules\Assistant\Actions\MendShownQuestions;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductsNamed;
+use App\Modules\Assistant\Contracts\ProductsNear;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
@@ -28,6 +29,7 @@ use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use App\Modules\Runs\Models\Run;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -1388,6 +1390,45 @@ final class SiteQuestionTest extends TestCase
         foreach ($products as $product) {
             $this->assertStringNotContainsString('שאלות נפוצות', (string) ($product['about'] ?? ''), 'a list of results reads the short line of each');
         }
+    }
+
+    /**
+     * Earrings whose page says only "שני חלקים, חלק אחורי מניפה", while the description of their picture, kept since the
+     * scan, says which part is the stud and which the fan: asked "מה הכוונה שני חלקים" with them alone on the screen, the
+     * question is about them, and the writer reads what the picture shows. It had said the phrase again in other words,
+     * among five other products the words found (Rocks, 18.11). A question that asks for products is no question about it.
+     */
+    public function test_a_word_of_the_one_product_on_the_screen_is_asked_about_it_and_its_picture_is_read(): void
+    {
+        $earrings = $this->product('951', 'עגילים צמודים, שני חלקים, חלק אחורי מניפה משובצת יהלומים', 'עגילים זהב לבן 14 קארט.', [], ['price' => '6300.00', 'in_stock' => true]);
+        $this->product('952', 'תליון שני לבבות', 'תליון זהב.', [], ['price' => '900.00', 'in_stock' => true]);
+        $this->inShop(fn () => RetrievalImage::query()->create(['product_id' => $earrings->id, 'external_id' => '951', 'title' => 'x', 'image_url' => 'https://x.test/e.jpg', 'url_hash' => 'e',
+            'caption' => 'עגילים צמודים בשני חלקים. החלק העליון הוא סטוד, והחלק התחתון הוא מניפה של זרועות דקות.', 'captioned_at' => now()]));
+        $this->app->bind(ProductsNear::class, fn () => new class implements ProductsNear
+        {
+            public function near(string $shopId, string $question, int $limit): array
+            {
+                return ['952'];
+            }
+        });
+        $this->replies = [
+            ['found' => true, 'answer' => 'החלק הקדמי הוא עגיל צמוד, והחלק האחורי הוא מניפה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'העגילים שעל המסך']]],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $this->askWith('מה הכוונה שני חלקים', ['951'])->assertOk();
+
+        $given = json_decode($this->calls[0]['user'], true);
+        $this->assertCount(1, $given['products'], 'the earrings alone: what the words find elsewhere is not what was asked');
+        $this->assertSame('p1', $given['viewing'] ?? null);
+        $this->assertStringContainsString("\nPicture: עגילים צמודים בשני חלקים. החלק העליון הוא סטוד", (string) $given['products'][0]['about']);
+
+        $this->calls = [];
+        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => []]];
+        $this->askWith('יש עוד תליונים?', ['951']);
+
+        $titles = array_column(json_decode($this->calls[0]['user'], true)['products'] ?? [], 'title');
+        $this->assertSame('תליון שני לבבות', $titles[0] ?? null, 'a question asking for products: what the store\'s search finds, first');
     }
 
     /**

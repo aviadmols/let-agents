@@ -75,7 +75,7 @@ final class BuildTradeGlossary
     private const NOT_TOLD = '/₪|\$|€|ש["״]ח|\bnis\b|\+?\d(?:[\s-]?\d){8,}|@|https?:\/\/|www\./iu';
 
     /** A question asking what a word means, or how two differ: what follows is the word. */
-    private const ASKS_MEANING = '/(?:^|\s)(?:מה\s+(?:זה|זאת|זו|הם|הן|ההבדל\s+בין|ההבדלים\s+בין|המשמעות\s+של|הפירוש\s+של)|מהו|מהי|מהם|מהן|what(?:\'s|\s+is|\s+are|\s+does)|difference\s+between|meaning\s+of)\s+(.+)$/iu';
+    private const ASKS_MEANING = '/(?:^|\s)(?:מה\s+(?:זה|זאת|זו|הם|הן|ההבדל\s+בין|ההבדלים\s+בין|המשמעות\s+של|הפירוש\s+של|הכוונה(?:\s+של)?|פירוש)|מהו|מהי|מהם|מהן|what(?:\'s|\s+is|\s+are|\s+does)|difference\s+between|meaning\s+of)\s+(.+)$/iu';
 
     public function __construct(
         private readonly RecordsRuns $runs,

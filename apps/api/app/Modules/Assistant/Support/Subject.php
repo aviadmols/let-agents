@@ -67,6 +67,8 @@ final class Subject
                 'highlights' => (array) ($card['highlights'] ?? []),
                 'related' => $related,
                 'text' => mb_substr((string) ($card['text'] ?? ''), 0, $maxTextChars),
+                // what its picture shows (answer v10 on reads it): how it is built and looks, where its page does not say
+                'picture' => PictureOf::product($product),
             ], fn ($value): bool => $value !== null && $value !== '' && $value !== []),
             ['title' => $product->title, 'category' => $category],
         );

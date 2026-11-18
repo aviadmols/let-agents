@@ -40,6 +40,12 @@ final class TroubleAndGeneralTest extends TestCase
         $this->assertSame([], AnswerSiteQuestion::general($answer, ['משפט שלא נמצא בתשובה.'])['general'], 'only what the answer says');
         $this->assertSame([], AnswerSiteQuestion::general('אצלנו המשלוח חינם. כדאי לבדוק בתיקיית הספאם.', ['אצלנו המשלוח חינם.'])['general']);
 
+        // a price with no sum is how a grade stands beside another, the trade's knowledge: the line on I1 left the answer to
+        // "מה זה FG I1?" for it (Rocks, 18.11). A price with a sum is still the store's word.
+        $grade = 'I1 היא דרגת ניקיון בחלק הנמוך של הסולם, ולכן המחיר נוח יותר מדרגות SI ומעלה.';
+        $this->assertSame([$grade], AnswerSiteQuestion::general($grade, [$grade])['general']);
+        $this->assertSame([], AnswerSiteQuestion::general('המחיר של יהלום כזה הוא 3,000.', ['המחיר של יהלום כזה הוא 3,000.'])['general']);
+
         // a purity or a material in percent is the trade's measure, not the store's word: "9K vs 14K" lost its figures (Rocks,
         // 16.11); a discount in percent still is the store's
         $gold = 'הם נבדלים בכמות הזהב: 9K הוא 37.5% זהב טהור, ו־14K הוא 58.5% זהב טהור.';

@@ -392,7 +392,7 @@
         {
             "name": "products_by_search",
             "type": "bool",
-            "default": false,
+            "default": true,
             "scope": "shop"
         },
         {

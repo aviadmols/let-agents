@@ -1236,9 +1236,20 @@ final class HebrewSearch
         $text = mb_strtolower((string) $text, 'UTF-8');
         $text = (string) preg_replace('/[\x{0591}-\x{05C7}]/u', '', $text);
         $text = (string) preg_replace('/[\x{05F3}\x{05F4}\'"`]/u', '', $text);
-        $text = self::dates(strtr($text, self::FINALS));
+        $text = self::karats(self::dates(strtr($text, self::FINALS)));
 
         return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
+    }
+
+    /**
+     * A karat is one thing however it is written: "21 קראט", "21 קארט", "21 קרט", "21 karat" and "21 K" are all "21k", as a
+     * title's "זהב 21K" is. Rocks, 18.11: "יש תליונים ב 21 קארט" found the pendants set with a stone of "1.21 קראט" and
+     * never the two of 21K gold, and the answer said there were none. A whole number only: "0.21 קראט" stays a weight.
+     * Same in the browser (hebrew-search-engine.js karats()); change both.
+     */
+    public static function karats(string $text): string
+    {
+        return (string) preg_replace('~(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])~u', '$1$2k', $text);
     }
 
     /** The months, as the day before them is written in digits. */
