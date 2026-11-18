@@ -54,7 +54,7 @@ final class CompleteVocabulary
 
     public const ACTION = 'enrichment.complete_vocabulary';
 
-    public const PROMPT_VERSION = 1;
+    public const PROMPT_VERSION = 2;
 
     /** Products a new type or value must tag, unless the store's own data says it. */
     public const MIN_PRODUCTS = 2;
@@ -134,8 +134,18 @@ final class CompleteVocabulary
         }
 
         try {
-            $proposed = $this->ask($run, $writer, 'schema_writer', 'bank_completion', $this->writerInput($before, $gaps), self::WRITER_TOKENS, $report);
+            $input = $this->writerInput($before, $gaps);
+            $proposed = $this->ask($run, $writer, 'schema_writer', 'bank_completion', $input, self::WRITER_TOKENS, $report);
             [$candidate, $added, $rejected] = self::merge($before, $proposed);
+            // one round of correction: a new type whose patterns read less than half the untyped products it was proposed
+            // for goes back to the writer with what it read and the titles it missed ("\bscarves?\b" never reads "scarf":
+            // 3 of 15 scarves, Me369, 18.11)
+            $feedback = $this->weakTypes($added, $candidate, $gaps, $products, $pictures, $brands);
+            if ($feedback !== []) {
+                $report['corrected'] = $feedback;
+                $proposed = $this->ask($run, $writer, 'schema_writer', 'bank_completion', $input + ['feedback' => ['proposal' => $proposed, 'types_reading_too_little' => $feedback]], self::WRITER_TOKENS, $report);
+                [$candidate, $added, $rejected] = self::merge($before, $proposed);
+            }
             $report['proposal'] = $proposed;
             $report['proposed'] = ['types' => count((array) ($proposed['types'] ?? [])), 'values' => count((array) ($proposed['values'] ?? [])), 'attributes' => count((array) ($proposed['attributes'] ?? []))];
 
@@ -253,7 +263,7 @@ final class CompleteVocabulary
                 continue;
             }
             $changed['product_types'][] = ['key' => (string) $p['key'], 'label' => $label($p), 'patterns' => $patterns($p)];
-            $try($changed, ['kind' => 'type', 'key' => (string) $p['key'], 'label' => 'type '.$p['key'], 'patterns' => $patterns($p)]);
+            $try($changed, ['kind' => 'type', 'key' => (string) $p['key'], 'label' => 'type '.$p['key'], 'patterns' => $patterns($p), 'groups' => array_map('strval', (array) ($p['groups'] ?? []))]);
         }
 
         foreach ((array) ($proposed['values'] ?? []) as $p) {
@@ -423,6 +433,37 @@ final class CompleteVocabulary
         }
 
         return [$audit, $wrong];
+    }
+
+    /**
+     * The new types whose patterns, alone in the bank, read less than half the untyped products of the groups they were
+     * proposed for, each with what it read and up to six titles it missed.
+     *
+     * @return list<array{type: string, patterns: list<string>, read: int, of: int, missed_titles: list<string>}>
+     */
+    private function weakTypes(array $added, VocabularyDefinition $candidate, array $gaps, Collection $products, array $pictures, BrandResolver $brands): array
+    {
+        $byId = $products->keyBy(fn (CatalogProduct $p): string => (string) $p->id);
+        $groups = array_column($gaps['untyped'], 'ids', 'group');
+        $out = [];
+        foreach ($added as $item) {
+            $wanted = [];
+            foreach ((array) ($item['groups'] ?? []) as $group) {
+                array_push($wanted, ...(array) ($groups[mb_strtolower((string) $group)] ?? []));
+            }
+            if ($item['kind'] !== 'type' || $wanted === []) {
+                continue;
+            }
+            $wanted = array_values(array_unique($wanted));
+            [$tagged] = self::alone($item, $candidate, $added, $gaps['read'], $byId, $pictures, $brands);
+            $read = array_intersect($wanted, $tagged);
+            if (count($read) * 2 < count($wanted)) {
+                $out[] = ['type' => $item['key'], 'patterns' => (array) $item['patterns'], 'read' => count($read), 'of' => count($wanted),
+                    'missed_titles' => array_slice(array_values(array_map(fn (string $id): string => (string) ($byId->get($id)?->title ?? ''), array_diff($wanted, $read))), 0, 6)];
+            }
+        }
+
+        return $out;
     }
 
     /**

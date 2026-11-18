@@ -34,6 +34,9 @@ final class BankCompletionTest extends TestCase
     /** @var array<string, mixed>|null what the writer proposes, when a test sets it */
     public ?array $proposal = null;
 
+    /** @var list<array<string, mixed>> what the writer proposes, one after another, when a test sets them */
+    public array $proposals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -71,6 +74,9 @@ final class BankCompletionTest extends TestCase
                 $this->test->asked[] = str_contains($system, 'You complete') ? 'writer' : (str_contains($system, 'were missed') ? 'recall' : 'auditor');
                 if (str_contains($system, 'were missed')) {
                     return new ModelReply(['verdicts' => array_map(fn (array $i): array => ['id' => $i['id'], 'value' => 'none'], (array) (json_decode($user, true)['items'] ?? []))], 1000, 100);
+                }
+                if (str_contains($system, 'You complete') && $this->test->proposals !== []) {
+                    return new ModelReply(array_shift($this->test->proposals), 3000, 800);
                 }
                 if (str_contains($system, 'You complete') && $this->test->proposal !== null) {
                     return new ModelReply($this->test->proposal, 3000, 800);
@@ -153,6 +159,21 @@ final class BankCompletionTest extends TestCase
         $this->assertStringStartsWith('changes or takes what 1 products had', $why['sleeve_type.belted_sleeve'] ?? '', 'what a product had stays as it was');
         $this->assertStringStartsWith('repeats the attribute sleeve_type', $why['attribute sleeve_length'] ?? '');
         $this->assertSame([], $report['added']);
+    }
+
+    public function test_a_type_whose_patterns_miss_the_products_it_was_for_goes_back_to_the_writer_once(): void
+    {
+        $label = fn (string $en): array => ['label_he' => $en, 'label_en' => $en];
+        $type = fn (array $patterns): array => ['types' => [['key' => 'scarf', 'patterns' => $patterns, 'same_as' => '', 'groups' => ['scarf']] + $label('Scarf')], 'values' => [], 'attributes' => []];
+        // "\bscarves?\b" never reads "scarf" (Me369, 18.11)
+        $this->proposals = [$type(['\bscarves?\b']), $type(['\bscar(?:f|ves)\b'])];
+
+        app(CompleteVocabulary::class)->handle($this->shop->id, false, $report);
+
+        $this->assertSame(['writer', 'writer'], array_values(array_filter($this->asked, fn (string $a): bool => $a === 'writer')), 'asked once more, with what its patterns missed');
+        $this->assertSame([['type' => 'scarf', 'patterns' => ['\bscarves?\b'], 'read' => 0, 'of' => 2, 'missed_titles' => ['Sky Silk Scarf', 'River Linen Scarf']]], $report['corrected']);
+        $this->assertContains('type scarf', array_column($report['added'], 'label'));
+        $this->assertSame(0, $report['untyped_after']);
     }
 
     public function test_a_value_that_is_another_under_a_new_name_joins_it(): void
