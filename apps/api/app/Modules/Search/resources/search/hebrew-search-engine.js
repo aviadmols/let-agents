@@ -39,20 +39,31 @@
   var FLOOR = 0.45;
   var RELATIVE_FLOOR = 0.8;
 
+  // The same text is read again and again while the shopper types (the titles of the results, at every letter): each is
+  // read once and kept, up to NORMALIZED texts, then the keeping starts over. Typing on a phone stopped for a moment at
+  // each letter (Rocks, 18.11).
+  var NORMALIZED = 20000, normalized = Object.create(null), normalizedCount = 0;
   function normalize(text) {
-    return karats(dates(String(text == null ? '' : text)
+    var key = String(text == null ? '' : text);
+    var kept = normalized[key];
+    if (kept !== undefined) { return kept; }
+    if (normalizedCount >= NORMALIZED) { normalized = Object.create(null); normalizedCount = 0; }
+    normalizedCount++;
+    return (normalized[key] = karats(dates(key
       .toLowerCase()
       .replace(/[֑-ׇ]/g, '')
       .replace(/[׳״'"`]/g, '')
       .replace(/[ךםןףץ]/g, function (letter) { return FINALS[letter]; })))
       .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .trim();
+      .trim());
   }
 
   // A karat is one thing however it is written: "21 קראט", "21 קארט", "21 karat" and "21 K" are all "21k", as a title's
   // "זהב 21K" is; a whole number only ("0.21 קראט" stays a weight). The same on the server (HebrewSearch::karats); change both.
+  // Only a text with a number before a k or a ק is read by the whole pattern.
   var KARAT = /(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])/gu;
-  function karats(text) { return text.replace(KARAT, '$1$2k'); }
+  var MAY_BE_KARAT = /\d[\s-]*[קkc]/;
+  function karats(text) { return MAY_BE_KARAT.test(text) ? text.replace(KARAT, '$1$2k') : text; }
 
   // A date is one thing however it is written: "7.10", "7/10", "ה-7 באוקטובר", "השביעי באוקטובר" and "שבעה באוקטובר" are
   // all "7 אוקטובר"; a number before a point followed by a measure ("4.5 ממ") is a size. The same on the server
@@ -65,7 +76,11 @@
   var NOT_A_DATE = '(?!\\s*(?:ממ|סמ|מטר|מל|ליטר|קג|גרמ|גר|אינצ|מ|mm|cm|m|kg|g|ml|l|in|x|×|\\*)(?:\\s|$))';
   var DOTTED_DATE = new RegExp('(^|[^\\p{L}\\p{N}.])(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?(?![\\d.])' + NOT_A_DATE, 'gu');
   var SAID_DATE = new RegExp('(^|[^\\p{L}\\p{N}])ה?-?(?:(\\d{1,2})|(' + Object.keys(DAYS).join('|') + '))\\s+[בל]?(' + MONTH_NAMES.join('|') + ')(?![\\p{L}\\p{N}])', 'gu');
+  // the patterns only where a date can be: digits with a point or a slash between them, or a month's name
+  var MAY_BE_DOTTED = /\d[./]\d/;
+  var MAY_BE_SAID = new RegExp(MONTH_NAMES.join('|'));
   function dates(text) {
+    if (!MAY_BE_DOTTED.test(text) && !MAY_BE_SAID.test(text)) { return text; }
     return text
       .replace(DOTTED_DATE, function (all, before, d, m, year) {
         var day = Number(d), month = Number(m), name = MONTH_NAMES.filter(function (k) { return MONTHS[k] === month; })[0];

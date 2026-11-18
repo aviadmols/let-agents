@@ -172,12 +172,26 @@
   }
   // 1 for a product whose name says a word of the search, in any of its forms ("נעלי" of "נעליים", "sandal" of "sandals"),
   // else 0; all 0 when nothing was typed that means something
+  // each word's stem read once for the whole visit: a sort asked it of every title at every comparison, and typing on a
+  // phone stopped for a moment at each letter (Rocks, 18.11)
+  var stems = {};
   function namesSearch(turn) {
-    var E = S.engine, st = function (w) { try { return E && E.stem && E.normalize ? E.stem(E.normalize(w)) : w; } catch (e) { return w; } };
-    var asked = [];
-    meantWords(turn.words || turn.q || '').forEach(function (w) { wordForms(w).forEach(function (f) { asked.push(st(f)); }); });
-    if (!asked.length) { return function () { return 0; }; }
-    return function (r) { return wordsOf(decode(r.title || '')).some(function (w) { return wordForms(w).some(function (f) { return asked.indexOf(st(f)) >= 0; }); }) ? 1 : 0; };
+    var E = S.engine, st = function (w) {
+      if (Object.prototype.hasOwnProperty.call(stems, w)) { return stems[w]; }
+      var s; try { s = E && E.stem && E.normalize ? E.stem(E.normalize(w)) : w; } catch (e) { s = w; }
+      return (stems[w] = s);
+    };
+    var asked = {}, any = false, seen = {};
+    meantWords(turn.words || turn.q || '').forEach(function (w) { wordForms(w).forEach(function (f) { asked[st(f)] = 1; any = true; }); });
+    if (!any) { return function () { return 0; }; }
+    // and each title read once for this search
+    return function (r) {
+      var title = decode(r.title || '');
+      if (!Object.prototype.hasOwnProperty.call(seen, title)) {
+        seen[title] = wordsOf(title).some(function (w) { return wordForms(w).some(function (f) { return asked[st(f)] === 1; }); }) ? 1 : 0;
+      }
+      return seen[title];
+    };
   }
   // search.evidence_filter, as the index says it: the filters read from the words go by how each value was read
   function byEvidence() { return !!(S.config && S.config.evidence); }
@@ -306,7 +320,10 @@
       // ...then what its picture was read as: a high-top named only "UY SK8-Hi" is a shoe by its picture, a flip-flop is not,
       // and comes after it (VANS QA, 17.11)
       var shows = function (r) { return says({ title: tgWords(r) }); };
-      out = out.slice().sort(function (a, b) { return (b.s === 0 ? 0 : 1) - (a.s === 0 ? 0 : 1) || says(b) - says(a) || shows(b) - shows(a) || pure(b) - pure(a) || shade(b) - shade(a) || kind(b) - kind(a); });
+      // each product weighed once, then sorted by its weights (a comparator that weighed it read its words n log n times)
+      out = out.map(function (r, at) { return { r: r, at: at, k: [r.s === 0 ? 0 : 1, says(r), shows(r), pure(r), shade(r), kind(r)] }; })
+        .sort(function (a, b) { for (var i = 0; i < a.k.length; i++) { if (b.k[i] !== a.k[i]) { return b.k[i] - a.k[i]; } } return a.at - b.at; })
+        .map(function (x) { return x.r; });
     }
     // two colours of one model under one name ("Kayla" and "Kayla"): one card, its colours its dots; nothing told them
     // apart (Naot QA, 15.11). Under names of their own ("Julius - BA6 Soft Black") each keeps its card.
