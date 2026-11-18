@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
@@ -26,6 +27,7 @@ use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -154,6 +156,12 @@ final class SearchSettingsPagesTest extends TestCase
         $this->assertSame('none', $this->config()['noAnswer'], 'no details taken and no WhatsApp: only "not found"');
         $this->assertNull($this->config()['leadForm']);
         Features::clearOverride('shoppers.callbacks', $this->shop->id);
+        // the store's privacy policy, for the link beside every consent (Shopify review, 18.11): none known, none linked
+        $this->assertNull($config['privacyUrl']);
+        app(TenantContext::class)->run($this->shop->id, fn () => CatalogContent::query()->create(['type' => 'page', 'external_id' => 'policy-privacy_policy', 'title' => 'Privacy Policy',
+            'url' => 'https://www.gueta.test/policies/privacy-policy', 'body' => 'We keep your details only to answer you.', 'hash' => 'pp']));
+        Cache::flush();
+        $this->assertSame('https://www.gueta.test/policies/privacy-policy', $this->config()['privacyUrl']);
 
         $page->set('data.take_over', false)
             ->set('data.photos', true)

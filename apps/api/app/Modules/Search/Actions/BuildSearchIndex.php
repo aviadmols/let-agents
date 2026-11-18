@@ -34,7 +34,9 @@ use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Search\Support\StoreFamilies;
 use App\Modules\Search\Support\Transliterate;
+use App\Modules\Tenancy\Enums\ShopPlatform;
 use App\Modules\Tenancy\Models\Shop;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 
@@ -224,6 +226,9 @@ final class BuildSearchIndex
      */
     private const DEPICTED = '/^(?:(?:איור|ציור|לוגו|גרפיקה|סמל|כיתוב|כתובת|תמונה|דמות|illustration|drawing|logo|artwork|lettering|text|image|picture)(?:\s+של)?|(?:הדפס|הדפסה|print|printed|graphic)\s+(?:של|of))\s+\S/iu';
 
+    /** A picture's word that says the product's print or pattern, each colour of a model its own (shareModelWords). */
+    private const PRINT_WORDS = '/(?:^|\s)(?:print|printed|pattern|motif|graphic|הדפס|מודפס|דוגמה|דוגמת|גרפי)/iu';
+
     /** A word that only says a product carries something drawn ("לוגו", "הדפס"): its own, whatever is drawn. */
     private const DRAWN_WORDS = '/^(?:איור|ציור|הדפס|הדפסה|לוגו|גרפיקה|סמל|כיתוב|כתובת|תמונה|דמות|טקסט|illustration|drawing|print|logo|graphic|artwork|lettering|text|image|picture)$/iu';
 
@@ -253,15 +258,16 @@ final class BuildSearchIndex
     }
 
     /**
-     * What is only drawn, printed or written on the product, as one text: its picture's words that shown() leaves out.
-     * Null when nothing is.
+     * What is only drawn, printed or written on the product, as one text: its picture's words that shown() leaves out, and
+     * what the describer listed apart as drawn (caption_depicted), whether or not its words say it too: "moon phases" on a
+     * jacket was in its list alone, and "jackets moon" found no moon (Me369 QA, 18.11). Null when nothing is.
      */
     private static function drawn(?RetrievalImage $picture): ?string
     {
         if ($picture === null) {
             return null;
         }
-        $drawn = array_diff(array_map('strval', (array) $picture->caption_words), self::shown($picture));
+        $drawn = [...array_diff(array_map('strval', (array) $picture->caption_words), self::shown($picture)), ...array_filter((array) ($picture->caption_depicted ?? []), 'is_string')];
 
         return $drawn === [] ? null : mb_substr(implode(' ', array_unique(array_filter(array_map('trim', $drawn)))), 0, self::MAX_KEYWORDS);
     }
@@ -451,6 +457,7 @@ final class BuildSearchIndex
                 $items[count($items) - 1]['cl'] = (string) $sibling->label;
             }
             $families[$sibling !== null ? 'store|'.$sibling->group_key : self::familyKey($product)][] = count($items) - 1;
+            $productOf[count($items) - 1] = (string) $product->id;
             $counts['product']++;
             $sized = $sized || $z !== null;
         }
@@ -471,6 +478,7 @@ final class BuildSearchIndex
                 foreach ($members as $i) {
                     $items[$i]['cf'] = $mark.substr(md5((string) $key), 0, 8);
                 }
+                self::shareModelWords($items, $members, $productOf ?? [], $pictures);
             }
         }
 
@@ -866,25 +874,81 @@ final class BuildSearchIndex
     }
 
     /**
-     * The main colour family of each product's picture, by product id: the first word of its description that is a colour
-     * alone (ColorFamily::ofColourWord), from its first picture described.
+     * One model in several colours shares what its pictures say of the model itself: what one colour's picture says (its
+     * sleeves, cut, length, neckline) the others are too, whatever their own picture left out. Me369 QA, 18.11: the green
+     * Martha camisole dress said "sleeveless", the white one only "thin straps", and "white sleeveless dress" missed it.
+     * Never a colour, nor a print or what is drawn on it (each colour's own: one is plain, another printed), and only
+     * words a member does not hold already. Any store, any language: the store's own family of the products, and the
+     * describer's own words.
+     *
+     * @param  list<array<string, mixed>>  $items  the records, changed in place
+     * @param  list<int>  $members  the family's places in $items
+     * @param  array<int, string>  $productOf  product id by place in $items
+     * @param  Collection<array-key, RetrievalImage>  $pictures  by product id
+     */
+    private static function shareModelWords(array &$items, array $members, array $productOf, Collection $pictures): void
+    {
+        $model = [];
+        foreach ($members as $i) {
+            $picture = $pictures->get($productOf[$i] ?? '');
+            if ($picture === null) {
+                continue;
+            }
+            $print = HebrewSearch::normalize((string) (((array) ($picture->caption_pattern ?? []))['name'] ?? ''));
+            foreach (self::shown($picture) as $word) {
+                $word = trim((string) $word);
+                $plain = HebrewSearch::normalize($word);
+                $tokens = array_filter(explode(' ', $plain));
+                if ($plain === '' || ColorFamily::ofColourWord($word) !== null
+                    || array_any($tokens, fn (string $t): bool => HebrewSearch::colorOf($t) !== null || ColorFamily::ofColourWord($t) !== null)
+                    || ($print !== '' && str_contains($plain, $print)) || preg_match(self::PRINT_WORDS, $plain) === 1) {
+                    continue;
+                }
+                $model[$plain] ??= $word;
+            }
+        }
+        if ($model === []) {
+            return;
+        }
+        foreach ($members as $i) {
+            $own = ' '.HebrewSearch::normalize((string) ($items[$i]['kw'] ?? '').' '.(string) ($items[$i]['title'] ?? '')).' ';
+            $missing = array_filter($model, fn (string $word, string $plain): bool => ! str_contains($own, ' '.$plain.' '), ARRAY_FILTER_USE_BOTH);
+            if ($missing !== []) {
+                $items[$i]['kw'] = mb_substr(trim((string) ($items[$i]['kw'] ?? '').' '.implode(' ', $missing)), 0, self::MAX_KEYWORDS);
+            }
+        }
+    }
+
+    /**
+     * The colour families of each product whose variants name none, by product id: every colour its own name says
+     * ("Kinsley Emb Black Wool Jacket" is black, whatever its picture's charcoal), and the main colour its picture shows,
+     * the first word of the picture's description that is a colour alone (ColorFamily::ofColourWord). Me369 QA, 18.11:
+     * the black wool jacket was filed under Grey alone. The store's description is not read: it names the colours of
+     * what goes with the piece too.
      *
      * @param  list<string>  $productIds
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
-    private static function pictureColours(array $productIds): array
+    private static function productColours(array $productIds): array
     {
         $out = [];
         foreach (array_chunk($productIds, 1000) as $ids) {
+            CatalogProduct::query()->whereIn('id', $ids)->get(['id', 'title'])->each(function (CatalogProduct $product) use (&$out): void {
+                foreach (self::colourWordsOf((string) $product->title) as $family) {
+                    $out[(string) $product->id][$family] = $family;
+                }
+            });
+            $pictured = [];
             RetrievalImage::query()->whereIn('product_id', $ids)->whereNotNull('caption_words')->orderBy('id')
-                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out): void {
+                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out, &$pictured): void {
                     $id = (string) $picture->product_id;
-                    if (isset($out[$id])) {
+                    if (isset($pictured[$id])) {
                         return;
                     }
                     foreach ((array) $picture->caption_words as $word) {
                         if (is_string($word) && ($family = ColorFamily::ofColourWord($word)) !== null) {
-                            $out[$id] = $family->value;
+                            $out[$id][$family->value] = $family->value;
+                            $pictured[$id] = true;
 
                             return;
                         }
@@ -892,7 +956,29 @@ final class BuildSearchIndex
                 });
         }
 
-        return $out;
+        return array_map('array_values', $out);
+    }
+
+    /**
+     * The colour families a product's name says, each word or pair of words that is a colour alone ("Black", "Light
+     * Blue", "שחור"), in the order said.
+     *
+     * @return list<string>
+     */
+    private static function colourWordsOf(string $title): array
+    {
+        $words = preg_split('/[\s,|\/()\-–]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $found = [];
+        for ($i = 0; $i < count($words); $i++) {
+            $pair = isset($words[$i + 1]) ? ColorFamily::ofColourWord($words[$i].' '.$words[$i + 1]) : null;
+            $one = $pair ?? ColorFamily::ofColourWord($words[$i]);
+            if ($one !== null) {
+                $found[$one->value] = $one->value;
+                $i += $pair !== null ? 1 : 0;
+            }
+        }
+
+        return array_values($found);
     }
 
     private function variantFacets(array &$facets, string $locale, string $shopId = ''): array
@@ -913,8 +999,9 @@ final class BuildSearchIndex
                 $rows[] = [$variant->product_id, (array) $variant->color_families, $variant->size_key, $variant->in_stock ? 1 : 0];
             });
 
-        // A product whose variants name no colour: the main colour its picture shows, the first colour the describer lists
-        // (caption v8 lists the colours after the kind, the one most of it is first), read in code. Me369, 18.11: 5 of
+        // A product whose variants name no colour: the colours its own name says, and the main colour its picture shows (the
+        // first colour the describer lists: caption v8 lists the colours after the kind, the one most of it first), read in
+        // code (productColours). Me369, 18.11: 5 of
         // 1,185 variants named a colour, the Colour filter held "Pink" alone, and "jackets white" had nothing to filter
         // by. Only where the look matters (search.photo_match "look": no book's cover colour is a filter), and a store with a
         // colour filter of its own (a stone's colour) is left with it. A product with no variants (a simple
@@ -928,7 +1015,7 @@ final class BuildSearchIndex
                         $rows[] = [$product->id, [], null, $product->in_stock ? 1 : 0];
                     }
                 });
-            $main = self::pictureColours(array_values(array_unique(array_map(
+            $main = self::productColours(array_values(array_unique(array_map(
                 fn (array $row): string => (string) $row[0], array_filter($rows, fn (array $row): bool => $row[1] === []),
             ))));
             // a simple product no picture coloured stays out, as before
@@ -936,8 +1023,10 @@ final class BuildSearchIndex
         }
         foreach ($rows as &$row) {
             if ($row[1] === [] && isset($main[(string) $row[0]])) {
-                $row[1] = [$main[(string) $row[0]]];
-                $families[$main[(string) $row[0]]] = true;
+                $row[1] = $main[(string) $row[0]];
+                foreach ($row[1] as $family) {
+                    $families[$family] = true;
+                }
             }
         }
         unset($row);
@@ -1815,6 +1904,14 @@ final class BuildSearchIndex
      */
     private function brandFacet(array &$facets, string $locale): array
     {
+        // A Shopify store's brand is its products' Vendor, where many stores keep their suppliers: a filter only where the
+        // store turns search.vendor_filter on (off by default; Aviad, 18.11: Rocks showed its consignors' names, Aeraj,
+        // Sivan, "לא ידוע", as brands). A WooCommerce store's brand is its own brand field, a real brand (Stanley, Makita).
+        $platform = Shop::query()->whereKey($this->tenant->id())->value('platform');
+        $platform = $platform instanceof ShopPlatform ? $platform : ShopPlatform::tryFrom((string) $platform);
+        if ($platform === ShopPlatform::Shopify && ! Settings::get('search.vendor_filter', $this->tenant->id())) {
+            return [];
+        }
         $byBrand = [];
         $names = [];
         $total = 0;

@@ -213,7 +213,7 @@
     var type = lf.field ? (lf.field.type === 'email' ? 'email' : lf.field.type === 'phone' ? 'tel' : 'text') : 'text';
     return '<form class="ls-form ls-lead-flow" data-lead-flow="' + turn.id + '" novalidate><p class="ls-noanswer__text" style="margin:0"' + (lf.error ? ' role="alert"' : '') + '>' + esc(said) + '</p>' +
       (lf.state === 'field' ? '<div class="ls-input"><input name="v" type="' + type + '" maxlength="200" dir="auto" aria-label="' + esc(lf.field.label || '') + '" placeholder="' + esc(lf.field.label || '') + '"' + (lf.error ? ' aria-invalid="true"' : '') + '></div>' : '') +
-      (lf.state === 'consent' ? '<label class="ls-check-row"><input type="checkbox" name="consent"><span>' + esc(lf.consentText) + '</span></label>' : '') +
+      (lf.state === 'consent' ? '<label class="ls-check-row"><input type="checkbox" name="consent"><span>' + esc(lf.consentText) + privacyLink() + '</span></label>' : '') +
       '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary ls-btn--sm"' + (lf.busy ? ' disabled' : '') + '>' + esc(lf.state === 'consent' ? bankLabel('lead_finish', t('leadSend')) : bankLabel('lead_next', t('leadSend'))) + '</button>' +
       '<button type="button" class="ls-btn ls-btn--link" data-lead-flow-no="' + turn.id + '">' + esc(bankLabel('lead_no', t('leadNo'))) + '</button></div></form>';
   }
@@ -408,7 +408,7 @@
       '<div class="ls-input"><label for="lq-' + turn.id + '">' + esc(t('leadQuestion')) + '</label><textarea id="lq-' + turn.id + '" name="question" rows="2" dir="auto"' + (e.question ? ' aria-invalid="true" aria-describedby="lqe-' + turn.id + '"' : '') + '>' + esc(turn.lq != null ? turn.lq : q || '') + '</textarea>' + (e.question ? '<span class="ls-input__err" id="lqe-' + turn.id + '">' + esc(t('leadNeedQuestion')) + '</span>' : '') + '</div>' +
       '<div class="ls-input"><label for="ln-' + turn.id + '">' + esc(t('name')) + '</label><input id="ln-' + turn.id + '" name="name" autocomplete="name" value="' + esc(turn.ln || '') + '"' + (e.name ? ' aria-invalid="true" aria-describedby="lne-' + turn.id + '"' : '') + '>' + (e.name ? '<span class="ls-input__err" id="lne-' + turn.id + '">' + esc(t('leadNeedName')) + '</span>' : '') + '</div>' +
       '<div class="ls-input"><label for="lc-' + turn.id + '">' + esc(t('contact')) + '</label><input id="lc-' + turn.id + '" name="contact" autocomplete="tel" inputmode="email" dir="ltr" style="text-align:' + (DIR === 'rtl' ? 'right' : 'left') + '" value="' + esc(turn.lc || '') + '"' + (e.contact ? ' aria-invalid="true" aria-describedby="lce-' + turn.id + '"' : '') + '>' + (e.contact ? '<span class="ls-input__err" id="lce-' + turn.id + '">' + esc(t('leadBadContact')) + '</span>' : '') + '</div>' +
-      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
+      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(t('consent')) + privacyLink() + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
       (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
       '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary">' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
   }
@@ -459,7 +459,7 @@
       (form.title ? '<p class="ls-noanswer__text" style="margin:0;font-weight:500">' + esc(form.title) + '</p>' : '') +
       '<div class="ls-input"><label for="' + id('q') + '">' + esc(t('leadQuestion')) + '</label><textarea id="' + id('q') + '" name="question" rows="2" dir="auto"' + (e.question ? ' aria-invalid="true"' : '') + '>' + esc(turn.lq != null ? turn.lq : q || '') + '</textarea>' + (e.question ? '<span class="ls-input__err">' + esc(t('leadNeedQuestion')) + '</span>' : '') + '</div>' +
       fields +
-      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(form.consent || t('consent')) + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
+      '<label class="ls-check-row"><input type="checkbox" name="consent"' + (turn.lk ? ' checked' : '') + (e.consent ? ' aria-invalid="true"' : '') + '><span>' + esc(form.consent || t('consent')) + privacyLink() + (e.consent ? '<br><span class="ls-input__err">' + esc(t('leadNeedConsent')) + '</span>' : '') + '</span></label>' +
       (turn.leadErr ? '<span class="ls-input__err">' + esc(t('leadError')) + '</span>' : '') +
       '<div class="ls-form__actions"><button class="ls-btn ls-btn--primary"' + (turn.leadBusy ? ' disabled' : '') + '>' + esc(t('leadSend')) + '</button><button type="button" class="ls-btn ls-btn--link" data-lead-no="' + turn.id + '">' + esc(t('leadNo')) + '</button></div></form>';
   }

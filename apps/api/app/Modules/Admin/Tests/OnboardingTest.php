@@ -146,6 +146,37 @@ final class OnboardingTest extends TestCase
         $this->assertSame(1, $scan->started);
     }
 
+    public function test_coming_back_from_the_theme_editor_opens_where_the_merchant_left_off_and_never_scans_again(): void
+    {
+        // Shopify review, 18.11: step 3's "Turn on in your theme" sent the merchant to the theme editor; back in the app it
+        // opened at step 2, "We found your store. Is this right?", and the scan had to be started again
+        $shop = Shop::factory()->onboarding()->create(['platform' => ShopPlatform::Shopify]);
+        $this->as($shop);
+        $scan = new OnboardingTestScan;
+        $this->app->instance(ShopScan::class, $scan);
+
+        Livewire::test(Onboarding::class)->assertSet('step', 2)->call('confirm')->assertSet('step', 3);
+        $this->assertSame(1, $scan->started);
+        $scan->progress = ['finished' => true, 'parts' => []];
+
+        // the app opened again, as coming back from the theme editor opens it
+        Livewire::test(Onboarding::class)->assertSet('step', 3);
+        $this->assertSame(1, $scan->started, 'no scan again');
+
+        // its scan gone (a store read anew), step 3 has nothing to show: where a store starts, as before
+        $scan->progress = null;
+        Livewire::test(Onboarding::class)->assertSet('step', 2);
+        $scan->progress = ['finished' => true, 'parts' => []];
+
+        // "Continue" pressed: the first steps from then on
+        Livewire::test(Onboarding::class)->call('toFirstSteps')->assertSet('step', 4);
+        Livewire::test(Onboarding::class)->assertSet('step', 4);
+
+        // another store that never started: its first step, as before
+        $this->as(Shop::factory()->onboarding()->create(['platform' => ShopPlatform::Shopify]));
+        Livewire::test(Onboarding::class)->assertSet('step', 2);
+    }
+
     public function test_finishing_sets_the_shop_up_and_its_panel_opens_on_the_home_from_then_on(): void
     {
         $shop = Shop::factory()->onboarding()->create();
@@ -257,9 +288,12 @@ final class OnboardingTestScan implements ShopScan
 {
     public int $started = 0;
 
+    /** @var array{finished: bool, parts: array<string, string>}|null what a scan begun would show */
+    public ?array $progress = null;
+
     public function progress(Shop $shop): ?array
     {
-        return null;
+        return $this->progress;
     }
 
     public function start(Shop $shop): bool

@@ -31,7 +31,7 @@ final class CodeReading
      * How sure each source is: the store's own fields (its type, tags, attributes), then the
      * title, then the start of the description, then what a model saw in the picture.
      */
-    public const CONFIDENCE = ['category' => 0.95, 'variant' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8, 'image' => 0.7];
+    public const CONFIDENCE = ['category' => 0.95, 'variant' => 0.95, 'store_type' => 0.95, 'field' => 0.95, 'title' => 0.9, 'description' => 0.8, 'image' => 0.7];
 
     /** The vocabulary attributes the variants answer: the colour a product is sold in, and its pattern. */
     private const VARIANT_COLOUR_KEYS = ['color', 'colour', 'colors', 'colours'];
@@ -70,9 +70,15 @@ final class CodeReading
 
         $text = $readText && $vocabulary !== null ? self::texts($product) + ['image' => (string) $picture] : null;
 
-        // No category gives it: the store's own type field, then the title, when exactly one type fits.
+        // No category gives it: the store's own product type alone, then its fields (type, categories, tags, attributes), then
+        // the title, when exactly one type fits. The store's own type comes first and alone: "Dresses" beside the tags
+        // "Kimono" and "dress" fitted two types together, and 27 of Me369's dresses had none (18.11).
         if ($text !== null && $type === null && ! self::categoryNamesAnotherType($vocabulary, $categories)) {
-            foreach (['field', 'title'] as $source) {
+            $text['store_type'] = trim((string) ($product->payload['product_type'] ?? ''));
+            foreach (['store_type', 'field', 'title'] as $source) {
+                if ($text[$source] === '') {
+                    continue;
+                }
                 $fits = array_values(array_filter($vocabulary->productTypes(), fn (array $t): bool => self::find($text[$source], (array) ($t['patterns'] ?? [])) !== null));
                 if (count($fits) === 1) {
                     [$type, $typeSource] = [$fits[0]['key'], $source];
@@ -168,6 +174,49 @@ final class CodeReading
             $patterns = [];
             foreach ((array) ($attribute['values'] ?? []) as $value) {
                 $patterns[(string) $value['key']] = (array) ($value['patterns'] ?? []);
+            }
+
+            // A choice that may hold several (stones, colours, prints) takes what the store's fields, the title and the
+            // description each name, together, every value with the source it came from: "קורל, אוניקס ופנינים" in a
+            // title and "ספיר" in its description are four stones, not the title's three (Aviad, 18.11: the name and the
+            // description both go into the tags). The picture is read only when none of them names one.
+            if ($vocabulary->isMultiple($key)) {
+                $union = [];
+                $by = [];
+                foreach (self::sources($vocabulary, $key) as $source) {
+                    if ($source === 'image' && $union !== []) {
+                        break;
+                    }
+                    $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
+                    foreach ((array) ($attribute['values'] ?? []) as $value) {
+                        $valueKey = (string) $value['key'];
+                        if (isset($union[$valueKey])) {
+                            continue;
+                        }
+                        $quote = self::find($read, (array) ($value['patterns'] ?? []));
+                        if ($quote === null) {
+                            continue;
+                        }
+                        if (($text['colours'] ?? null) !== null && $source !== 'field' && in_array($key, self::VARIANT_COLOUR_KEYS, true)
+                            && self::find((string) $text['colours'], (array) ($patterns[$valueKey] ?? [])) === null) {
+                            continue;
+                        }
+                        $union[$valueKey] = $quote;
+                        $by[$valueKey] = $source;
+                    }
+                    // What the store's own fields name is the whole list: its "זהב צהוב" is not joined by the title's
+                    // bare "זהב", nor by a metal its description speaks of in passing (Rocks, 18.11: "gold" beside
+                    // "yellow gold" on 1,979 products). The title and the description are read together only where the
+                    // fields name none.
+                    if ($source === 'image' || ($source === 'field' && $union !== [])) {
+                        break;
+                    }
+                }
+                if ($union !== []) {
+                    $out[$key] = ['values' => array_keys($union), 'source' => (string) reset($by), 'quote' => implode(' · ', array_unique(array_values($union))), 'by' => $by];
+                }
+
+                continue;
             }
 
             foreach (self::sources($vocabulary, $key) as $source) {

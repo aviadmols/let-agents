@@ -153,7 +153,11 @@
     var turn = turnOf(el);
     // left the page through one of the products a turn showed (a search's, an answer's, similar products): the next
     // opening comes back to that turn, as it was shown, at that product
-    var left = el.tagName === 'A' && !el.dataset.heart ? el.closest('[data-card]') : null;
+    // (an answer's picks are no cards: each is known by its [data-after]; left through one, the answer was never come
+    // back to: Rocks, 18.11)
+    var leftPick = el.tagName === 'A' && !el.dataset.heart && !el.closest('[data-card]') ? el.closest('.ls-pick') : null;
+    var pickAfter = leftPick ? leftPick.querySelector('[data-after]') : null;
+    var left = el.tagName === 'A' && !el.dataset.heart ? el.closest('[data-card]') || (pickAfter ? { dataset: { card: pickAfter.dataset.after } } : null) : null;
     if (turn && left) { keepBackTo(turn, left.dataset.card); }
     if (!turn || !turn.q) { return null; }
     var card = el.closest('[data-card]'), pick = el.closest('.ls-pick'), after = pick && pick.querySelector('[data-after]');

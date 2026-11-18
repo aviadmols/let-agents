@@ -249,7 +249,8 @@
       // its title, its words and its tags, as the search reads them ("חטופים", a tag of Omer Shem Tov's book)
       // a tag is [its words, how central], read for its words
       var tags = Array.isArray(r.tg) ? r.tg.map(function (t) { return Array.isArray(t) ? t[0] : t; }).join(' ') : String(r.tg || '');
-      var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '') + ' ' + tags).split(' ').filter(Boolean);
+      // and what is drawn or printed on it (dw): a word chip "moon" holds the dress with a moon print
+      var set = {}, list = S.engine.normalize(decode(r.title || '') + ' ' + (r.kw || '') + ' ' + tags + ' ' + (r.dw || '')).split(' ').filter(Boolean);
       list.forEach(function (w) { wordForms(w).forEach(function (f) { set[f] = 1; }); });
       r._wf = set;
       r._ww = list;

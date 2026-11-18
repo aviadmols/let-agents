@@ -84,6 +84,32 @@ final class AnswerCheckTest extends TestCase
         $this->assertSame('check_unfixed', $long['refusal'], 'a "fix" much longer than the answer adds what was not there: not taken');
     }
 
+    public function test_a_detail_left_out_stops_nothing_when_the_setting_is_on(): void
+    {
+        // Fashion (Naot, 18.11): a right return answer taken apart only for "incomplete" sentences, so nothing was left.
+        $answer = 'כדי להחזיר מוצר צריך קודם מספר אישור החזרה מהצוות. אפשר להחזיר עד 30 יום מהרכישה.';
+        $check = ['decision' => 'revise', 'revised' => '', 'issues' => [
+            ['text' => 'כדי להחזיר מוצר צריך קודם מספר אישור החזרה מהצוות', 'kind' => 'incomplete', 'severity' => 'major'],
+            ['text' => 'אפשר להחזיר עד 30 יום מהרכישה', 'kind' => 'incomplete', 'severity' => 'major'],
+        ]] + self::SAFE;
+
+        $on = AnswerSiteQuestion::applyCheck($check, $answer, [], true);
+        $off = AnswerSiteQuestion::applyCheck($check, $answer, [], false);
+
+        $this->assertSame([$answer, null, 'kept', 'approve'], [$on['answer'], $on['refusal'], $on['verdict'], $on['decision']]);
+        $this->assertCount(2, $on['issues'], 'still logged');
+        $this->assertSame('check_unfixed', $off['refusal'], 'off: as before');
+
+        // beside a real issue, only the real one's sentence goes; a reject for "incomplete" alone stands as approved
+        $mixed = AnswerSiteQuestion::applyCheck(['decision' => 'revise', 'revised' => '', 'issues' => [
+            ['text' => 'כדי להחזיר מוצר צריך קודם מספר אישור החזרה מהצוות', 'kind' => 'incomplete', 'severity' => 'major'],
+            ['text' => 'אפשר להחזיר עד 30 יום מהרכישה', 'kind' => 'contradiction', 'severity' => 'major'],
+        ]] + self::SAFE, $answer, [], true);
+        $this->assertSame('כדי להחזיר מוצר צריך קודם מספר אישור החזרה מהצוות.', $mixed['answer']);
+        $rejected = AnswerSiteQuestion::applyCheck(['decision' => 'reject', 'issues' => [['text' => 'x', 'kind' => 'incomplete', 'severity' => 'critical']]] + self::SAFE, $answer, self::picks('p1'), true);
+        $this->assertSame([$answer, 1], [$rejected['answer'], count($rejected['picks'])]);
+    }
+
     public function test_a_material_issue_without_a_fix_takes_out_only_its_sentence(): void
     {
         // Food: the delivery time is right, "always free" is said nowhere.

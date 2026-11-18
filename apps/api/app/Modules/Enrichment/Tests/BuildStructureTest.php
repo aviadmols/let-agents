@@ -108,6 +108,18 @@ final class BuildStructureTest extends TestCase
         $this->assertSame('whole_catalog_vocabulary', $run->output['skipped']);
     }
 
+    public function test_a_vocabulary_whose_root_category_the_store_no_longer_has_is_retired(): void
+    {
+        // sellameir, 18.11: its root category was renumbered, its vocabulary read no product, and its filters were empty
+        $gone = ['root_category_external_id' => 'no-such-category', 'key' => 'branch_gone'] + (array) ImportVocabulary::template('jewelry');
+        app(ImportVocabulary::class)->handle($this->shop->id, $gone, 'test');
+
+        $run = app(BuildStructure::class)->handle($this->shop->id);
+
+        $this->assertSame(['branch_gone'], $run->output['retired'] ?? null);
+        $this->assertFalse((bool) $this->inShop(fn () => EnrichmentVocabulary::query()->where('key', 'branch_gone')->value('active')));
+    }
+
     public function test_the_structure_command_the_first_scan_runs_reaches_the_action(): void
     {
         $this->replies = [...$this->branchReplies('pendant', 'תליון', '^\s*תליו(?:ן|נים)'), ...$this->branchReplies('ring', 'טבעת', '^\s*טבע(?:ת|ות)')];

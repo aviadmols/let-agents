@@ -86,8 +86,8 @@ final class AnswerBatchWithModel
             }
 
             $run->usage($provider->value, $model, $reply->inputTokens, $reply->outputTokens, 0, $reply->costUsd(
-                ReadingPrices::input($batch->task),
-                ReadingPrices::output($batch->task),
+                ReadingPrices::input($batch->task, (int) $batch->review_tier),
+                ReadingPrices::output($batch->task, (int) $batch->review_tier),
             ));
             $counts['asked']++;
 

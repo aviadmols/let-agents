@@ -9,6 +9,7 @@ enum AiProviderName: string
     case Gemini = 'gemini';
     case Replicate = 'replicate';
     case Voyage = 'voyage';
+    case Xai = 'xai';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum AiProviderName: string
             self::Gemini => 'Google (Gemini)',
             self::Replicate => 'Replicate (images)',
             self::Voyage => 'Voyage AI (embeddings)',
+            self::Xai => 'xAI (Grok)',
         };
     }
 

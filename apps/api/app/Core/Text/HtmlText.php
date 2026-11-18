@@ -144,22 +144,29 @@ final class HtmlText
     /** One table's rows as "| a | b |", the header row first and marked; an empty table is nothing. */
     private static function table(string $inner): string
     {
-        preg_match_all('#<tr\b[^>]*>(.*?)</tr\s*>#isu', $inner, $rows);
+        // A row is what stands between row tags, so one whose <tr> or </tr> the editor dropped is still a row of its
+        // own (Gueta's shipping table: "</tr><td>הובלה…</td>…</tr>"), never lost or run into the next.
+        $rows = preg_split('#<tr\b[^>]*>|</tr\s*>#iu', $inner) ?: [$inner];
         $lines = [];
         $header = false;
+        $i = 0;
 
-        foreach ($rows[1] as $i => $row) {
+        foreach ($rows as $row) {
             preg_match_all('#<(t[hd])\b[^>]*>(.*?)</t[hd]\s*>#isu', $row, $cells, PREG_SET_ORDER);
             $values = array_map(fn (array $c): string => self::cell($c[2]), $cells);
 
             if ($values === [] || implode('', $values) === '') {
+                if ($values !== []) {
+                    $i++;
+                }
+
                 continue;
             }
 
             $lines[] = '| '.implode(' | ', $values).' |';
 
             // The first row is the header when it is all <th>: the line under it says so.
-            if ($i === 0 && count($cells) === count(array_filter($cells, fn (array $c): bool => strtolower($c[1]) === 'th'))) {
+            if ($i++ === 0 && count($cells) === count(array_filter($cells, fn (array $c): bool => strtolower($c[1]) === 'th'))) {
                 $lines[] = '|'.str_repeat(' --- |', count($values));
                 $header = true;
             }

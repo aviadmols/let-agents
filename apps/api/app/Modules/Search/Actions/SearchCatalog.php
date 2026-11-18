@@ -403,6 +403,14 @@ final class SearchCatalog
                     continue;
                 }
                 $tried = $this->searchOnce($shopId, $word, $only, false, $perGroup, false);
+                // the products this one word finds that hold the rest printed on them or in their own words ("jackets moon":
+                // the jacket printed with moons among the jackets) are the search itself, whichever word is tried first
+                $rest = $words;
+                unset($rest[$at]);
+                $whole = self::printedOf(['left' => array_values($rest), 'query' => $word, 'result' => $tried], $index['records'], array_values($bound));
+                if ($whole !== null) {
+                    return $whole;
+                }
                 $count = max((int) ($tried['counts']['product'] ?? 0), (int) ($tried['total'] ?? 0));
                 // said in so many letters by the first it found, never a word that only looks like it ("אדמים": "אדם")
                 $top = $index['records'][(string) ($tried['groups']['product'][0]['id'] ?? '')] ?? null;
@@ -445,7 +453,7 @@ final class SearchCatalog
         // A word left out that the products found carry printed or drawn on them (dw: "jackets moon", a jacket printed with
         // moons): those products are what was asked, with nothing said left out (Me369 QA, 18.11: "without moon" over the moon
         // jacket). The search's kind still came from their own words; a drawing never makes a product of the kind it shows.
-        $printed = self::printedOf($first, $index['records']);
+        $printed = self::printedOf($first, $index['records'], array_values($bound));
         if ($printed !== null) {
             return $printed;
         }
@@ -465,25 +473,36 @@ final class SearchCatalog
     }
 
     /**
-     * The loosened search's products that carry every word left out printed or drawn on them (their picture's dw), as the
-     * whole result with no word left out; null when none does.
+     * The loosened search's products that hold every word left out after all, as the whole result with no word left out;
+     * null when none does. A word is held in any of its forms ("jackets" for "Jacket") in the product's own name and words,
+     * or printed or drawn on it (its picture's dw: "moon" on the jacket printed with moons), except a word that names a
+     * kind of product ($kinds): that only by the product's own words, never by a drawing ("נעלי משבצות" is no T-shirt with
+     * a checkered shoe on it).
      *
      * @param  array{left: list<string>, query: string, result: array<string, mixed>}  $loose
      * @param  array<string, array<string, mixed>>  $records
+     * @param  list<string>  $kinds  the words of the search that name a kind, a price or whom it is for
      * @return array<string, mixed>|null
      */
-    private static function printedOf(array $loose, array $records): ?array
+    private static function printedOf(array $loose, array $records, array $kinds = []): ?array
     {
         $left = array_values(array_filter(array_map(fn (string $w): string => HebrewSearch::normalize($w), $loose['left']),
             fn (string $w): bool => mb_strlen($w) >= 3 && ! HebrewSearch::saysNothing($w)));
         if ($left === []) {
             return null;
         }
+        $kinds = array_flip(array_map(fn (string $w): string => HebrewSearch::normalize($w), $kinds));
         $result = $loose['result'];
-        $carries = function (string $id) use ($records, $left): bool {
-            $drawn = (string) ($records[$id]['dw'] ?? '');
+        $holds = function (string $text, string $w): bool {
+            $forms = array_flip(array_map(fn (string $t): string => HebrewSearch::formKey($t), array_filter(explode(' ', $text))));
 
-            return $drawn !== '' && array_all($left, fn (string $w): bool => HebrewSearch::holdsAny($drawn, [$w]));
+            return isset($forms[HebrewSearch::formKey($w)]) || HebrewSearch::holdsAny($text, [$w]);
+        };
+        $carries = function (string $id) use ($records, $left, $kinds, $holds): bool {
+            $own = HebrewSearch::normalize((string) ($records[$id]['title'] ?? '').' '.(string) ($records[$id]['kw'] ?? ''));
+            $drawn = HebrewSearch::normalize((string) ($records[$id]['dw'] ?? ''));
+
+            return array_all($left, fn (string $w): bool => $holds($own, $w) || (! isset($kinds[$w]) && $drawn !== '' && $holds($drawn, $w)));
         };
         $ids = array_values(array_filter(array_map('strval', (array) ($result['ids'] ?? [])), fn (string $id): bool => str_starts_with($id, 'p:') && $carries($id)));
         if ($ids === []) {

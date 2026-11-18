@@ -77,9 +77,9 @@ class DrawerFiltersTest extends TestCase
         // the store's tags narrow together, and each is counted within what the others show: Sandals chosen, Organic
         // counts the one sandal that is organic, never every organic product; chosen, the two together show that one
         $this->assertSame([1, ['Arthur']], self::drawer("(function () { var x = turn('', [1, 6, 7, 9], { f: { 2000: true } }); var w = T.wouldCounts(x, x.ids.map(function (i) { return S.records[i]; })); var y = turn('', [1, 6, 7, 9], { f: { 2000: true, 2003: true } }); return [w.counts[2003], titles(y)]; })()"));
-        // in the sheet a value that would show nothing stays in its place, counted 0 (greyed), never taken out from under
-        // the finger, nor a new one brought in
-        $this->assertSame([true, 0], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001]]; })()"));
+        // in the sheet a value that would show nothing is not offered, never a greyed "(0)" (Aviad, 18.11); the values
+        // chosen stay, each in its place, so they can be taken off
+        $this->assertSame([false, 0, true, true], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001], fc.codes.indexOf(2000) >= 0, fc.codes.indexOf(2003) >= 0]; })()"));
     }
 
     public function test_a_sets_count_in_the_answer_is_the_cards_it_shows(): void
@@ -182,6 +182,36 @@ class DrawerFiltersTest extends TestCase
         // Miss Nori, 16.11: "מחנסים אדומים" showed the red trousers and said "מחנסים is not on the site"
         $left = self::drawer("(function () { var list = [{ title: 'שורטס הארט | בז/אדום', kw: 'מכנסיים קצרים אדום מכנסי מכנס' }, { title: 'מכנסי מיה | בורדו', kw: 'מכנסיים בורדו' }]; return [T.unsaid('מחנסים אדומים', list, [], []), T.unsaid('מכנסיים ירוקים', list, [], [])]; })()");
         $this->assertSame([[], ['ירוקים']], $left, 'ח as כ is the same word; a colour none says is still said missing');
+    }
+
+    public function test_what_is_drawn_on_a_product_is_said_by_it(): void
+    {
+        // Me369, 18.11: "dress MOON" showed the dress whose pocket reads "FLY ME TO THE MOON" and said "without moon"
+        $left = self::drawer("(function () { var list = [{ title: 'Nova Kimono Magic Dress', kw: 'dress kimono black', dw: 'moon and stars sun butterfly' }]; return [T.unsaid('dress moon', list, [], []), T.unsaid('dress unicorn', list, [], [])]; })()");
+        $this->assertSame([[], ['unicorn']], $left, 'the moon drawn on it is said; a unicorn none shows is still missing');
+    }
+
+    public function test_a_product_its_page_says_is_sold_out_is_drawn_sold_out_and_left_out_of_in_stock(): void
+    {
+        // Shopify review, 18.11: the admin counted "The 3p Fulfilled Snowboard" in stock, its page said "Sold out"; with
+        // "In stock" on it was shown, offered to add, and the press only opened its page
+        $got = self::drawer("(function () { S.records['p:20'] = P(20, 'The 3p Fulfilled Snowboard', { buy: 1, url: 'https://s.test/products/3p' }); S.records['p:21'] = P(21, 'The Complete Snowboard', { buy: 1 });
+            S.products['20'] = { is_in_stock: false }; S.products['21'] = { is_in_stock: true }; T.liveStock(['p:20', 'p:21']);
+            var x = turn('snowboard', [20, 21], { stock: true });
+            var out = T.buyBtn(S.records['p:20'], '');
+            return [titles(x), out.indexOf('data-add') < 0 && /data-similar|disabled/.test(out), T.buyBtn(S.records['p:21'], '').indexOf('data-add') >= 0]; })()");
+        $this->assertSame([['The Complete Snowboard'], true, true], $got, 'out of "In stock"; before any press never offered to add (its like in stock instead, or sold out); the one in stock still adds');
+    }
+
+    public function test_every_consent_to_keep_details_links_the_stores_privacy_policy_when_it_is_known(): void
+    {
+        // Shopify review, 18.11: the form took a name and a phone or an email with a consent box, and no privacy policy beside it
+        $got = self::drawer("(function () { var none = T.privacyLink(); S.config.privacyUrl = 'https://s.test/policies/privacy-policy'; var link = T.privacyLink(); S.config.privacyUrl = 'javascript:alert(1)'; return [none, link, T.privacyLink()]; })()");
+        $this->assertSame('', $got[0], 'none known, none linked');
+        $this->assertStringContainsString('href="https://s.test/policies/privacy-policy"', $got[1]);
+        $this->assertStringContainsString('Privacy policy', $got[1]);
+        $this->assertStringContainsString('target="_blank"', $got[1], 'opens apart: the form keeps what was typed');
+        $this->assertSame('', $got[2], 'only a web address');
     }
 
     public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void

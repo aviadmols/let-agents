@@ -11,18 +11,19 @@ use App\Modules\Enrichment\Enums\TaskType;
  */
 final class ReadingPrices
 {
-    public static function role(TaskType $task): string
+    /** A review of what the first reviewer was unsure of (tier 2) is the stronger model's, at its own price. */
+    public static function role(TaskType $task, int $tier = 1): string
     {
-        return $task === TaskType::FactReview ? 'reviewer' : 'reader';
+        return $task === TaskType::FactReview ? ($tier >= 2 ? 'escalation' : 'reviewer') : 'reader';
     }
 
-    public static function input(TaskType $task): float
+    public static function input(TaskType $task, int $tier = 1): float
     {
-        return (float) Settings::get('enrichment.'.self::role($task).'_input_usd_per_million');
+        return (float) Settings::get('enrichment.'.self::role($task, $tier).'_input_usd_per_million');
     }
 
-    public static function output(TaskType $task): float
+    public static function output(TaskType $task, int $tier = 1): float
     {
-        return (float) Settings::get('enrichment.'.self::role($task).'_output_usd_per_million');
+        return (float) Settings::get('enrichment.'.self::role($task, $tier).'_output_usd_per_million');
     }
 }

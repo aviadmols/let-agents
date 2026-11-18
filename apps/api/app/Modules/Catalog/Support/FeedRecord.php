@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalog\Support;
 
+use App\Core\Text\ShortcodeText;
 use Illuminate\Support\Carbon;
 use Throwable;
 
@@ -133,6 +134,12 @@ final class FeedRecord
         ksort($terms, SORT_STRING);
         $record['terms'] = $terms;
         unset($record['hash']);
+        // a page builder's shortcodes left in the text are read out of it; the hash changes only where they were
+        foreach (['text', 'excerpt'] as $field) {
+            if (is_string($record[$field] ?? null)) {
+                $record[$field] = ShortcodeText::readable($record[$field]);
+            }
+        }
 
         return [
             'type' => self::limit((string) ($record['type'] ?? 'post'), 40),

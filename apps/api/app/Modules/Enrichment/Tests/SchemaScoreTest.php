@@ -9,6 +9,7 @@ use App\Modules\Admin\Models\User;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\AdvanceSchemaProposal;
 use App\Modules\Enrichment\Actions\DiscoverSchema;
 use App\Modules\Enrichment\Actions\ProposeSchema;
@@ -18,6 +19,7 @@ use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BranchPlan;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
+use App\Modules\Retrieval\Models\RetrievalImage;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -101,6 +103,35 @@ final class SchemaScoreTest extends TestCase
         $this->assertSame(70, $this->proposal->score);
         $this->assertNull($this->proposal->hard_failures);
         $this->assertStringContainsString('70', $run->summary());
+    }
+
+    public function test_the_pilot_reads_a_product_with_what_its_picture_says_as_the_scan_does(): void
+    {
+        // Me369, 18.11: a clothing store's sleeves, necklines and colours are in its pictures. The pilot read products
+        // without them, found sleeve type on 8 of 40, and the vocabulary was held at 35 of 50 with no filter at all.
+        $this->inShop(function (): void {
+            $ring = CatalogProduct::query()->where('external_id', '3')->sole();
+            RetrievalImage::query()->create(['product_id' => $ring->id, 'external_id' => '3', 'title' => 'x', 'image_url' => 'https://x.test/3.jpg',
+                'url_hash' => 'p3', 'caption' => 'טבעת סוליטר עדינה.', 'caption_words' => ['טבעת', 'זהב צהוב', 'זהוב'], 'captioned_at' => now()]);
+        });
+
+        $scored = app(ScoreSchemaProposal::class)->measure($this->proposal);
+
+        $this->assertSame(['metal' => 3, 'certificate' => 0], $scored['parts']['pilot']['found'], 'the metal its picture shows counts, as the scan will read it');
+        $this->assertSame(15.0, $scored['parts']['fill'], '3 of 8 asked');
+    }
+
+    public function test_a_thing_left_out_in_every_round_of_writing_is_one_thing_left_out(): void
+    {
+        // Me369, 18.11: the size attribute was left out in each of three rounds, and cost the form three times.
+        $this->proposal->update(['problems' => [
+            'tryon: only false belongs on the vocabulary',
+            'attribute size: attributes[0].values[2].key must be snake_case',
+            'attribute size: attributes[0].values[2].key must be snake_case',
+            'attribute size: attributes[0].values[3].key must be snake_case',
+        ]]);
+
+        $this->assertSame(10.5, app(ScoreSchemaProposal::class)->measure($this->proposal->refresh())['parts']['form'], 'two things left out: 15 x (1 - 2 x 0.15)');
     }
 
     public function test_the_gate_waits_for_the_pass_score_the_shops_say_so_and_no_hard_failure(): void

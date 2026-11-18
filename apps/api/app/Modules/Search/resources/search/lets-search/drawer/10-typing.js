@@ -60,7 +60,7 @@
       // only what reads as a question: letters struck at random, a few letters, or words that found nothing ("ווכמקן",
       // "חולצה" in a hardware store) wait for the shopper's own press, as before (as Aviad asked, 17.11)
       if (!asksInWords(q)) { return; }
-      var card = askCardFor(q), btn = !card ? SUG.querySelector('.ls-askcard__btn[data-ask], [data-ask-pending]') : null;
+      var card = askCardFor(q), btn = !card ? SUG.querySelector('.ls-nomatch__btn[data-ask], .ls-askcard__btn[data-ask], [data-ask-pending]') : null;
       if (!card && !btn) { return; }
       restAsked++;
       try { win.sessionStorage.setItem('ls_rest_asks', String(restAsks() + 1)); } catch (e) { /* counted in memory */ }
@@ -159,6 +159,9 @@
       lv.singleBy = lv.single ? d.single.by : null;
       lv.content = ((d.groups && d.groups.content) || []).slice(0, contentShown(ids.length)); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
       lv.actions = d.actions || [];
+      // the first results' stock as their pages say it, read in the background: one sold out there turns "Sold out" and
+      // leaves "In stock" as soon as it is known, while typing too (Shopify review, 18.11)
+      products(ids.slice(0, 8)).then(function () { if (S.live === lv) { refresh(lv); } });
       // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet
       // (it often finds what the store calls by another word). "No results" only once both found nothing.
       // The meaning pass follows every search of three letters or more: the index first, then the meaning (as
@@ -302,11 +305,8 @@
   // action, a solid button that sends it to the store's AI. The AI runs only when the shopper asks (the button, or Enter
   // on it as the selected option); nothing is asked on its own, so no search spends anything. act: the button's data-*.
   function askCard(q, active, act) {
-    return '<div class="ls-askcard"><p class="ls-askcard__kicker"><span class="ls-askcard__mark">' + mark() + '</span>' + esc(t('askKicker')) + '</p>' +
-      // the words in quotes that read right in their direction: curly ones turn about in Hebrew (QA, 16.11)
-      '<p class="ls-askcard__q" dir="auto">' + (/[֐-׿]/.test(String(q || '')) ? '"' : '“') + esc(String(q || '').replace(/[“”"]/g, '')) + (/[֐-׿]/.test(String(q || '')) ? '"' : '”') + '</p>' +
-      '<button class="ls-askcard__btn' + (active ? ' is-active' : '') + '" data-opt ' + act + '><span>' + esc(t('askBtn')) + '</span></button>' +
-      '<p class="ls-askcard__sub">' + esc(t('askSub', { name: CFG.assistant })) + '</p></div>';
+    // the design of 18.11 (noMatchCard): a question typed gets the same quiet card as words that found nothing
+    return noMatchCard(q, active, act);
   }
   // No exact match for the words (the design of 18.11, docs: lets-no-exact-match): says so plainly, with one quiet action,
   // the store's AI search for the same words. A light card, a white button with the lime sparkle that turns like a coin.

@@ -17,6 +17,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -90,9 +91,38 @@ final class Onboarding extends Page
 
     public function mount(): void
     {
-        $this->step = $this->firstStep();
+        $this->step = $this->resumeStep();
         $this->data = app(SaveShopProfile::class)->load($this->shop());
         $this->contentSite = $this->data['kind'] === 'content';
+    }
+
+    /**
+     * Where the merchant left off: the step they reached by their own press ("Right, start the scan", "Continue"), kept for
+     * the store, so coming back from the theme editor, where step 3's own button sent them, never starts them at step 2 and
+     * a scan again (Shopify review, 18.11). Step 3 only while its scan is there to show; with nothing kept, the first step,
+     * as before.
+     */
+    private function resumeStep(): int
+    {
+        $reached = (int) Cache::get(self::reachedKey($this->shop()), 0);
+
+        return match (true) {
+            $reached >= 4 => 4,
+            $reached === 3 && $this->progress() !== null => 3,
+            default => $this->firstStep(),
+        };
+    }
+
+    /** The step the merchant reached by their own press, kept for the store; never moved back. */
+    private function reached(int $step): void
+    {
+        $key = self::reachedKey($this->shop());
+        Cache::forever($key, max($step, (int) Cache::get($key, 0)));
+    }
+
+    private static function reachedKey(Shop $shop): string
+    {
+        return 'onboarding:reached:'.$shop->id;
     }
 
     /** A platform card: Shopify, WooCommerce, or a WordPress site with no store. */
@@ -290,6 +320,7 @@ final class Onboarding extends Page
     {
         if ($this->canEdit()) {
             $this->startScan();
+            $this->reached(3);
         }
 
         $this->step = 3;
@@ -376,14 +407,19 @@ final class Onboarding extends Page
             }
 
             $n = (int) $facts[$key];
+            // no scan this week: what is there was read before
+            $state = $parts[$part] ?? ($n > 0 ? ShopScan::DONE : ShopScan::WAITING);
+            // a part that is done with nothing counted says "Done", never "0 of 3": a merchant read the zero as a scan
+            // that never ran, while the summary under it said it had finished (Shopify review, 18.11)
+            $done = $state === ShopScan::DONE && $n === 0;
             $out[] = [
                 'key' => $part,
                 'title' => (string) __("admin::onboarding.scan.rows.{$part}.title"),
                 'sub' => (string) __("admin::onboarding.scan.rows.{$part}.sub"),
                 'n' => $n,
-                'unit' => $against ?? (string) __("admin::onboarding.scan.rows.{$part}.unit"),
-                // no scan this week: what is there was read before
-                'state' => $parts[$part] ?? ($n > 0 ? ShopScan::DONE : ShopScan::WAITING),
+                'shown' => $done ? (string) __('admin::onboarding.scan.done') : number_format($n),
+                'unit' => $done ? '' : ($against ?? (string) __("admin::onboarding.scan.rows.{$part}.unit")),
+                'state' => $state,
             ];
         }
 
@@ -475,6 +511,7 @@ final class Onboarding extends Page
     {
         if ($this->canEdit()) {
             app(FinishOnboarding::class)->handle($this->shop());
+            $this->reached(4);
         }
 
         $this->step = 4;

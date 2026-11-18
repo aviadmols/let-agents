@@ -924,6 +924,12 @@
             "scope": "shop"
         },
         {
+            "name": "vendor_filter",
+            "type": "bool",
+            "default": false,
+            "scope": "shop"
+        },
+        {
             "name": "similar_by",
             "type": "enum",
             "options": [

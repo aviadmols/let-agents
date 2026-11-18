@@ -87,6 +87,22 @@ final class WholeWordReadingTest extends TestCase
         $this->assertEqualsCanonicalizing(['sapphire', 'ruby', 'emerald'], $group['values']);
     }
 
+    public function test_a_choice_of_several_is_read_from_the_title_and_the_description_together_each_value_by_its_source(): void
+    {
+        // Aviad, 18.11: the name and the description both go into the tags. A title naming two stones ended the reading,
+        // and the stone only the description named was never read.
+        $this->buildShop();
+        [$jewelry] = VocabularyDefinition::parse((array) ImportVocabulary::template('jewelry'));
+        $this->assertTrue($jewelry->isMultiple('stone'));
+        $ring = $this->product('1', 'טבעת וינטאג משובצת אבני רובי ויהלומים', 'בשיבוץ גבוה, עם ספיר כחול במרכז', [$this->category('31', 'טבעות')]);
+
+        $read = $this->inShop(fn () => CodeReading::read($ring->fresh(), new BrandResolver, $jewelry, true)['text_choices']['stone'] ?? []);
+
+        $this->assertEqualsCanonicalizing(['ruby', 'diamond', 'sapphire'], $read['values'] ?? []);
+        $this->assertSame('title', $read['by']['ruby'] ?? null);
+        $this->assertSame('description', $read['by']['sapphire'] ?? null, 'kept with the source that named it, at its own confidence');
+    }
+
     public function test_the_stores_own_colour_attribute_is_the_whole_list_of_colours(): void
     {
         // As Gueta's MDF board taught (2026-10-18): sold in green, its description says "and black".

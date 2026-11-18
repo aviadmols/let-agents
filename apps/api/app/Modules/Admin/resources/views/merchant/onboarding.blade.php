@@ -222,7 +222,7 @@
                                         <div @class(['lp-onb-scan-row', 'is-done' => $row['state'] === 'done', 'is-wait' => $row['state'] === 'waiting']) data-scan-row="{{ $row['key'] }}" data-state="{{ $row['state'] }}">
                                             <span class="lp-onb-ic" aria-hidden="true"><svg><use href="#{{ $icons[$row['key']] }}"/></svg></span>
                                             <div><div class="lp-onb-t">{{ $row['title'] }}</div><div class="lp-onb-s">{{ $row['sub'] }}</div></div>
-                                            <div class="lp-onb-n"><span data-n>{{ number_format($row['n']) }}</span><div class="lp-onb-s">{{ $row['unit'] }}</div></div>
+                                            <div class="lp-onb-n"><span data-n>{{ $row['shown'] }}</span>@if ($row['unit'] !== '')<div class="lp-onb-s">{{ $row['unit'] }}</div>@endif</div>
                                         </div>
                                     @endforeach
                                 </div>

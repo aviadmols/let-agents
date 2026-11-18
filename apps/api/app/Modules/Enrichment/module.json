@@ -53,6 +53,10 @@
             "default": true
         },
         {
+            "name": "bank_completion",
+            "default": true
+        },
+        {
             "name": "picture_suggestions",
             "default": true
         },
@@ -289,6 +293,53 @@
             "default": 200,
             "min": 0,
             "max": 2000,
+            "scope": "shop",
+            "unit": "requests"
+        },
+        {
+            "name": "escalation_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini",
+                "xai"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "escalation_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "escalation_input_usd_per_million",
+            "type": "float",
+            "default": 3.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "escalation_output_usd_per_million",
+            "type": "float",
+            "default": 15.0,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "escalation_requests",
+            "type": "int",
+            "default": 100,
+            "min": 0,
+            "max": 1000,
             "scope": "shop",
             "unit": "requests"
         },

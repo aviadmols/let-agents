@@ -397,6 +397,10 @@ return [
         'label' => 'Tags never shown as a filter',
         'description' => 'The store\'s own tags for its shop pages and campaigns, not for what a product is ("Gift Guide, Vacation Shop"), separated by commas. A tag that starts with one of them is left out too.',
     ],
+    'vendor_filter' => [
+        'label' => 'Vendor as a brand filter',
+        'description' => 'On a Shopify store: the products\' Vendor field as a "Brand" filter. Off by default, since many stores keep their supplier\'s name there, not a brand. Turn it on only where it holds real brands.',
+    ],
     'length_filter' => [
         'label' => 'Length as a filter',
         'description' => 'For tours, courses and trips: how many days each lasts, as its title or opening words say it, a filter (1 day, 2 to 5 days…), and "4 days" in a search reads it.',

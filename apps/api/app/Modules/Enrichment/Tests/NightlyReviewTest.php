@@ -33,6 +33,9 @@ final class NightlyReviewTest extends TestCase
     /** @var array<string, string> verdict by claim id */
     public array $verdicts = [];
 
+    /** @var array<string, array<string, string>> a model's own verdicts, by key */
+    public array $byModel = [];
+
     private CatalogProduct $drill;
 
     protected function setUp(): void
@@ -63,7 +66,7 @@ final class NightlyReviewTest extends TestCase
                 $request = json_decode($user, true);
                 $verdicts = [];
                 foreach ($request['claims'] as [$id, , $key]) {
-                    $verdicts[$id] = $this->test->verdicts[$key] ?? 'unsure';
+                    $verdicts[$id] = $this->test->byModel[$model][$key] ?? $this->test->verdicts[$key] ?? 'unsure';
                 }
 
                 return new ModelReply(['id' => $request['id'], 'verdicts' => $verdicts], 800, 40);
@@ -85,6 +88,30 @@ final class NightlyReviewTest extends TestCase
         $this->asked = [];
         $this->assertSame('succeeded', app(RunNightlyReview::class)->handle($this->shop->id)->status->value);
         $this->assertSame([], $this->asked, 'nothing waits now: nothing is asked');
+    }
+
+    public function test_what_the_reviewer_is_unsure_of_goes_on_in_the_same_run_to_the_stronger_model(): void
+    {
+        // Me369, 18.11: 229 details waited for a person no one scheduled
+        $this->verdicts = ['type' => 'ok', 'kit' => 'unsure'];
+        $this->byModel = ['claude-sonnet-5-5' => ['kit' => 'ok']];
+
+        $run = app(RunNightlyReview::class)->handle($this->shop->id);
+
+        $this->assertSame('succeeded', $run->status->value);
+        $this->assertSame([['provider' => 'anthropic', 'model' => 'claude-haiku-4-5'], ['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5']], $this->asked, 'the reviewer, then the stronger model on what it was unsure of');
+        $statuses = $this->inShop(fn () => EnrichmentFact::query()->where('product_id', $this->drill->id)->pluck('status', 'key')->map(fn (FactStatus $s): string => $s->value)->all());
+        $this->assertSame(['kit' => 'approved', 'type' => 'approved'], collect($statuses)->sortKeys()->all());
+        $this->assertGreaterThan(0, (float) $run->fresh()->cost_usd, 'its calls are accounted, at its own price');
+
+        // off, what the reviewer is unsure of waits, as before
+        Settings::set('enrichment.escalation_requests', 0, $this->shop->id);
+        $this->asked = [];
+        $this->inShop(fn () => EnrichmentFact::query()->where('key', 'kit')->update(['status' => FactStatus::AwaitingReview]));
+        $this->byModel = [];
+        app(RunNightlyReview::class)->handle($this->shop->id);
+        $this->assertSame([['provider' => 'anthropic', 'model' => 'claude-haiku-4-5']], $this->asked);
+        $this->assertSame(FactStatus::AwaitingEscalation, $this->inShop(fn () => EnrichmentFact::query()->where('key', 'kit')->value('status')));
     }
 
     public function test_the_same_family_on_both_sides_checks_nothing(): void

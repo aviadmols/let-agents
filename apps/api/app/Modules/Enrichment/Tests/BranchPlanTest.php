@@ -49,6 +49,27 @@ final class BranchPlanTest extends TestCase
         $this->assertSame($plan, $this->inShop(fn (): array => BranchPlan::of(minProducts: 15, splitPercent: 35, maxBranches: 12)), 'the same catalog, the same plan');
     }
 
+    public function test_categories_that_are_collections_not_kinds_make_one_vocabulary_and_kinds_stay_branches(): void
+    {
+        // a bookshop's lines and genres hold the same books (sellameir, 18.11: 53% of its books in two branches or more)
+        $this->buildShop();
+        $line = $this->category('line', 'ספריית שיבולת');
+        $genre = $this->category('genre', 'ביוגרפיות');
+        $business = $this->category('biz', 'הספרייה העסקית');
+        $n = 0;
+        foreach ([[[$line, $genre], 10], [[$line], 8], [[$business, $genre], 8], [[$business], 8]] as [$categories, $count]) {
+            for ($i = 0; $i < $count; $i++) {
+                $this->product('b'.(++$n), 'ספר '.$n, '', $categories);
+            }
+        }
+
+        $plan = $this->inShop(fn (): array => BranchPlan::of(minProducts: 6, splitPercent: 35, maxBranches: 0));
+
+        $this->assertTrue($plan['whole'], 'one vocabulary for the whole catalog');
+        $this->assertSame([], $plan['branches']);
+        $this->assertGreaterThanOrEqual(BranchPlan::COLLECTIONS_FROM, $plan['overlap']);
+    }
+
     public function test_a_category_that_is_not_a_big_share_stays_whole_and_the_most_branches_cut_the_smallest(): void
     {
         $this->buildShop();

@@ -26,6 +26,7 @@ use App\Modules\Ai\Support\Drivers\OpenAiChat;
 use App\Modules\Ai\Support\Drivers\OpenAiEmbeddings;
 use App\Modules\Ai\Support\Drivers\ReplicateImages;
 use App\Modules\Ai\Support\Drivers\VoyageEmbeddings;
+use App\Modules\Ai\Support\Drivers\XaiChat;
 use App\Modules\Ai\Support\KeyAlert;
 use App\Modules\Ai\Support\MonthlySpendGuard;
 use App\Modules\Ai\Support\ProviderBatchModel;
@@ -45,7 +46,7 @@ final class AiServiceProvider extends ModuleServiceProvider
      * One class per provider and job. A new provider is a case in AiProviderName and a driver
      * here; the settings that name a provider and model then reach it without other changes.
      */
-    public const CHAT_DRIVERS = [OpenAiChat::class, AnthropicChat::class, GeminiChat::class];
+    public const CHAT_DRIVERS = [OpenAiChat::class, AnthropicChat::class, GeminiChat::class, XaiChat::class];
 
     /** Providers with a batch API: many questions at once, answered within a day at half price. */
     public const BATCH_DRIVERS = [OpenAiBatches::class, AnthropicBatches::class];

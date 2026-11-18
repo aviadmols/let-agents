@@ -164,8 +164,20 @@ final class AnswerSiteQuestion implements TriesQuestions
      * bracelet's wrist (Rocks). On 18 real replies from 9 stores against v35/v37 it did better in 6 (a refund no longer
      * called store credit, bags up to ₪500 found, silver necklaces for "And in silver?", the necklace's SKU for "48 ס"מ")
      * and the same in the rest; a 21K bracelet question wavered in both (docs/eval/answers-v39-replies.json in Let Agents).
+     *
+     * v43 (answer_site only; verify_site stays v39), 18.11, as Aviad approved: Aviad's compact prompt (a third of v39's length,
+     * for any kind of store), with a stronger protection section, a service-minded salesperson's voice (the request met
+     * first, the best match first, one specific follow-up that leads somewhere), a SKU or a certificate line only where
+     * relevant, the shopper addressed in the singular in forms that fix no gender, and what is not among the products said
+     * as "not found by that name" with the closest alternatives, never "we don't have". Graded blind on 51 real questions
+     * from 7 stores by a model of the other family (v39 / v41 / v43): correct 21 / 31 / 34, wrong 7 / 6 / 5, missed 6 / 2 / 2,
+     * best for the shopper 8 / 15 / 28; the same latency, a third less writer input. Rolled back by setting this to 39.
+     *
+     * v44 (answer_site only), 18.11, released as Aviad asked, without a comparison (he checks it on the stores): v43, and
+     * the writer is told who the store is (`store`: its name, whether it sells or tells, what it sells) and to fit the
+     * answer's voice to its trade. Rolled back to v43 by setting this to 43.
      */
-    public const PROMPT_VERSION = 39;
+    public const PROMPT_VERSION = 44;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -221,7 +233,8 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38], 'verify_site' => [36]];
+    // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
@@ -1385,6 +1398,21 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             return false;
         };
+        // The store's general text by what speaks of the question, never all of it in every answer (Aviad, 18.11: the same
+        // certificate and installments lines under every answer): a row the question's words name, or one the search by
+        // meaning found near it; a question about the store itself (its address, its hours, a visit) still reads it all.
+        // What is kept goes first, as the store's word (assistant.knowledge_by_search).
+        $bySearch = (bool) Settings::get('assistant.knowledge_by_search', $shopId)
+            && ! self::asksOfTheStore($question) && ! self::asksIfOpen($question) && ! self::asksAboutVisit($question);
+        $nearOfEntry = function (CatalogContent $entry) use ($found): string {
+            return implode("\n", array_map(fn (array $p): string => (string) $p['text'], array_filter($found,
+                fn (array $p): bool => ($p['source'] ?? null) === 'content' && (string) ($p['source_id'] ?? '') === (string) $entry->id)));
+        };
+        $relevantRow = function (string $row, string $near) use ($speaks): bool {
+            $line = trim((string) preg_replace('/^\s*-\s*/u', '', $row));
+
+            return $line !== '' && ($speaks($line) || ($near !== '' && mb_strpos($near, mb_substr($line, 0, 60)) !== false));
+        };
 
         foreach ($entries as $entry) {
             $text = self::withoutThisProduct(trim((string) $entry->body));
@@ -1456,6 +1484,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $rows = $said;
                     $said = [];
                 }
+                if ($bySearch) {
+                    $nearText = $nearOfEntry($entry);
+                    $rows = array_values(array_filter($rows, fn (string $row): bool => $relevantRow($row, $nearText)));
+                    $said = [];
+                }
                 if ($said !== [] && count($said) < count($rows)) {
                     $first[] = $passage($whole($said));
                     $rows = array_values(array_filter($rows, fn (string $row): bool => ! $speaks($row)));
@@ -1471,6 +1504,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($entry->external_id === BuildShopKnowledge::REPEATED) {
                 // and only what tells of its service: a heading or a line of its screens, read before, is not its word
                 $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line) && RepeatedText::fact($line)));
+                if ($bySearch) {
+                    $nearText = $nearOfEntry($entry);
+                    $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => $relevantRow($line, $nearText)));
+                }
             }
 
             if ($text !== '') {
@@ -1931,7 +1968,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
             + ($now === null ? [] : ['now' => $now])
             + (($tone = $this->voice !== null ? $this->voice['tone'] : self::tone($shopId)) === null ? [] : ['tone' => $tone])
-            + (($rules = $this->rulesFor($shopId)) === [] ? [] : ['rules' => $rules]) + [
+            + (($rules = $this->rulesFor($shopId)) === [] ? [] : ['rules' => $rules])
+            // who the store is, so the answer speaks its trade (as Aviad asked, 18.11): only to a writer that reads it
+            + (self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'store') ? ['store' => $this->writerStore($shopId)] : []) + [
                 'products' => $forModel,
                 'analysis' => $analysis,
                 'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
@@ -2388,7 +2427,7 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $checked['ran'] = true;
 
                         $offered = $picks;
-                        $applied = self::applyCheck($check->data, $answer, $picks);
+                        $applied = self::applyCheck($check->data, $answer, $picks, (bool) Settings::get('assistant.check_ignores_incomplete', $shopId));
                         ['answer' => $answer, 'picks' => $picks, 'refusal' => $refusal] = $applied;
                         // the products a kept answer offers instead of what is not here keep their cards (Rocks, 11.11)
                         $picks = self::offeredInstead($answer, $cited, $byRef, $offered, $picks, $prepared['productsByRef']);
@@ -3524,10 +3563,11 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public static function withoutRefs(string $text): string
     {
-        // "(p5)", "(p5, p6)", "[s2]", "(ref p5)", " - p5" at the end of a clause.
-        $text = (string) preg_replace('~\s*[(\[]\s*(?:ref\s*)?[ps]\d{1,2}(?:\s*[,/]\s*[ps]\d{1,2})*\s*[)\]]~iu', '', $text);
+        // "(p5)", "(p5, p6)", "[s2]", "(ref p5)", " - p5" at the end of a clause; and the same in Hebrew letters, "(פ10)",
+        // "(ס2)", as a writer wrote them in a Hebrew answer (Grok, Rocks 18.11)
+        $text = (string) preg_replace('~\s*[(\[]\s*(?:ref\s*)?[psפס]\d{1,2}(?:\s*[,/]\s*[psפס]\d{1,2})*\s*[)\]]~iu', '', $text);
         // Only a dash or colon that stands apart (" - p5"): "מ-p3" is a prefix glued to the ref, a ref used as a word.
-        $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[ps]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
+        $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[psפס]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
 
         return trim((string) preg_replace('/[ \t]{2,}/u', ' ', $text));
     }
@@ -3595,10 +3635,10 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array<string, mixed>>  $picks
      * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string}
      */
-    public static function applyCheck(array $check, string $answer, array $picks): array
+    public static function applyCheck(array $check, string $answer, array $picks, bool $ignoreIncomplete = false): array
     {
         if (isset($check['decision'])) {
-            return self::applyDecision($check, $answer, $picks);
+            return self::applyDecision($check, $answer, $picks, $ignoreIncomplete);
         }
 
         $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
@@ -3642,7 +3682,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  list<array<string, mixed>>  $picks
      * @return array{answer: string, picks: list<array<string, mixed>>, safe: bool, injection: bool, refusal: string|null, verdict: string, decision: string, issues: list<array{text: string, kind: string, severity: string, pick?: string}>, revised: bool}
      */
-    private static function applyDecision(array $check, string $answer, array $picks): array
+    private static function applyDecision(array $check, string $answer, array $picks, bool $ignoreIncomplete = false): array
     {
         $before = ['answer' => $answer !== '', 'picks' => $picks !== []];
         $decision = in_array($check['decision'], ['approve', 'revise', 'reject'], true) ? (string) $check['decision'] : 'reject';
@@ -3658,6 +3698,17 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         if (! $safe || $injection || in_array('critical', array_column($issues, 'severity'), true) && in_array('safety', array_column($issues, 'kind'), true)) {
             return ['answer' => '', 'picks' => [], 'safe' => $safe && ! $injection, 'injection' => $injection, 'refusal' => 'check_'.($injection ? 'injection' : 'unsafe'), 'verdict' => 'rejected', 'decision' => 'reject', 'issues' => $issues, 'revised' => false];
+        }
+
+        // "incomplete" (a detail left out) is no reason to stop an answer (verify_site v39: "Never an issue: … a detail
+        // left out"), yet the checker gives it: in 68 of 70 answers stopped only for it the sentence was right by the
+        // evidence the checker had (blind grading by Claude, 18.11). Logged, never acted on (assistant.check_ignores_incomplete).
+        $acting = $issues;
+        if ($ignoreIncomplete) {
+            $acting = array_values(array_filter($issues, fn (array $i): bool => ($i['kind'] ?? '') !== 'incomplete'));
+            if ($acting === [] && $issues !== [] && $decision !== 'approve') {
+                $decision = 'approve';
+            }
         }
 
         // Each pick judged apart: one that does not fit goes, a wrong reason is the checker's from its description.
@@ -3689,12 +3740,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($fix !== '' && mb_strlen($fix) <= mb_strlen($answer) * self::REVISED_GROWTH + 80) {
                 $answer = $fix;
                 $revised = true;
-            } elseif (array_diff(array_column($issues, 'severity'), ['minor']) !== []) {
+            } elseif (array_diff(array_column($acting, 'severity'), ['minor']) !== []) {
                 // A material issue and no fix to put in its place: only the sentences the issues name go, and the
                 // rest stays, however short, while a sentence of it is left beside its offer: the checker said the
                 // answer stands in the main (a revise, not a reject). "עד 500" kept its necklace, not an empty answer
                 // beside its card (Miss Nori, 16.11). Else the answer goes, the fitting picks stay.
-                $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $issues), fn (string $t): bool => mb_strlen($t) >= 4));
+                $faulty = array_values(array_filter(array_map(fn (array $i): string => $i['severity'] === 'minor' ? '' : mb_strtolower((string) ($i['text'] ?? '')), $acting), fn (string $t): bool => mb_strlen($t) >= 4));
                 $answer = $faulty === [] ? '' : self::withoutSentences($answer, function (string $sentence) use ($faulty): bool {
                     $sentence = mb_strtolower($sentence);
                     foreach ($faulty as $text) {
@@ -4154,6 +4205,20 @@ final class AnswerSiteQuestion implements TriesQuestions
         $byName = ((! $followUp || $ownKind) && $named !== [] && $asks !== null && app()->bound(ProductsNamed::class)
             ? app(ProductsNamed::class)->all($this->tenant->require(), $question)
             : null) ?: null;
+        // A reply whose price is a turn before's keeps that turn's wish too, where the store's products say it: "איזה טבעות
+        // יש?" after "מה מתאים למתנה לגבר עד 2000 ש״ח?" was "228 products in your price", women's rings and a ring sizer
+        // among them, the man forgotten (Rocks, 18.11). The rings the store's search finds with the wish are the answer;
+        // a wish its products say nothing of ("לאישתי" of a necklace) narrows nothing; a wish they say but none of these
+        // holds is the writer's.
+        $wish = $byName !== null && $asks === 'in_range' && $this->conversation !== [] && $this->priceInherited($question) ? $this->inheritedWish() : null;
+        if ($wish !== null) {
+            $withWish = array_values(array_intersect($byName, app(ProductsNamed::class)->all($this->tenant->require(), $question.' '.$wish)));
+            if ($withWish !== []) {
+                $byName = $withWish;
+            } elseif (app(ProductsNamed::class)->holds($this->tenant->require(), $wish)) {
+                return null;
+            }
+        }
 
         $productsByRef = [];
         foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : ($byName ?: $shown)) as $i => $product) {
@@ -4240,6 +4305,38 @@ final class AnswerSiteQuestion implements TriesQuestions
      * fewer than three letters): what a product would have to hold. "אני מחפש מכנסיים" asks for trousers, which a product
      * holds; "מתנה לחברה שלי ליום הולדת" asks for a choice.
      */
+    /**
+     * The wish of the turn in the conversation that said the price a reply inherits ("מתנה לגבר" of "מה מתאים למתנה לגבר עד
+     * 2000"): the words left of its price that name no kind of the store's, as computed() sends such a question to the
+     * writer. Null when no turn said a price, or its words left are a kind the store holds ("שרשרת עדינה עד 2000").
+     */
+    /** Whether the question says no price of its own, so its price is the conversation's (priceRange()). */
+    private function priceInherited(string $question): bool
+    {
+        $said = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : [];
+
+        return ($said['min'] ?? null) === null && ($said['max'] ?? null) === null;
+    }
+
+    private function inheritedWish(): ?string
+    {
+        if (! app()->bound(PriceRange::class) || ! app()->bound(ProductsNamed::class)) {
+            return null;
+        }
+        foreach (array_reverse($this->conversation) as $turn) {
+            $said = app(PriceRange::class)->read((string) $turn['question']);
+            if (($said['min'] ?? null) === null && ($said['max'] ?? null) === null) {
+                continue;
+            }
+            $left = self::wishWords((string) ($said['words'] ?? ''));
+            $shopId = $this->tenant->require();
+
+            return $left !== '' && (! app(ProductsNamed::class)->holds($shopId, $left) || count(app(ProductsNamed::class)->all($shopId, $left)) < self::KIND_PRODUCTS) ? $left : null;
+        }
+
+        return null;
+    }
+
     private static function wishWords(string $words): string
     {
         $kept = array_filter(preg_split('/\s+/u', trim($words)) ?: [], function (string $w): bool {
@@ -5371,6 +5468,25 @@ final class AnswerSiteQuestion implements TriesQuestions
             ->toBase()->first();
 
         return (int) ($row->kinds ?? 0).':'.(int) ($row->said ?? 0);
+    }
+
+    /**
+     * Who the store is, for the writer to speak its trade (as Aviad asked, 18.11): its name, whether it sells or tells
+     * (a content site), what it sells as its owner wrote it, else its biggest categories. A few words, never its pages.
+     *
+     * @return array{name: string, kind: string, sells: list<string>}
+     */
+    private function writerStore(string $shopId): array
+    {
+        $shop = Shop::query()->whereKey($shopId)->first(['name', 'profile']);
+        $profile = (array) ($shop?->profile ?? []);
+        $sells = array_values(array_filter(array_map('strval', (array) ($profile['sells'] ?? []))));
+
+        return [
+            'name' => (string) ($shop?->name ?? ''),
+            'kind' => ($profile['kind'] ?? null) === 'content' ? 'content site' : 'store',
+            'sells' => array_slice($sells !== [] ? $sells : CatalogCategory::query()->whereNull('removed_at')->orderByDesc('product_count')->limit(10)->pluck('name')->all(), 0, 10),
+        ];
     }
 
     /** What the store is, for the topic check: its name and what it sells. */

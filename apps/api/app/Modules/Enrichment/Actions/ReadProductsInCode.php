@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Enums\Verdict;
 use App\Modules\Enrichment\Models\EnrichmentCodeReading;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
@@ -104,7 +105,7 @@ final class ReadProductsInCode
             $said[$fact->product_id][$fact->key][] = (string) $fact->value_text;
         }
 
-        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'tryon_yes' => 0, 'tryon_no' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0, 'implied_colours' => 0];
+        $counts = ['products' => 0, 'changed' => 0, 'unchanged' => 0, 'facts' => 0, 'with_brand' => 0, 'types_from_category' => 0, 'title_specs' => 0, 'with_choices' => 0, 'tryon_yes' => 0, 'tryon_no' => 0, 'rentals' => 0, 'text_choices' => 0, 'text_specs' => 0, 'flags' => 0, 'implied_colours' => 0, 'verdicts_kept' => 0];
         $brandSources = [];
         $families = [];
         $samples = [];
@@ -165,6 +166,17 @@ final class ReadProductsInCode
                     'read_at' => $now,
                 ]);
 
+                // What the reviewers decided of this product's facts, kept: the same claim read again (its kind, key, value
+                // and source) is the claim they decided, and is never sent to them again (Aviad, 18.11: no paying twice
+                // for thousands of tags already checked). A superseded fact keeps its verdict, so one a re-read lost before
+                // is found again too. The last verdict of each claim stands.
+                $decided = [];
+                EnrichmentFact::query()->where('product_id', $product->id)->where('origin', FactOrigin::Code)->whereNotNull('review_verdict')
+                    ->orderBy('updated_at')->orderBy('id')->get()
+                    ->each(function (EnrichmentFact $fact) use (&$decided): void {
+                        $decided[self::claim($fact->kind, $fact->key, $fact->value_text, $fact->value_number, self::sourceOf($fact))] = $fact;
+                    });
+
                 // Code's earlier facts about this product, unless a person decided on them.
                 EnrichmentFact::query()
                     ->where('product_id', $product->id)
@@ -177,9 +189,16 @@ final class ReadProductsInCode
                 // What the shop's team said of a detail stands: code does not write that detail again.
                 $team = EnrichmentFact::query()->where('product_id', $product->id)->where('origin', FactOrigin::Person)
                     ->whereIn('status', [FactStatus::Approved, FactStatus::NotApplicable])->pluck('key')->all();
-                $write = function (array $values) use ($shopId, $product, $hash, $status, $team, &$counts): void {
+                $write = function (array $values) use ($shopId, $product, $hash, $status, $team, $decided, $autoApprove, &$counts): void {
                     if (in_array($values['kind'], [FactKind::Choice, FactKind::Spec, FactKind::Flag], true) && in_array($values['key'], $team, true)) {
                         return;
+                    }
+
+                    $source = (string) (($values['evidence']['source'] ?? null) ?: preg_replace('/^code_/', '', (string) ($values['status_reason'] ?? '')));
+                    $before = $decided[self::claim($values['kind'], $values['key'], $values['value_text'] ?? null, $values['value_number'] ?? null, $source)] ?? null;
+                    if ($before !== null) {
+                        $values = self::withVerdict($values, $before, $autoApprove);
+                        $counts['verdicts_kept'] = ($counts['verdicts_kept'] ?? 0) + 1;
                     }
 
                     EnrichmentFact::query()->create($values + [
@@ -226,8 +245,10 @@ final class ReadProductsInCode
                 // Read from the store's own words, each with how sure its source is and where it was read.
                 foreach ((array) ($reading['text_choices'] ?? []) as $key => $choice) {
                     foreach ($choice['values'] as $value) {
-                        $write(self::fromPicture($choice['source'], $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
-                            'confidence' => CodeReading::CONFIDENCE[$choice['source']], 'evidence' => ['source' => $choice['source'], 'ref' => mb_substr($choice['quote'], 0, 300)]]);
+                        // each value by the source that named it, where a choice of several was read from more than one
+                        $source = (string) ($choice['by'][$value] ?? $choice['source']);
+                        $write(self::fromPicture($source, $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$source,
+                            'confidence' => CodeReading::CONFIDENCE[$source], 'evidence' => ['source' => $source, 'ref' => mb_substr($choice['quote'], 0, 300)]]);
                     }
                 }
                 // Implied by what the product is made of (a ruby is red): code, never superseded by a model reading.
@@ -275,10 +296,62 @@ final class ReadProductsInCode
      *
      * @return array{status?: FactStatus}
      */
+    /** One claim of code's about a product: what it says and where it was read, whatever vocabulary read it. */
+    private static function claim(FactKind $kind, string $key, ?string $value, int|float|string|null $number, string $source): string
+    {
+        return implode('|', [$kind->value, $key, mb_strtolower(trim((string) $value)), $number === null ? '' : (string) (float) $number, $source]);
+    }
+
+    /** Where a fact of code's was read: its evidence's source, else its reason's ("code_title"); a review's reason says none. */
+    private static function sourceOf(EnrichmentFact $fact): string
+    {
+        $source = (string) ($fact->evidence['source'] ?? '');
+
+        return $source !== '' ? $source : (str_starts_with((string) $fact->status_reason, 'code_') ? substr((string) $fact->status_reason, 5) : '');
+    }
+
+    /**
+     * A claim read again, as its reviewer decided it: right is approved (or waits for a person, where nothing is approved
+     * without one), wrong rejected, unsure waits for the next tier, or for a person after the last.
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private static function withVerdict(array $values, EnrichmentFact $before, bool $autoApprove): array
+    {
+        $verdict = $before->review_verdict instanceof Verdict ? $before->review_verdict : Verdict::tryFrom((string) $before->review_verdict);
+        if ($verdict === null) {
+            return $values;
+        }
+        $tier = (int) $before->review_tier;
+
+        return [
+            'status' => match ($verdict) {
+                Verdict::Ok => $autoApprove ? FactStatus::Approved : FactStatus::NeedsPerson,
+                Verdict::Wrong => FactStatus::Rejected,
+                Verdict::Unsure => $tier >= 2 ? FactStatus::NeedsPerson : FactStatus::AwaitingEscalation,
+            },
+            'status_reason' => $verdict === Verdict::Wrong ? 'review_wrong' : ($verdict === Verdict::Unsure ? 'review_unsure' : ($values['status_reason'] ?? null)),
+            'review_verdict' => $verdict,
+            'review_model' => $before->review_model,
+            'review_tier' => $before->review_tier,
+            'review_batch_id' => $before->review_batch_id,
+        ] + $values;
+    }
+
     private static function fromPicture(string $source, string $key, ?EnrichmentVocabulary $vocabulary, FactStatus $status): array
     {
         if ($source !== 'image' || $vocabulary === null || $status !== FactStatus::Approved) {
             return [];
+        }
+
+        // A colour the picture shows is filed as the vocabulary's threshold says; any other look read from the picture alone
+        // (a style, a neckline, a print) waits for the reviewer, who sees the picture's words beside the text (fact_review
+        // v6): a bank written with a low threshold filed "romantic" from a describer's word on a red dress (Me369, 18.11).
+        // (a threshold the vocabulary names for this very attribute is still its own word: it trusts pictures for its metal)
+        $named = array_key_exists($key, (array) ($vocabulary->definition()->toArray()['image']['filter_confidence'] ?? []));
+        if (! $named && preg_match('/(?:^|_)colou?rs?(?:$|_)/', $key) !== 1) {
+            return ['status' => FactStatus::AwaitingReview];
         }
 
         return CodeReading::CONFIDENCE['image'] >= $vocabulary->definition()->imageFilterConfidence($key) ? [] : ['status' => FactStatus::AwaitingReview];

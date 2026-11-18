@@ -30,6 +30,9 @@ final class BranchPlan
     /** Branches covering less than this share of the catalog give way to one vocabulary for all of it. */
     public const WHOLE_BELOW = 0.5;
 
+    /** Branches this share of whose products are in another branch too are collections, not kinds: one vocabulary. */
+    public const COLLECTIONS_FROM = 0.3;
+
     /**
      * @return array{total: int, rest: int, whole: bool, branches: list<array{key: string, name: string, path: string, root: string, products: int, split_from: string|null}>}
      */
@@ -127,6 +130,22 @@ final class BranchPlan
 
         if ($total > 0 && count($covered) < $total * self::WHOLE_BELOW) {
             return ['total' => $total, 'rest' => 0, 'whole' => true, 'branches' => []];
+        }
+
+        // Categories that are collections, not kinds of product: a ring is never an earring, but a book is in "ביוגרפיות"
+        // and in "ספריית שיבולת" at once, and a baby store's "All Products", its "הקרקס" and its "best sellers" hold the
+        // same products. Where many products are in two branches or more, the branches do not part kinds: the whole
+        // catalog is one vocabulary, whose product types part them (measured 18.11: Gueta 15%, sellameir 53%, Rocks 97%,
+        // Take Me Home 100%).
+        $in = [];
+        foreach ($chosen as $entry) {
+            foreach ($below($entry['external_id']) as $productId => $_) {
+                $in[$productId] = ($in[$productId] ?? 0) + 1;
+            }
+        }
+        $overlap = $in === [] ? 0.0 : count(array_filter($in, fn (int $n): bool => $n > 1)) / count($in);
+        if (count($chosen) >= 2 && $overlap >= self::COLLECTIONS_FROM) {
+            return ['total' => $total, 'rest' => 0, 'whole' => true, 'branches' => [], 'overlap' => round($overlap, 2)];
         }
 
         return ['total' => $total, 'rest' => max(0, $total - count($covered)), 'whole' => false, 'branches' => $branches];

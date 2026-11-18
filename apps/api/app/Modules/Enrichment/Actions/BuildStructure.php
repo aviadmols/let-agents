@@ -3,6 +3,7 @@
 namespace App\Modules\Enrichment\Actions;
 
 use App\Core\Tenancy\TenantContext;
+use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BranchPlan;
@@ -52,6 +53,16 @@ final class BuildStructure
     private function build(RunContext $run, string $shopId, bool $force): void
     {
         $vocabularies = EnrichmentVocabulary::query()->where('active', true)->get();
+        // A vocabulary whose root category the store no longer has reads no product: its branch is gone, and every fact
+        // read with it was superseded at the next reading with nothing in its place (sellameir: its root 451 renumbered,
+        // 459 of 463 facts superseded, its filters empty). It is retired, and the branch as the store files it now gets
+        // a vocabulary of its own below.
+        $live = CatalogCategory::query()->whereNull('removed_at')->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
+        $orphans = $vocabularies->filter(fn (EnrichmentVocabulary $v): bool => ! $v->definition()->coversWholeCatalog() && ! in_array((string) $v->definition()->rootCategoryExternalId(), $live, true));
+        foreach ($orphans as $orphan) {
+            $orphan->update(['active' => false]);
+        }
+        $vocabularies = $vocabularies->reject(fn (EnrichmentVocabulary $v): bool => $orphans->contains('id', $v->id))->values();
         $whole = $vocabularies->contains(fn (EnrichmentVocabulary $v): bool => $v->definition()->coversWholeCatalog());
 
         if ($whole && ! $force) {
@@ -119,7 +130,7 @@ final class BuildStructure
             }
         }
 
-        $run->output($counts + ['rest' => $plan['rest'], 'total' => $plan['total'], 'detail' => $branches])
+        $run->output($counts + ['rest' => $plan['rest'], 'total' => $plan['total'], 'detail' => $branches, 'retired' => $orphans->pluck('key')->values()->all()])
             ->summary('enrichment::runs.structure_built', [
                 'branches' => (string) $counts['branches'],
                 'approved' => (string) $counts['approved'],

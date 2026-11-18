@@ -61,6 +61,10 @@ final class FirstScan
         'structure' => ['enrichment', ['step' => 'structure', 'target' => '{shop}']],
         // Every product a model has not read, in batches, not only a night's share.
         'products' => ['enrichment', ['step' => 'nightly', 'target' => '{shop}', '--all-products' => true]],
+        // The bank completed from every product, not only the sample it was written from: the kinds and values the
+        // products say and no type or value reads, proposed by one family, audited by the other, and made the bank only
+        // once they hold (CompleteVocabulary; as Aviad asked, 18.11). Before the search, which files products by it.
+        'complete' => ['enrichment', ['step' => 'complete', 'target' => '{shop}', '--activate' => true]],
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
@@ -96,6 +100,7 @@ final class FirstScan
         'pictures' => ['retrieval.build_image_index', 'retrieval.caption_images'],
         'structure' => ['enrichment.build_structure', 'enrichment.propose_schema', 'enrichment.discover_schema', 'enrichment.score_schema', 'enrichment.import_vocabulary'],
         'products' => ['enrichment.nightly', 'enrichment.nightly_model', 'enrichment.nightly_review', 'enrichment.read_in_code', 'enrichment.build_cards', 'enrichment.collect_batches'],
+        'complete' => ['enrichment.complete_vocabulary'],
         'pages' => ['retrieval.build_index', 'retrieval.match_products'],
         'search' => ['search.build_index'],
         'tags' => ['search.write_tags'],

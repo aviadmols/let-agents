@@ -17,7 +17,8 @@ final class PromptLibrary
     /** @var array<string, int> task => current version */
     public const CURRENT = [
         'product_extraction' => 4,
-        'fact_review' => 5,
+        // v6: told where each claim was read, and shown the product's picture as described (18.11)
+        'fact_review' => 6,
         'content_mapping' => 2,
         'product_highlights' => 2,
         'product_summary' => 1,
@@ -32,7 +33,7 @@ final class PromptLibrary
      */
     public const WITHOUT_KIND = [
         'product_extraction' => 3,
-        'fact_review' => 4,
+        // fact_review v6 is sent for every vocabulary: a review is asked only of what waits, and nothing is read again
     ];
 
     /** The version a task is sent at; for the vocabulary it is read with, when the version depends on it. */

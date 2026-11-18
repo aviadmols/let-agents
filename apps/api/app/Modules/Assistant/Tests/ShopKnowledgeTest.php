@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Tests;
 
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Admin\Enums\ShopRole;
 use App\Modules\Admin\Models\User;
@@ -155,6 +156,31 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertStringEndsWith('החזרות', trim($passages[1]['text']), 'and no row cut in its middle');
     }
 
+    public function test_with_knowledge_by_search_the_team_text_goes_only_where_it_speaks_of_the_question_and_first(): void
+    {
+        // Aviad, 18.11: the same certificate and installments lines under every answer. With the setting on, a row goes only
+        // where the question's words name it or the search by meaning found it near; a question about a visit reads it all
+        $this->shop = Shop::factory()->create(['name' => 'Rocks and Gold', 'content_locale' => 'he']);
+        $certificate = 'כל התכשיטים מגיעים עם תעודת הערכה לביטוח.';
+        $diamonds = 'כל היהלומים באתר שלנו הם יהלומים טבעיים לחלוטין.';
+        $address = 'שבזי 31 תל אביב. שעות פתיחה: ראשון עד חמישי 10.30 עד 18.30.';
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->own(implode("\n", [$certificate, $diamonds, $address])));
+        Settings::set('assistant.knowledge_by_search', true, $this->shop->id);
+        $own = (string) $this->inShop(fn () => CatalogContent::query()->where('external_id', BuildShopKnowledge::OWN)->value('id'));
+        $knowledge = fn (string $question, array $found = []): array => $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), $question, $this->shop->id, $found));
+        $team = fn (array $passages): string => implode("\n", array_column(array_filter($passages, fn (array $p): bool => ($p['from'] ?? null) === 'store_team'), 'text'));
+
+        $said = $team($knowledge('יש לכם יהלומי מעבדה?'));
+        $this->assertStringContainsString($diamonds, $said, 'the row its words name');
+        $this->assertStringNotContainsString($certificate, $said, 'never the certificate under an answer that is not about it');
+
+        $found = [['source' => 'content', 'source_id' => $own, 'external_id' => null, 'title' => '', 'text' => $certificate, 'similarity' => 0.6]];
+        $this->assertStringContainsString($certificate, $team($knowledge('מה מקבלים עם הטבעת?', $found)), 'a row the search by meaning found near the question');
+
+        $this->assertStringContainsString($certificate, $team($knowledge('אפשר לבוא למדוד אצלכם את המוצר?')), 'a visit still reads all of it');
+    }
+
     public function test_a_visit_brings_the_address_and_hours_however_much_the_team_wrote_and_a_no_opens_with_what_the_store_sells(): void
     {
         // Rocks, 9.11: "אפשר לבוא למדוד אצלכם את המוצר?" was answered without the address: the team's text ran past one
@@ -242,9 +268,9 @@ final class ShopKnowledgeTest extends TestCase
     {
         $prompts = __DIR__.'/../Prompts/';
 
-        $this->assertSame(file_get_contents($prompts.'answer_site.v39.md'), AnswerSiteQuestion::prompt('answer_site'), 'v39: a reply is the shopper\'s own words, the topic check\'s reading a help (read_as); v35: how a piece is built, told from its picture; v33: a how-to question picks what is used for it, never the thing itself; v32: a term of the trade explained again when asked again and tied to the piece, a gift opens with a wish; v30: the store\x27s rules and the team\x27s instructions followed and never told, no offer to tell more of the answer\x27s own subject; v29: a reply keeps its subject, how-to answers give the fee, the deadline and the way to arrange, the contact when it sends the shopper to the store, no stale offer, general knowledge says what is measured; v26: a term of the trade explained from general knowledge, in general; v22: several passages answering, brought together into one answer; v21: an offer under the least price a page sets is said not to apply; v20: the answer, the next need, one offer, and the store\'s tone; v19: the clock of the store, for a question that depends on when it is asked; v18: clear everyday language, never a page\'s official wording; v17: said directly, never "לפי הצוות"; v16: the store\'s own word gives its address and link, and stands over a page; v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
+        $this->assertSame(file_get_contents($prompts.'answer_site.v44.md'), AnswerSiteQuestion::prompt('answer_site'), 'v44: told who the store is and to speak its trade; v43: Aviad\'s compact prompt for any kind of store, stronger protection, a service-minded voice, "not found by that name" with the closest alternatives; v39: a reply is the shopper\'s own words, the topic check\'s reading a help (read_as); v35: how a piece is built, told from its picture; v33: a how-to question picks what is used for it, never the thing itself; v32: a term of the trade explained again when asked again and tied to the piece, a gift opens with a wish; v30: the store\x27s rules and the team\x27s instructions followed and never told, no offer to tell more of the answer\x27s own subject; v29: a reply keeps its subject, how-to answers give the fee, the deadline and the way to arrange, the contact when it sends the shopper to the store, no stale offer, general knowledge says what is measured; v26: a term of the trade explained from general knowledge, in general; v22: several passages answering, brought together into one answer; v21: an offer under the least price a page sets is said not to apply; v20: the answer, the next need, one offer, and the store\'s tone; v19: the clock of the store, for a question that depends on when it is asked; v18: clear everyday language, never a page\'s official wording; v17: said directly, never "לפי הצוות"; v16: the store\'s own word gives its address and link, and stands over a page; v15: what is recommended most by what the store\'s customers choose; v14: the names of what it recommends; v13: a reply in the conversation, the shopper in the plural; v12: a condition on a yes first; v11: the store speaks as itself ("יש לנו"); the products\' prices, quoted only as given');
         $this->assertStringContainsString('יש לנו', AnswerSiteQuestion::prompt('answer_site'));
-        $this->assertStringContainsString('"store_team"', AnswerSiteQuestion::prompt('answer_site'));
+        $this->assertStringContainsString('`store_team`', AnswerSiteQuestion::prompt('answer_site'));
         $this->assertSame(file_get_contents($prompts.'verify_site.v39.md'), AnswerSiteQuestion::prompt('verify_site'), 'the checker reads its last version (v39: a reply is read as typed, with the conversation; v37: it stops only what is off the question, wrong or unsafe, never rewriting; v35: how a piece is built is what the trade knows; v32: what the trade knows is no unsupported claim and no repeat; v30: an offer to tell more of the answer\x27s own subject is stale; v29: the conversation, a repeat, an incomplete answer and a stale offer revised; v19: open or closed by the clock of the store; v16: the store\'s own word stands; v15: "the most popular" only by popular_first): approve, revise or reject; a product\'s title is what it is about, guidance is no claim; an honest close alternative fits; a price only as given');
         $this->assertSame(file_get_contents($prompts.'scope_site.v29.md'), AnswerSiteQuestion::prompt('scope_site'), 'v29: a short reply naming no subject keeps the subject of the conversation; v10: asking the store whether it does something is about the store, released after the Rocks runs of 9.11; v9: a reply that narrows the request keeps its conditions, released after the Rocks runs of 28.10; v8: a reply written to stand alone; v7: the scope check also reads what its own products and pages say nearest the question');
     }

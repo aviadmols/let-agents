@@ -32,7 +32,7 @@
     if (!st) { return '<button class="ls-btn ls-btn--link" style="margin-top:8px" data-phone-start>' + esc(t('savedPhone')) + '</button>'; }
     return '<form class="ls-form" style="margin-top:12px;padding:14px;border-radius:16px;background:var(--ls-bg-sunken)" data-phone-form><div style="font-weight:500;font-size:14px">' + esc(t('savedPhone')) + '</div><div style="font-size:13px;color:var(--ls-fg-muted)">' + esc(t('savedPhoneHelp')) + '</div>' +
       (st === 'num' ? '<div class="ls-input"><label for="lsph">' + esc(t('phone')) + '</label><input id="lsph" name="phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" style="background:var(--ls-bg)"' + (S.phoneErr ? ' aria-invalid="true"' : '') + '>' + (S.phoneErr ? '<span class="ls-input__err">' + esc(S.phoneErr) + '</span>' : '') + '</div><button class="ls-btn ls-btn--primary ls-btn--sm">' + esc(t('sendCode')) + '</button>'
-        : '<div class="ls-input"><label for="lscd">' + esc(t('code')) + '</label><input id="lscd" name="code" inputmode="numeric" autocomplete="one-time-code" dir="ltr" style="background:var(--ls-bg)"' + (S.phoneErr ? ' aria-invalid="true"' : '') + '>' + (S.phoneErr ? '<span class="ls-input__err">' + esc(S.phoneErr) + '</span>' : '') + '</div><label class="ls-check-row"><input type="checkbox" name="consent"><span>' + esc(shortWord('phone_consent', t('phoneConsent'))) + '</span></label><button class="ls-btn ls-btn--primary ls-btn--sm">' + esc(t('verifyCode')) + '</button>') + '</form>';
+        : '<div class="ls-input"><label for="lscd">' + esc(t('code')) + '</label><input id="lscd" name="code" inputmode="numeric" autocomplete="one-time-code" dir="ltr" style="background:var(--ls-bg)"' + (S.phoneErr ? ' aria-invalid="true"' : '') + '>' + (S.phoneErr ? '<span class="ls-input__err">' + esc(S.phoneErr) + '</span>' : '') + '</div><label class="ls-check-row"><input type="checkbox" name="consent"><span>' + esc(shortWord('phone_consent', t('phoneConsent'))) + privacyLink() + '</span></label><button class="ls-btn ls-btn--primary ls-btn--sm">' + esc(t('verifyCode')) + '</button>') + '</form>';
   }
   function compareHtml(turn) {
     if (turn.loading) { return '<div style="padding-top:12px">' + thinking() + '</div>'; }
@@ -109,9 +109,26 @@
       if (typeof onAdded === 'function') { try { onAdded(); } catch (e) { /* theirs */ } }
       afterAdd(parent || id, btn);
     };
-    var failed = function (message) {
+    var failed = function (message, soldOut) {
       if (btn) { btn.dataset.state = ''; btn.removeAttribute('aria-busy'); }
       var page = (rec(parent || id) || {}).url;
+      // the store's page says it is sold out (read live at the press): said so on the button, never a silent move to its
+      // page, and kept out of "In stock" from now on (Shopify review, 18.11: "The 3p Fulfilled Snowboard" was offered to
+      // add, and the press only opened its page). Its page stays a press away.
+      if (soldOut) {
+        var r = rec(parent || id);
+        if (r) { r.s = 0; r.buy = 0; }
+        if (btn) {
+          btn.disabled = true;
+          btn.className = btn.className.replace('ls-btn--primary', 'ls-btn--secondary').replace(' ls-add', '');
+          btn.textContent = t('outStock');
+          btn.removeAttribute('data-add');
+        }
+        var at = afterBox(parent || id, btn);
+        if (at && page && /^https?:/.test(page)) { at.innerHTML = '<a class="ls-link" href="' + esc(page) + '">' + esc(t('orderPage')) + '</a>'; }
+        announce(t('outStock'));
+        return;
+      }
       if (!variation && !variant && page && /^https?:/.test(page)) { win.location.href = page; return; }
       var box = afterBox(parent || id, btn) || LAYER.querySelector('.ls-layer__foot');
       if (box) { box.insertAdjacentHTML('beforeend', '<div class="ls-input__err" role="alert" style="margin-top:8px;width:100%">' + esc(message || t('addFailed')) + '</div>'); }
@@ -134,7 +151,8 @@
       return products([id]).then(function () {
         var p = S.products[pid(id)];
         if (p && p.variants > 1) { return choose(); }
-        if (!p || !p.variant || !p.is_in_stock) { failed(); return null; }
+        if (p && p.variant && !p.is_in_stock) { failed(null, true); return null; }
+        if (!p || !p.variant) { failed(); return null; }
         // one variant, but the page may still ask for something (a ring size): chosen first, never left out
         return pageFields(id).then(function (f) {
           if (f && f.free) { failed(); return null; }
