@@ -106,7 +106,7 @@ final class AnswerQuestionTest extends TestCase
 
         $first = $this->ask('האם זה מתאים לחוץ?')->assertOk()->json('data');
         $this->assertSame(['outcome' => 'answered', 'answer' => 'כן, הוא מתאים לשימוש בחוץ ובפנים.', 'from' => 'model', 'source' => 'store'], $first);
-        $this->assertSame(['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-5.4-nano'], array_column($this->model->calls, 'model'), 'the small model checks the question, the writer answers, the small model checks the answer');
+        $this->assertSame(['gpt-5.4-nano', 'gpt-5.4', 'gpt-5.4-nano'], array_column($this->model->calls, 'model'), 'the small model checks the question, the writer answers, the small model checks the answer');
         $this->assertStringContainsString('ברגים לעץ קשה', $this->model->calls[1]['user'], 'the writer gets the product text');
         $this->assertStringContainsString('כן, הוא מתאים', $this->model->calls[2]['user'], 'the checker gets the answer');
 

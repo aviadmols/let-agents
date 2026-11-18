@@ -87,7 +87,7 @@
         {
             "name": "answer_model",
             "type": "string",
-            "default": "gpt-5.4-mini",
+            "default": "gpt-5.4",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -150,7 +150,7 @@
         {
             "name": "answer_input_usd_per_million",
             "type": "float",
-            "default": 1,
+            "default": 2.5,
             "min": 0,
             "max": 100,
             "scope": "global",
@@ -159,7 +159,7 @@
         {
             "name": "answer_output_usd_per_million",
             "type": "float",
-            "default": 8,
+            "default": 15,
             "min": 0,
             "max": 400,
             "scope": "global",
