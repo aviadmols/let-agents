@@ -172,8 +172,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      * as "not found by that name" with the closest alternatives, never "we don't have". Graded blind on 51 real questions
      * from 7 stores by a model of the other family (v39 / v41 / v43): correct 21 / 31 / 34, wrong 7 / 6 / 5, missed 6 / 2 / 2,
      * best for the shopper 8 / 15 / 28; the same latency, a third less writer input. Rolled back by setting this to 39.
+     *
+     * v44 (answer_site only), 18.11, released as Aviad asked, without a comparison (he checks it on the stores): v43, and
+     * the writer is told who the store is (`store`: its name, whether it sells or tells, what it sells) and to fit the
+     * answer's voice to its trade. Rolled back to v43 by setting this to 43.
      */
-    public const PROMPT_VERSION = 43;
+    public const PROMPT_VERSION = 44;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -1964,7 +1968,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             + (is_string($viewingRef) ? ['viewing' => $viewingRef] : [])
             + ($now === null ? [] : ['now' => $now])
             + (($tone = $this->voice !== null ? $this->voice['tone'] : self::tone($shopId)) === null ? [] : ['tone' => $tone])
-            + (($rules = $this->rulesFor($shopId)) === [] ? [] : ['rules' => $rules]) + [
+            + (($rules = $this->rulesFor($shopId)) === [] ? [] : ['rules' => $rules])
+            // who the store is, so the answer speaks its trade (as Aviad asked, 18.11): only to a writer that reads it
+            + (self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'store') ? ['store' => $this->writerStore($shopId)] : []) + [
                 'products' => $forModel,
                 'analysis' => $analysis,
                 'passages' => array_map(fn (string $ref, array $p): array => ['ref' => $ref, 'title' => $p['title'], 'text' => $p['text']] + (isset($p['from']) ? ['from' => $p['from']] : []), array_keys($byRef), $byRef),
@@ -5451,6 +5457,25 @@ final class AnswerSiteQuestion implements TriesQuestions
             ->toBase()->first();
 
         return (int) ($row->kinds ?? 0).':'.(int) ($row->said ?? 0);
+    }
+
+    /**
+     * Who the store is, for the writer to speak its trade (as Aviad asked, 18.11): its name, whether it sells or tells
+     * (a content site), what it sells as its owner wrote it, else its biggest categories. A few words, never its pages.
+     *
+     * @return array{name: string, kind: string, sells: list<string>}
+     */
+    private function writerStore(string $shopId): array
+    {
+        $shop = Shop::query()->whereKey($shopId)->first(['name', 'profile']);
+        $profile = (array) ($shop?->profile ?? []);
+        $sells = array_values(array_filter(array_map('strval', (array) ($profile['sells'] ?? []))));
+
+        return [
+            'name' => (string) ($shop?->name ?? ''),
+            'kind' => ($profile['kind'] ?? null) === 'content' ? 'content site' : 'store',
+            'sells' => array_slice($sells !== [] ? $sells : CatalogCategory::query()->whereNull('removed_at')->orderByDesc('product_count')->limit(10)->pluck('name')->all(), 0, 10),
+        ];
     }
 
     /** What the store is, for the topic check: its name and what it sells. */
