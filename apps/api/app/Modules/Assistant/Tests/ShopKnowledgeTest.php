@@ -200,6 +200,15 @@ final class ShopKnowledgeTest extends TestCase
         }
         $rows = ['א'.str_repeat('ב', 30), 'ג'.str_repeat('ד', 30), 'ה'.str_repeat('ו', 30)];
         $this->assertSame([$rows[0]."\n".$rows[1], $rows[2]], AnswerSiteQuestion::rowChunks($rows, 70, 3), 'whole rows, none lost');
+
+        // a row longer than a piece is split at its sentences and headings, never cut in a word (Rocks, 18.11)
+        $long = '- קיצור שרשראות  אפשר תמיד לקצר שרשרת עם חוליות. האורך תלוי בגודל החוליות.  קיצור צמידים  אפשר לקצר צמיד. האורך נקבע לפי היקף פרק כף היד והמרווח שנוח להשאיר לענידה.';
+        $pieces = AnswerSiteQuestion::rowChunks([$long, '- לפריטים שמחירם 2,000 ש״ח ומעלה יש Layaway.'], 60, 9);
+        foreach ($pieces as $piece) {
+            $this->assertLessThanOrEqual(60, mb_strlen($piece));
+            $this->assertDoesNotMatchRegularExpression('/להשאיר לע$/u', $piece, 'no word cut');
+        }
+        $this->assertContains('אפשר תמיד לקצר שרשרת עם חוליות.', explode("\n", implode("\n", $pieces)));
     }
 
     public function test_what_the_team_wrote_writes_a_saved_answer_again(): void

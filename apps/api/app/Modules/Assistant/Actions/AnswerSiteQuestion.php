@@ -1262,8 +1262,10 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /**
-     * Rows in whole pieces of at most $chars each, at most $pieces of them; a row longer than $chars alone is a piece
-     * of its own, cut.
+     * Rows in whole pieces of at most $chars each, at most $pieces of them. A row longer than $chars is split at its
+     * sentences first, never cut in a word: the team's long row on shortening necklaces and bracelets was cut at "להשאיר לע",
+     * the next piece began with Layaway, and the writer told a shopper asking about a necklace of a bracelet's wrist and of
+     * Layaway in one sentence (Rocks, 18.11).
      *
      * @param  list<string>  $rows
      * @return list<string>
@@ -1272,6 +1274,22 @@ final class AnswerSiteQuestion implements TriesQuestions
     {
         $out = [];
         $piece = [];
+        $whole = [];
+        foreach ($rows as $row) {
+            if (mb_strlen($row) <= $chars) {
+                $whole[] = $row;
+
+                continue;
+            }
+            // at a sentence's end, or where the team put a heading ("קיצור צמידים" after two spaces)
+            foreach (preg_split('/(?<=[.!?])\s+|\s{2,}/u', $row) ?: [$row] as $sentence) {
+                $sentence = trim($sentence);
+                if ($sentence !== '') {
+                    $whole[] = mb_strlen($sentence) <= $chars ? $sentence : self::wholeWordsAtEnd(mb_substr($sentence, 0, $chars));
+                }
+            }
+        }
+        $rows = $whole;
 
         foreach ($rows as $row) {
             if ($piece !== [] && mb_strlen(implode("\n", [...$piece, $row])) > $chars) {
