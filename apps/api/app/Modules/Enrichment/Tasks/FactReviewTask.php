@@ -15,6 +15,7 @@ use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentBatchItem;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Scanning\Measurement;
+use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\ProductDigest;
 use App\Modules\Enrichment\Scanning\TextCondenser;
 use Illuminate\Support\Collection;
@@ -34,6 +35,19 @@ final class FactReviewTask implements AgentTask
     public static function waitingStatus(int $tier): FactStatus
     {
         return $tier >= 2 ? FactStatus::AwaitingEscalation : FactStatus::AwaitingReview;
+    }
+
+    /** Where a claim was read, as the reviewer is told it: title, field, description, picture, or empty. */
+    public static function source(EnrichmentFact $fact): string
+    {
+        $source = (string) (($fact->evidence['source'] ?? null) ?: preg_replace('/^code_/', '', (string) $fact->status_reason));
+
+        return match ($source) {
+            'image' => 'picture',
+            'title', 'field', 'description' => $source,
+            'store_type', 'variant', 'category' => 'field',
+            default => '',
+        };
     }
 
     public function requests(EnrichmentBatch $batch, int $limit): iterable
@@ -66,12 +80,25 @@ final class FactReviewTask implements AgentTask
                 continue;
             }
 
+            // From v6 the reviewer is told where each claim was read and sees the product's picture as it was described:
+            // a look read from the photo was judged from the text alone, and true ones were rejected (Me369, 18.11:
+            // a collar, a floral print, a gathered waist, all in the picture)
+            $seesPicture = $subject === 'product' && $batch->prompt_version >= 6;
             $claims = [];
             $claimIds = [];
             foreach ($facts->values() as $i => $fact) {
                 $claimId = 'f'.($i + 1);
                 $claimIds[$claimId] = $fact->id;
-                $claims[] = [$claimId, $fact->kind->value, $fact->key, $this->claimValue($fact), (string) $fact->quote];
+                $claim = [$claimId, $fact->kind->value, $fact->key, $this->claimValue($fact), (string) $fact->quote];
+                if ($seesPicture) {
+                    $claim[] = self::source($fact);
+                }
+                $claims[] = $claim;
+            }
+            $picture = null;
+            if ($seesPicture && in_array('picture', array_column($claims, 5), true)) {
+                $seen = PictureText::for([(string) $subjectId])[(string) $subjectId] ?? null;
+                $picture = $seen === null ? null : mb_substr(PictureText::text($seen), 0, 1200);
             }
 
             // Highlights were written from longer text (see ProductHighlightsTask): the checker reads the same text.
@@ -82,6 +109,7 @@ final class FactReviewTask implements AgentTask
                 'text' => $highlights
                     ? $this->text($subjectModel, (int) Settings::get('enrichment.max_highlight_text_chars', $batch->shop_id), $this->boilerplate($facts->first(fn (EnrichmentFact $f): bool => in_array($f->kind, [FactKind::Highlight, FactKind::Summary], true))), true)
                     : $this->text($subjectModel, $maxChars, $this->boilerplate($facts->first())),
+            ] + ($picture === null ? [] : ['picture' => $picture]) + [
                 'claims' => $claims,
             ];
 

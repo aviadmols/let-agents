@@ -175,13 +175,14 @@ final class KindOfProductTest extends TestCase
         $this->assertContains('quote_not_found:genre', $problems, 'words the text does not hold');
 
         $review = app(CreateTaskFile::class)->handle($this->shop->id, TaskType::FactReview, $vocabulary->id, 1, ['subject' => 'product'])['batch'];
-        $this->assertSame(5, $review->prompt_version);
+        $this->assertSame(6, $review->prompt_version);
         $this->assertSame(PromptLibrary::version(TaskType::FactReview, $vocabulary->definition()), $review->prompt_version);
         $this->assertStringContainsString('`unsure` only when the text does not say what the product is about', $review->system_prompt);
         $this->assertStringContainsString('## Kinds', $review->system_prompt);
 
         $claim = $this->inShop(fn () => $review->items()->sole());
-        $this->assertSame([['f1', 'choice', 'genre', 'fantasy', 'מסע אפי בעולם של קסם, דרקונים ומלכים']], $claim->request['claims']);
+        // the claim says where it was read (fact_review v6): a model's reading names none
+        $this->assertSame([['f1', 'choice', 'genre', 'fantasy', 'מסע אפי בעולם של קסם, דרקונים ומלכים', '']], $claim->request['claims']);
         $this->import($review, $claim->custom_id, ['id' => '2', 'verdicts' => ['f1' => 'ok']]);
 
         $this->assertSame(FactStatus::Approved, $this->inShop(fn () => $fact->fresh()->status), 'a fantasy novel that never says "פנטזיה" is found by it');

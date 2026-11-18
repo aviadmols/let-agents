@@ -226,8 +226,10 @@ final class ReadProductsInCode
                 // Read from the store's own words, each with how sure its source is and where it was read.
                 foreach ((array) ($reading['text_choices'] ?? []) as $key => $choice) {
                     foreach ($choice['values'] as $value) {
-                        $write(self::fromPicture($choice['source'], $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$choice['source'],
-                            'confidence' => CodeReading::CONFIDENCE[$choice['source']], 'evidence' => ['source' => $choice['source'], 'ref' => mb_substr($choice['quote'], 0, 300)]]);
+                        // each value by the source that named it, where a choice of several was read from more than one
+                        $source = (string) ($choice['by'][$value] ?? $choice['source']);
+                        $write(self::fromPicture($source, $key, $vocabulary, $status) + ['kind' => FactKind::Choice, 'key' => $key, 'value_text' => $value, 'quote' => mb_substr($choice['quote'], 0, 1000), 'vocabulary_id' => $vocabulary?->id, 'status_reason' => 'code_'.$source,
+                            'confidence' => CodeReading::CONFIDENCE[$source], 'evidence' => ['source' => $source, 'ref' => mb_substr($choice['quote'], 0, 300)]]);
                     }
                 }
                 // Implied by what the product is made of (a ruby is red): code, never superseded by a model reading.
@@ -279,6 +281,15 @@ final class ReadProductsInCode
     {
         if ($source !== 'image' || $vocabulary === null || $status !== FactStatus::Approved) {
             return [];
+        }
+
+        // A colour the picture shows is filed as the vocabulary's threshold says; any other look read from the picture alone
+        // (a style, a neckline, a print) waits for the reviewer, who sees the picture's words beside the text (fact_review
+        // v6): a bank written with a low threshold filed "romantic" from a describer's word on a red dress (Me369, 18.11).
+        // (a threshold the vocabulary names for this very attribute is still its own word: it trusts pictures for its metal)
+        $named = array_key_exists($key, (array) ($vocabulary->definition()->toArray()['image']['filter_confidence'] ?? []));
+        if (! $named && preg_match('/(?:^|_)colou?rs?(?:$|_)/', $key) !== 1) {
+            return ['status' => FactStatus::AwaitingReview];
         }
 
         return CodeReading::CONFIDENCE['image'] >= $vocabulary->definition()->imageFilterConfidence($key) ? [] : ['status' => FactStatus::AwaitingReview];

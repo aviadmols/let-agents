@@ -90,6 +90,26 @@ return [
         'label' => 'Products the reviewer checks a night',
         'description' => 'Products with details waiting for review. 0 turns the review off.',
     ],
+    'escalation_provider' => [
+        'label' => 'The provider of the stronger model that decides what the reviewer was unsure of',
+        'description' => 'Another family than the reader. anthropic by default.',
+    ],
+    'escalation_model' => [
+        'label' => 'The stronger model that decides',
+        'description' => 'What it is unsure of too goes to a person.',
+    ],
+    'escalation_input_usd_per_million' => [
+        'label' => 'The deciding model\'s input price (USD per million tokens)',
+        'description' => 'For the cost of each check.',
+    ],
+    'escalation_output_usd_per_million' => [
+        'label' => 'The deciding model\'s output price (USD per million tokens)',
+        'description' => 'For the cost of each check.',
+    ],
+    'escalation_requests' => [
+        'label' => 'Products the deciding model checks a run',
+        'description' => 'Products with details the reviewer was unsure of. 0 turns the decision off.',
+    ],
     'picture_provider' => [
         'label' => 'Provider of the model that suggests a detail from the picture',
         'description' => 'On the missing details screen: suggests a value for a detail of looks (colour, stone, shape) from the product\'s picture. A person approves.',

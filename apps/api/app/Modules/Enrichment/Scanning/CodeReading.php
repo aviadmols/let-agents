@@ -176,6 +176,45 @@ final class CodeReading
                 $patterns[(string) $value['key']] = (array) ($value['patterns'] ?? []);
             }
 
+            // A choice that may hold several (stones, colours, prints) takes what the store's fields, the title and the
+            // description each name, together, every value with the source it came from: "קורל, אוניקס ופנינים" in a
+            // title and "ספיר" in its description are four stones, not the title's three (Aviad, 18.11: the name and the
+            // description both go into the tags). The picture is read only when none of them names one.
+            if ($vocabulary->isMultiple($key)) {
+                $union = [];
+                $by = [];
+                foreach (self::sources($vocabulary, $key) as $source) {
+                    if ($source === 'image' && $union !== []) {
+                        break;
+                    }
+                    $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
+                    foreach ((array) ($attribute['values'] ?? []) as $value) {
+                        $valueKey = (string) $value['key'];
+                        if (isset($union[$valueKey])) {
+                            continue;
+                        }
+                        $quote = self::find($read, (array) ($value['patterns'] ?? []));
+                        if ($quote === null) {
+                            continue;
+                        }
+                        if (($text['colours'] ?? null) !== null && $source !== 'field' && in_array($key, self::VARIANT_COLOUR_KEYS, true)
+                            && self::find((string) $text['colours'], (array) ($patterns[$valueKey] ?? [])) === null) {
+                            continue;
+                        }
+                        $union[$valueKey] = $quote;
+                        $by[$valueKey] = $source;
+                    }
+                    if ($source === 'image') {
+                        break;
+                    }
+                }
+                if ($union !== []) {
+                    $out[$key] = ['values' => array_keys($union), 'source' => (string) reset($by), 'quote' => implode(' · ', array_unique(array_values($union))), 'by' => $by];
+                }
+
+                continue;
+            }
+
             foreach (self::sources($vocabulary, $key) as $source) {
                 $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
                 $found = [];

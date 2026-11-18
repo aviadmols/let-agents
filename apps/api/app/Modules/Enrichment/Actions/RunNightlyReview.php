@@ -68,7 +68,12 @@ final class RunNightlyReview
                     return;
                 }
 
-                $viaBatch = Features::enabled('enrichment.batch_reading', $shopId) && $this->provider->supports($reviewer->provider);
+                // What the reviewer was unsure of goes on, in the same run, to a stronger model, of another family than the
+                // reader too: those waited for a person no one scheduled (229 on Me369, 18.11). Each batch is answered by
+                // the model of its own tier: a waiting tier-2 batch was answered by the tier-1 reviewer.
+                $escalator = AgentModel::from('enrichment.escalation_provider', 'enrichment.escalation_model');
+                $escalate = (int) Settings::get('enrichment.escalation_requests', $shopId) > 0 && $escalator->provider->family() !== $reader->family();
+                $tiers = [1 => [$reviewer, $limit]] + ($escalate ? [2 => [$escalator, (int) Settings::get('enrichment.escalation_requests', $shopId)]] : []);
                 $waiting = fn () => EnrichmentBatch::query()->where('task', TaskType::FactReview)->where('status', BatchStatus::AwaitingResults)
                     ->where('runner', '!=', CompareReaders::RUNNER);
 
@@ -79,35 +84,45 @@ final class RunNightlyReview
                     return;
                 }
 
-                $batch = $this->tenant->run($shopId, fn () => $waiting()->whereNull('provider_batch_id')->oldest('created_at')->first());
-
-                if ($batch === null) {
-                    foreach ($this->tenant->run($shopId, fn () => EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get()) as $vocabulary) {
-                        $batch = $this->batches->handle($shopId, TaskType::FactReview, $vocabulary->id, 1, ['subject' => 'product'], $limit)['batch'] ?? null;
-
-                        if ($batch !== null) {
-                            break;
+                $done = [];
+                foreach ($tiers as $tier => [$model, $tierLimit]) {
+                    $batch = $this->tenant->run($shopId, fn () => $waiting()->whereNull('provider_batch_id')->where('review_tier', $tier)->oldest('created_at')->first());
+                    if ($batch === null) {
+                        foreach ($this->tenant->run($shopId, fn () => EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get()) as $vocabulary) {
+                            $batch = $this->batches->handle($shopId, TaskType::FactReview, $vocabulary->id, $tier, ['subject' => 'product'], $tierLimit)['batch'] ?? null;
+                            if ($batch !== null) {
+                                break;
+                            }
                         }
                     }
+                    if ($batch === null) {
+                        continue;
+                    }
+
+                    if (Features::enabled('enrichment.batch_reading', $shopId) && $this->provider->supports($model->provider)) {
+                        $sent = $this->tenant->run($shopId, fn (): array => $this->submit->handle($run, $batch, $model->model, $model->provider));
+                        $run->output($sent + ['batch' => $batch->id, 'tier' => $tier, 'via' => 'batch', 'model' => $model->model])
+                            ->summary('enrichment::runs.review_submitted', ['submitted' => number_format($sent['submitted'])]);
+
+                        return;
+                    }
+
+                    $done[$tier] = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $model->model, $tierLimit, $model->provider))
+                        + ['batch' => $batch->id, 'model' => $model->model];
                 }
 
-                if ($batch === null) {
+                if ($done === []) {
                     $run->output(['asked' => 0])->summary('enrichment::runs.review_nothing');
 
                     return;
                 }
 
-                if ($viaBatch) {
-                    $sent = $this->tenant->run($shopId, fn (): array => $this->submit->handle($run, $batch, $reviewer->model, $reviewer->provider));
-                    $run->output($sent + ['batch' => $batch->id, 'via' => 'batch', 'model' => $reviewer->model])
-                        ->summary('enrichment::runs.review_submitted', ['submitted' => number_format($sent['submitted'])]);
-
-                    return;
-                }
-
-                $counts = $this->tenant->run($shopId, fn (): array => $this->answers->handle($run, $batch, $reviewer->model, $limit, $reviewer->provider));
-                $run->output($counts + ['batch' => $batch->id, 'via' => 'direct', 'model' => $reviewer->model])
-                    ->summary('enrichment::runs.reviewed', ['asked' => number_format($counts['asked']), 'applied' => number_format($counts['applied'])]);
+                $first = $done[1] ?? reset($done);
+                $run->output($first + ['via' => 'direct', 'tiers' => $done])
+                    ->summary('enrichment::runs.reviewed', [
+                        'asked' => number_format(array_sum(array_column($done, 'asked'))),
+                        'applied' => number_format(array_sum(array_column($done, 'applied'))),
+                    ]);
             },
         );
     }
