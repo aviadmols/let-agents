@@ -161,7 +161,8 @@
     var opening = (el.tagName === 'A' || el.dataset.add || el.dataset.options) && el.dataset.state !== 'done';
     if (turn.kind === 'results' && id && opening && !el.dataset.heart) { countClick(turn.q, itemOf(id), filtered(turn).length); }
     // left the page through one of its results: the next opening, on that page or in another tab, comes back to it
-    if (el.tagName === 'A' && id && opening && (turn === S.live || turn.kind === 'results')) {
+    // (left through a card: kept above with the card, never again here without it)
+    if (!left && el.tagName === 'A' && id && opening && (turn === S.live || turn.kind === 'results')) {
       keepBack(turn.q, turn === S.live ? null : turn.id, turn !== S.live && S.wide === turn.id);
     }
     if (turn.kind === 'answer') {

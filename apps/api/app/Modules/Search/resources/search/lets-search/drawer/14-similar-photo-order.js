@@ -3,10 +3,14 @@
   // oos: from the product page's row for a product or a variant sold out ({ whole, want: [{ value, shown, size }], size }):
   // only the similar ones in stock, and in the option that is gone (the variant filters, asked of one variant in stock)
   // from: the results the product was shown in. What the shopper filtered them by stays on its like (QA, 18.11: size M was
-  // chosen, and "Similar" showed every size); where none of its like is all of it, the last chosen is let go, one at a
-  // time, and the line above them says which
+  // chosen, and "Similar" showed every size); where none of its like is all of it, a filter is let go, one at a time,
+  // and the line above them says which
   function similarTurn(id, size, oos, otherColour, asked, from) {
-    var fromC = from && from.c && !oos ? C(from) : null, kept = fromC ? codesOn(fromC) : [], keptC = blankC();
+    // (a value read from the words, "dress", is let go first and silently: the like of a dress are dresses, however the
+    // store tagged them; a value the shopper chose, a size, is let go last and said)
+    var fromC = from && from.c && !oos ? C(from) : null, keptC = blankC();
+    var chosen = fromC ? Object.keys(fromC.f).filter(function (k) { return fromC.f[k]; }).map(Number) : [];
+    var kept = fromC ? codesOn(fromC).filter(function (code) { return chosen.indexOf(code) < 0; }).concat(chosen) : [];
     kept.forEach(function (code) { keptC.f[code] = true; });
     if (fromC) { keptC.stock = onStock(fromC); keptC.sale = onSale(fromC); }
     // on a desktop the similar items open large, like "show all": the product on top, filters, the full grid
@@ -33,7 +37,7 @@
         if (kept.length && inSize.length) {
           turn.ids = inSize;
           var c = C(turn), label = function (code) { var f = S.facets[Math.floor(code / 1000)], v = f && f.v ? f.v[code % 1000] : null; return v ? String(v.l) : ''; };
-          for (var k = kept.length - 1; k >= 0 && !filtered(turn).length; k--) { delete c.f[kept[k]]; gone.push(label(kept[k])); }
+          for (var k = 0; k < kept.length && !filtered(turn).length; k++) { delete c.f[kept[k]]; if (chosen.indexOf(kept[k]) >= 0) { gone.push(label(kept[k])); } }
           if (!filtered(turn).length && c.sale) { c.sale = false; gone.push(t('onSale')); }
           if (!filtered(turn).length && c.stock) { c.stock = false; gone.push(t('inStock')); }
         }

@@ -98,7 +98,8 @@
     // words typed and left in the field come back with the next opening, as a search sent does
     var left = INPUT.value.trim();
     // (the words of the search on screen are that search, already kept with it)
-    if (left && !S.askMode && left !== S.keptQ) { keepBack(left, null); }
+    var was = backTo();
+    if (left && !S.askMode && left !== S.keptQ && !(was && was.q === left && was.card)) { keepBack(left, null); }
     // the similar products on screen are come back to as they were, large or not, not the search before them
     // (as Aviad asked, 2026-10-30); a question and its answer still are not
     else if (!S.askMode) {
