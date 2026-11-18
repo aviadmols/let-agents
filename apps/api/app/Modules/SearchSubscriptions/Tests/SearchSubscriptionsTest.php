@@ -51,7 +51,7 @@ final class SearchSubscriptionsTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        $this->shop = Shop::factory()->create(['name' => 'Gueta Avigdor', 'timezone' => 'Asia/Jerusalem', 'domain' => 'store.test']);
+        $this->shop = Shop::factory()->create(['name' => 'Gueta Avigdor', 'timezone' => 'Asia/Jerusalem', 'domain' => 'store.test', 'plan' => 'growth']);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => self::ORIGIN, 'access_token' => self::TOKEN, 'status' => ConnectionStatus::Connected,
         ]));

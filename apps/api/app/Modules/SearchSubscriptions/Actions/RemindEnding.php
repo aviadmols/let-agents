@@ -2,12 +2,12 @@
 
 namespace App\Modules\SearchSubscriptions\Actions;
 
-use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\SearchSubscriptions\Mail\StillInterestedMail;
 use App\Modules\SearchSubscriptions\Models\SearchSubscription;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionSend;
+use App\Modules\SearchSubscriptions\Support\Availability;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -31,7 +31,7 @@ final class RemindEnding
 
         $sent = 0;
         foreach ($due as $subscription) {
-            if (! Features::enabled('search_subscriptions.enabled', $subscription->shop_id)) {
+            if (! Availability::on($subscription->shop_id)) {
                 continue;
             }
             $shop = Shop::query()->find($subscription->shop_id);

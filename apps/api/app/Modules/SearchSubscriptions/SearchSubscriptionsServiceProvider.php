@@ -4,10 +4,12 @@ namespace App\Modules\SearchSubscriptions;
 
 use App\Core\Facades\Settings;
 use App\Core\Modules\ModuleServiceProvider;
+use App\Modules\Search\Contracts\DrawerConfig;
 use App\Modules\SearchSubscriptions\Actions\ForgetRemovedStores;
 use App\Modules\SearchSubscriptions\Actions\RemindEnding;
 use App\Modules\SearchSubscriptions\Actions\SendWeekly;
 use App\Modules\SearchSubscriptions\Listeners\ForgetSubscriber;
+use App\Modules\SearchSubscriptions\Support\DrawerOffer;
 use App\Modules\SearchSubscriptions\Support\SubscriberData;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
@@ -19,7 +21,8 @@ use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Search Subscriptions: a shopper subscribes to a search in the drawer and gets one email a week at most with its new,
- * in-stock products (docs: lets-search-subscriptions). Off unless search_subscriptions.enabled is on for the store.
+ * in-stock products (docs: lets-search-subscriptions). Off unless search_subscriptions.enabled is on for the store, and
+ * only on the plans in search_subscriptions.plans (Growth): Availability.
  */
 final class SearchSubscriptionsServiceProvider extends ModuleServiceProvider
 {
@@ -27,6 +30,8 @@ final class SearchSubscriptionsServiceProvider extends ModuleServiceProvider
     {
         // A shopper who asks the store what it keeps about them: their searches.
         $this->app->tag([SubscriberData::class], KeepsShopperData::TAG);
+        // The drawer's offer, for the stores that have the feature.
+        $this->app->tag([DrawerOffer::class], DrawerConfig::TAG);
     }
 
     protected function bootModule(): void
@@ -35,6 +40,8 @@ final class SearchSubscriptionsServiceProvider extends ModuleServiceProvider
         RateLimiter::for('search-subscriptions', fn (Request $request): Limit => Limit::perMinute((int) Settings::get('search_subscriptions.signups_per_minute'))
             ->by('search-subscriptions:'.$request->ip().'|'.$request->route('site')));
         RateLimiter::for('search-subscription-links', fn (Request $request): Limit => Limit::perMinute(60)->by('search-subscription-links:'.$request->ip()));
+        // Resend's webhook, from its own servers: signed, so only a generous limit
+        RateLimiter::for('search-subscription-bounces', fn (Request $request): Limit => Limit::perMinute(600)->by('search-subscription-bounces:'.$request->ip()));
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             // each store at its own day and hour, in its own time: looked at every hour

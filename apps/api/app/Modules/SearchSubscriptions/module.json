@@ -6,12 +6,18 @@
         "Connections",
         "Catalog",
         "Search",
-        "Shopify"
+        "Shopify",
+        "Analytics",
+        "Admin"
     ],
     "provider": "SearchSubscriptionsServiceProvider",
     "features": [
         {
             "name": "enabled",
+            "default": false
+        },
+        {
+            "name": "offered",
             "default": false
         }
     ],
@@ -137,6 +143,22 @@
             "max": 365,
             "scope": "global",
             "unit": "days"
+        },
+        {
+            "name": "plans",
+            "type": "string",
+            "default": "growth",
+            "min": 0,
+            "max": 200,
+            "scope": "global"
+        },
+        {
+            "name": "blocked_words",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 4000,
+            "scope": "global"
         }
     ]
 }

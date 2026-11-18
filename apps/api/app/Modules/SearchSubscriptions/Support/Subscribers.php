@@ -2,6 +2,7 @@
 
 namespace App\Modules\SearchSubscriptions\Support;
 
+use App\Core\Facades\Settings;
 use App\Modules\SearchSubscriptions\Models\SearchSubscription;
 use Illuminate\Support\Facades\URL;
 
@@ -14,6 +15,13 @@ final class Subscribers
 {
     /** The longest search kept, in characters. */
     public const QUERY_MAX = 120;
+
+    /**
+     * Offensive words no search to be followed may hold, as queryKey() reads them, beside the operator's own
+     * (search_subscriptions.blocked_words). A search is shown in emails and in the store's panel.
+     */
+    private const OFFENSIVE = ['fuck', 'shit', 'cunt', 'nigger', 'nigga', 'faggot', 'whore', 'slut', 'motherfucker', 'bitch',
+        'זונה', 'שרמוטה', 'כוסאמק', 'כוסאמא', 'כוס אמא', 'כוס אמק', 'בן זונה', 'מניאק', 'חרא', 'קוקסינל'];
 
     public static function normalEmail(string $email): string
     {
@@ -54,7 +62,32 @@ final class Subscribers
             return false;
         }
 
-        return preg_match('/[<>{}]|@|\b\S+@\S+\.\S+|(?:\d[\s\-]?){7,}/u', $query) !== 1;
+        return preg_match('/[<>{}]|@|\b\S+@\S+\.\S+|(?:\d[\s\-]?){7,}/u', $query) !== 1 && ! self::offensive($query);
+    }
+
+    /**
+     * Whether the words hold an offensive word: a Hebrew one as a whole word, with the letters that join a word before
+     * it (ה, ו, ב, ל, מ, ש, כ); a Latin one as a whole word or with a common ending ("fucking"), never inside another
+     * word ("shitake" is a mushroom).
+     */
+    public static function offensive(string $query): bool
+    {
+        $key = ' '.self::queryKey($query).' ';
+        $own = preg_split('/\s*,\s*/u', (string) Settings::get('search_subscriptions.blocked_words')) ?: [];
+        foreach (array_merge(self::OFFENSIVE, $own) as $word) {
+            $word = self::queryKey((string) $word);
+            if ($word === '') {
+                continue;
+            }
+            $pattern = preg_match('/\p{Hebrew}/u', $word) === 1
+                ? '/ [והבלמשכ]{0,2}'.preg_quote($word, '/').' /u'
+                : '/ '.preg_quote($word, '/').'(?:s|es|ing|in|ed|er|ers|y)? /u';
+            if (preg_match($pattern, $key) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** The words cut for a title or a line: about $max characters, never in the middle of a word when it can help it. */

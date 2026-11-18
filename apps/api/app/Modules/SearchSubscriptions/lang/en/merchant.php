@@ -1,0 +1,45 @@
+<?php
+
+return [
+    'nav' => 'Search Subscriptions',
+    'title' => 'Search Subscriptions',
+    'help' => 'A shopper who searched can follow the search and get one email a week at most, only when new matching products arrive and are in stock. They confirm their address first, and stop with one tap.',
+    'placement' => 'Where the offer shows',
+    'placement_sub' => 'Under a search\'s results, or only when nothing matches exactly.',
+    'placements' => [
+        'end' => 'At the end of the results',
+        'no_match' => 'Only with no exact match',
+    ],
+    'send_day' => 'Send day',
+    'send_day_sub' => 'The email goes out on this day at :hour, in your store\'s time.',
+    'days' => [
+        'sunday' => 'Sunday',
+        'monday' => 'Monday',
+        'tuesday' => 'Tuesday',
+        'wednesday' => 'Wednesday',
+        'thursday' => 'Thursday',
+        'friday' => 'Friday',
+        'saturday' => 'Saturday',
+    ],
+    'logo' => 'Logo for the email',
+    'logo_sub' => 'An image address starting with https. With none, your store\'s name heads the email.',
+    'reply_to' => 'Replies go to',
+    'reply_to_sub' => 'Your email address, for shoppers who reply to the email.',
+    'errors' => [
+        'logo' => 'Enter an image address that starts with https://',
+        'reply_to' => 'Enter a valid email address',
+    ],
+    'followed' => [
+        'title' => 'Searches people follow',
+        'help' => 'The searches with the most followers now, and what the emails did in the last :days days.',
+        'following' => 'People following',
+        'signups' => 'New sign-ups',
+        'sent' => 'Emails sent',
+        'opened' => 'Opened',
+        'clicked' => 'Clicked',
+        'of_sent' => ':n% of emails',
+        'revenue' => 'Sales from the emails',
+        'none' => 'No one follows a search yet. Followed searches will show here.',
+        'row' => '{1} One person follows “:query”|[2,*] :count people follow “:query”',
+    ],
+];

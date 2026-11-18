@@ -20,6 +20,9 @@ return [
 
     'resend' => [
         'key' => env('RESEND_API_KEY'),
+        // Resend's signing secret for its webhooks (whsec_…): a hard bounce or a complaint stops Search Subscriptions'
+        // emails to that address (SearchSubscriptions BounceController). Without it the webhook is refused.
+        'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),
     ],
 
     // The store's picture behind a demo (the Demo module). Without a key: the free tier, a few dozen a day.

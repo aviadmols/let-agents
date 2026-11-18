@@ -2,12 +2,12 @@
 
 namespace App\Modules\SearchSubscriptions\Http\Controllers;
 
-use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\SearchSubscriptions\Actions\StopSubscriptions;
 use App\Modules\SearchSubscriptions\Actions\Subscribe;
 use App\Modules\SearchSubscriptions\Models\SearchSubscription;
+use App\Modules\SearchSubscriptions\Support\Availability;
 use App\Modules\SearchSubscriptions\Support\BrowserTokens;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,7 +82,8 @@ final class SubscribeController
         if ($origin === null || ! $connection->allowsOrigin($origin)) {
             return [null, response()->json(['error' => 'other_origin'], 403)];
         }
-        if (! Features::enabled('search_subscriptions.enabled', $connection->shop_id)) {
+        // on for the store, and its plan carries it (Growth): otherwise no sign-up, whatever the page sends
+        if (! Availability::on($connection->shop_id)) {
             return [null, response()->json(['error' => 'not_enabled'], 403)];
         }
 

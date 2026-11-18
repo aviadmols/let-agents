@@ -2,7 +2,6 @@
 
 namespace App\Modules\SearchSubscriptions\Actions;
 
-use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -13,6 +12,7 @@ use App\Modules\SearchSubscriptions\Mail\WeeklyNewArrivalsMail;
 use App\Modules\SearchSubscriptions\Models\SearchSubscription;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionProduct;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionSend;
+use App\Modules\SearchSubscriptions\Support\Availability;
 use App\Modules\SearchSubscriptions\Support\Subscribers;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Carbon;
@@ -48,7 +48,7 @@ final class SendWeekly
 
         foreach ($shopIds as $shopId) {
             $shop = Shop::query()->find($shopId);
-            if ($shop === null || ! Features::enabled('search_subscriptions.enabled', (string) $shopId) || ($onlyShop === null && ! self::due($shop, $now))) {
+            if ($shop === null || ! Availability::on((string) $shopId) || ($onlyShop === null && ! self::due($shop, $now))) {
                 continue;
             }
             $connected = $this->tenant->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $shopId)->where('status', '!=', ConnectionStatus::Failed)->exists());
