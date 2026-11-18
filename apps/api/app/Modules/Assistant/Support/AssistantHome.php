@@ -13,6 +13,7 @@ use App\Modules\Admin\Contracts\ModuleFigure;
 use App\Modules\Admin\Contracts\ShopNotice;
 use App\Modules\Assistant\Filament\Merchant\Pages\ShopQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Tenancy\Models\Shop;
 use Carbon\CarbonInterface;
 
@@ -57,7 +58,7 @@ final class AssistantHome implements FirstSteps, HomeCards, HomeSource
             kind: ShopNotice::TODO,
             tone: 'bad',
             title: trans_choice('assistant::home.open_title', $open->count(), ['count' => $open->count()]),
-            body: __('assistant::home.open_body', ['question' => $top->question, 'times' => (int) $top->asked_count]),
+            body: __('assistant::home.open_body', ['question' => $top->question, 'times' => self::times($top)]),
             source: __('assistant::home.questions'),
             at: $top->last_asked_at,
             url: ShopQuestions::getUrl(panel: 'merchant', tenant: $shop),
@@ -109,11 +110,21 @@ final class AssistantHome implements FirstSteps, HomeCards, HomeSource
             key: 'answer',
             order: 30,
             title: __('assistant::home.step.title'),
-            body: $top === null ? __('assistant::home.step.body_none') : __('assistant::home.step.body', ['question' => $top->question, 'times' => (int) $top->asked_count]),
+            body: $top === null ? __('assistant::home.step.body_none') : __('assistant::home.step.body', ['question' => $top->question, 'times' => self::times($top)]),
             button: __('assistant::home.step.button'),
             url: ShopQuestions::getUrl(panel: 'merchant', tenant: $shop),
             done: AssistantAnswer::query()->where('source', 'team')->exists(),
         )];
+    }
+
+    /**
+     * How many times an open question was asked, as the shopper's asks of it count it: an answer of "not found" never
+     * raised its own count, and every open question read "asked 0 times" (Shopify review, 18.11). At least once: it is
+     * on the list because someone asked it.
+     */
+    private static function times(AssistantAnswer $answer): int
+    {
+        return max(1, (int) $answer->asked_count, AssistantSearchAsk::query()->where('answer_id', $answer->id)->count());
     }
 
     private function open()

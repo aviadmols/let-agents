@@ -9,6 +9,7 @@ use App\Modules\Admin\Contracts\FirstStep;
 use App\Modules\Admin\Contracts\FirstSteps;
 use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Analytics\Models\AnalyticsVisit;
+use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Search\Filament\Merchant\Pages\ManualConnectSettings;
 use App\Modules\Search\Models\SearchLog;
@@ -96,8 +97,16 @@ final class SearchFirstSteps implements FirstSteps
      */
     private function embedded(Shop $shop): bool
     {
+        // and any search, question or event from it: on a Shopify store those come only from the drawer the embed loads,
+        // and a visit's row can be missing (the theme editor's frame keeps no session) where the reviewer's question was
+        // there (App Store review, 18.11)
+        $since = now()->subDays(14);
+
         return $shop->platform === ShopPlatform::Shopify && Features::enabled('search.storefront', $shop->id)
-            && AnalyticsVisit::query()->where('created_at', '>=', now()->subDays(14))->exists();
+            && (AnalyticsVisit::query()->where('created_at', '>=', $since)->exists()
+                || AnalyticsEvent::query()->where('occurred_at', '>=', $since)->exists()
+                || SearchLog::query()->where('created_at', '>=', $since)->exists()
+                || AssistantSearchAsk::query()->where('created_at', '>=', $since)->exists());
     }
 
     private function live(): bool
