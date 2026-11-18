@@ -2178,6 +2178,8 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $corrected = self::corrected($question, $scope->data['corrected'] ?? null);
                     // a reply, as it stands alone (scope_site v8; v9 keeps what a narrowing reply does not change): "כמה פעמים כדאי לקחת את הקורדיספס?", what is searched and answered
                     $corrected = $this->conversation === [] ? $corrected : (self::standalone($scope->data['standalone'] ?? null) ?? $corrected);
+                    // the check read the reply and left it as it is: it stands alone, and is never glued to the question before
+                    $readAlone = true;
                     if ($corrected !== null && $remember && $keep && $viewing === null && $visitorHash !== null
                         && ($set = $this->set($shopId, $corrected, $visitorHash, $locale)) !== null) {
                         $result = $set;
@@ -2203,9 +2205,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                     }
                 }
 
-                // a reply the topic check did not write to stand alone (no check in this store): searched with the question
-                // before it, the nearest it can be read without a model
-                if ($this->conversation !== [] && $corrected === null) {
+                // a reply no topic check read (no check in this store): searched with the question before it, the nearest it
+                // can be read without a model. A reply
+                // the check read and left as it is stands alone: "מה מתאים לקידוח בבטון?" after a question on pergola wood
+                // was glued to it, and answered about pergolas (Gueta, 18.11).
+                if ($this->conversation !== [] && $corrected === null && ! ($readAlone ?? false)) {
                     $corrected = $this->conversation[count($this->conversation) - 1]['question'].' '.$question;
                 }
                 // A replay on frozen data gives the writer what it was given then; everything else, today's.

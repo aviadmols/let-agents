@@ -1223,6 +1223,24 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(1, $inputs[1]['products'], 'about what the answer before showed');
     }
 
+    public function test_a_new_question_the_topic_check_left_as_it_is_is_never_glued_to_the_one_before(): void
+    {
+        // Gueta, 18.11: "מה מתאים לקידוח בבטון?" after "איזה עץ הכי טוב לבנית פרגולה?" was searched and answered as both
+        // together; the check had left it as it was, and code glued the question before in front of it.
+        $this->drills();
+        Features::override('assistant.site_scope', true);
+        $this->replies = [
+            ['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'מה מתאים לקידוח בבטון?', 'standalone' => ''],
+            ['found' => true, 'answer' => 'למקדחה רוטטת, מקדח בטון.', 'refs' => [], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+
+        $this->reply('מה מתאים לקידוח בבטון?', [['q' => 'איזה עץ הכי טוב לבנית פרגולה?', 'a' => 'עץ אורן דו שכבתי.']]);
+
+        $sent = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['passages']));
+        $this->assertSame('מה מתאים לקידוח בבטון?', $sent['question']);
+    }
+
     public function test_a_reply_that_says_nothing_of_price_keeps_the_conversations(): void
     {
         // Rocks, 28.10: "יש משהו עם זהב צהוב?" after "טבעות לנישואים עם יהלום אחד עד 3000 ש"ח" showed a ring of ₪3,300.
