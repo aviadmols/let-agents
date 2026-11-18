@@ -214,7 +214,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38], 'verify_site' => [36]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 39], 'verify_site' => [36, 39]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
@@ -1907,8 +1907,15 @@ final class AnswerSiteQuestion implements TriesQuestions
         // something that does not work for the shopper ("לא קיבלתי קוד במייל"): the writer may ask back with choices (v24)
         $this->trouble = self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'trouble') && self::reportsTrouble($this->asked !== '' ? $this->asked : $question);
 
+        // A reply in a conversation is given to the writer as the shopper typed it, beside the conversation, and the topic
+        // check's reading of it as read_as, a help only (answer_site v39 on): "48 ס"מ" read as "לאיזה אורך תרצו להגיע? 48
+        // ס"מ" sent the writer to a bracelet's wrist in an answer about a necklace (Rocks, 18.11). The search still goes
+        // by the reading. An older prompt is given what it was.
+        $typed = $this->conversation !== [] && $this->asked !== '' && $this->asked !== $question
+            && self::promptReads('answer_site', $this->promptVersions['answer_site'] ?? self::PROMPT_VERSION, 'read_as');
         $input = (string) json_encode([
-            'question' => $question,
+            'question' => $typed ? $this->asked : $question,
+        ] + ($typed ? ['read_as' => $question] : []) + [
             // the language to answer in, as code read it from the question (AnswerLanguage): on an English store the
             // writer, reading Hebrew examples and passages, answered English questions in Hebrew (lets-review-test-4, 15.11)
             'language' => AnswerLanguage::name($this->language),
@@ -2346,7 +2353,9 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $started = hrtime(true);
 
                         try {
-                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared, (array) ($screened['general'] ?? [])), $checkOutput, $checkEffort, 'site_check');
+                            // a reply as the shopper typed it, for a checker that reads it with the conversation (verify_site v39)
+                            $typedToCheck = ($this->promptVersions['verify_site'] ?? self::releasedVersion('verify_site')) >= 39;
+                            $check = $this->call($run, $checker, 'verify_site', $this->checkInput($this->conversation === [] || $typedToCheck ? $question : ($corrected ?? $question), $answer, $cited, $picks, $prepared, (array) ($screened['general'] ?? [])), $checkOutput, $checkEffort, 'site_check');
                         } catch (ModelCallFailed $e) {
                             // The check could not be made (its provider refused, a key, an outage): the writer's
                             // words are never shown unchecked. What the store's own pages say, quoted as they

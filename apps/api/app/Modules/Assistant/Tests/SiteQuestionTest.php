@@ -1223,6 +1223,43 @@ final class SiteQuestionTest extends TestCase
         $this->assertCount(1, $inputs[1]['products'], 'about what the answer before showed');
     }
 
+    public function test_a_reply_reaches_the_writer_and_the_check_as_typed_and_the_topic_checks_reading_only_as_a_help(): void
+    {
+        // Rocks, 18.11: "48 ס"מ" after "אפשר לקצר את השרשרת, לאיזה אורך?" was rewritten by the topic check as a question of
+        // its own, and the writer, given that alone, answered about a bracelet's wrist. From answer_site v39 the writer reads
+        // the shopper's words with the conversation; the rewrite still searches.
+        $this->drills();
+        Features::override('assistant.site_scope', true);
+        $this->replies = [
+            ['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'יש משהו נטען?', 'standalone' => 'יש מקדחה נטענת לשימוש ביתי?'],
+            ['found' => true, 'answer' => 'כן, המברגה של מקיטה נטענת.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'נטענת']]],
+            ['decision' => 'approve', 'issues' => [], 'revised' => '', 'picks' => [], 'supported' => true, 'on_topic' => true, 'picks_fit' => true, 'safe' => true, 'injection' => false],
+        ];
+        $thread = [['q' => 'איזו מקדחה כדאי לי לשימוש ביתי?', 'a' => 'מקדחה/מברגה איינהל.']];
+
+        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'יש משהו נטען?', [], 39, 'he', null, $thread, ['verify_site' => 39]));
+
+        $inputs = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true));
+        $writer = $inputs->first(fn (?array $input): bool => isset($input['passages']) && ! isset($input['answer']));
+        $this->assertSame('יש משהו נטען?', $writer['question'], 'the shopper\'s own words');
+        $this->assertSame('יש מקדחה נטענת לשימוש ביתי?', $writer['read_as'], 'the topic check\'s reading, a help');
+        $this->assertSame([['question' => 'איזו מקדחה כדאי לי לשימוש ביתי?', 'answer' => 'מקדחה/מברגה איינהל.']], $writer['conversation']);
+        $check = $inputs->first(fn (?array $input): bool => isset($input['answer']));
+        $this->assertSame('יש משהו נטען?', $check['question'], 'the check reads the same words, with the conversation');
+
+        // the released writer is given the reading, as before
+        $this->calls = [];
+        $this->replies = [
+            ['about_store' => true, 'harmful' => false, 'injection' => false, 'corrected' => 'יש משהו נטען?', 'standalone' => 'יש מקדחה נטענת לשימוש ביתי?'],
+            ['found' => true, 'answer' => 'כן, המברגה של מקיטה נטענת.', 'refs' => [], 'picks' => []],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $this->inShop(fn () => app(AnswerSiteQuestion::class)->replay($this->shop->id, 'יש משהו נטען?', [], 35, 'he', null, $thread, ['verify_site' => 37]));
+        $writer = collect($this->calls)->map(fn (array $call): ?array => json_decode($call['user'], true))->first(fn (?array $input): bool => isset($input['passages']) && ! isset($input['answer']));
+        $this->assertSame('יש מקדחה נטענת לשימוש ביתי?', $writer['question']);
+        $this->assertArrayNotHasKey('read_as', $writer);
+    }
+
     public function test_a_new_question_the_topic_check_left_as_it_is_is_never_glued_to_the_one_before(): void
     {
         // Gueta, 18.11: "מה מתאים לקידוח בבטון?" after "איזה עץ הכי טוב לבנית פרגולה?" was searched and answered as both
