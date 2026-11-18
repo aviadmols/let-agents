@@ -376,14 +376,19 @@ final class Onboarding extends Page
             }
 
             $n = (int) $facts[$key];
+            // no scan this week: what is there was read before
+            $state = $parts[$part] ?? ($n > 0 ? ShopScan::DONE : ShopScan::WAITING);
+            // a part that is done with nothing counted says "Done", never "0 of 3": a merchant read the zero as a scan
+            // that never ran, while the summary under it said it had finished (Shopify review, 18.11)
+            $done = $state === ShopScan::DONE && $n === 0;
             $out[] = [
                 'key' => $part,
                 'title' => (string) __("admin::onboarding.scan.rows.{$part}.title"),
                 'sub' => (string) __("admin::onboarding.scan.rows.{$part}.sub"),
                 'n' => $n,
-                'unit' => $against ?? (string) __("admin::onboarding.scan.rows.{$part}.unit"),
-                // no scan this week: what is there was read before
-                'state' => $parts[$part] ?? ($n > 0 ? ShopScan::DONE : ShopScan::WAITING),
+                'shown' => $done ? (string) __('admin::onboarding.scan.done') : number_format($n),
+                'unit' => $done ? '' : ($against ?? (string) __("admin::onboarding.scan.rows.{$part}.unit")),
+                'state' => $state,
             ];
         }
 

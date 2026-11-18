@@ -5,6 +5,7 @@ return [
     'nav' => 'Searches',
     'title' => 'Searches',
     'lede' => 'What your shoppers look for, in their own words, and what they find.',
+    'preview_note' => 'Searches and questions you try in the theme preview or the theme editor are not counted here. The numbers fill in from your store\'s visitors.',
     'searches_n' => '{1} 1 search|[0,*] :n searches',
     'kpi' => [
         'searches' => 'Searches',

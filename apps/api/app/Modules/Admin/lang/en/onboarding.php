@@ -102,6 +102,7 @@ return [
             'knowledge' => ['title' => 'Building the knowledge centre', 'sub' => 'Ready answers to what shoppers will ask', 'unit' => 'answers'],
         ],
         'of' => 'of :count',
+        'done' => 'Done',
         'learned' => [
             'products' => 'The products',
             'images' => 'The pictures',
