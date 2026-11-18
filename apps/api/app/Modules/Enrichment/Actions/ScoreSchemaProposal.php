@@ -94,7 +94,9 @@ final class ScoreSchemaProposal
         }
 
         // Form: each thing code had to leave out costs a little.
-        $left = count((array) $proposal->problems);
+        // (the same thing left out again in each round of writing is one thing left out: Me369's size attribute, left
+        // out in three rounds, cost it three times, 18.11)
+        $left = count(array_unique(array_map(fn ($problem): string => trim(explode(':', (string) $problem, 2)[0]), (array) $proposal->problems)));
         $form = max(0.0, 1.0 - 0.15 * $left);
 
         // Review: the verdict, less what the reviewer dropped and what it found missing.

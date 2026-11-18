@@ -121,6 +121,19 @@ final class SchemaScoreTest extends TestCase
         $this->assertSame(15.0, $scored['parts']['fill'], '3 of 8 asked');
     }
 
+    public function test_a_thing_left_out_in_every_round_of_writing_is_one_thing_left_out(): void
+    {
+        // Me369, 18.11: the size attribute was left out in each of three rounds, and cost the form three times.
+        $this->proposal->update(['problems' => [
+            'tryon: only false belongs on the vocabulary',
+            'attribute size: attributes[0].values[2].key must be snake_case',
+            'attribute size: attributes[0].values[2].key must be snake_case',
+            'attribute size: attributes[0].values[3].key must be snake_case',
+        ]]);
+
+        $this->assertSame(10.5, app(ScoreSchemaProposal::class)->measure($this->proposal->refresh())['parts']['form'], 'two things left out: 15 x (1 - 2 x 0.15)');
+    }
+
     public function test_the_gate_waits_for_the_pass_score_the_shops_say_so_and_no_hard_failure(): void
     {
         app(ScoreSchemaProposal::class)->handle($this->proposal);
