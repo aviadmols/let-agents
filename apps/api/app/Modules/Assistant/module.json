@@ -444,7 +444,8 @@
             "options": [
                 "openai",
                 "anthropic",
-                "gemini"
+                "gemini",
+                "xai"
             ],
             "default": "openai",
             "scope": "global"

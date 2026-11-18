@@ -10,6 +10,7 @@ use Anthropic\RequestOptions;
 use App\Modules\Ai\Contracts\ListsProviderModels;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Ai\Support\Drivers\ReplicateImages;
+use App\Modules\Ai\Support\Drivers\XaiChat;
 use GuzzleHttp\Client;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -34,7 +35,38 @@ final class SdkModelLister implements ListsProviderModels
             AiProviderName::Gemini => $this->gemini($apiKey),
             AiProviderName::Replicate => $this->replicate($apiKey),
             AiProviderName::Voyage => $this->voyage($apiKey),
+            AiProviderName::Xai => $this->xai($apiKey),
         };
+    }
+
+    /**
+     * xAI's models, as its list (OpenAI's shape) gives them; where that list is not answered, the key is checked with one
+     * word asked of its smallest model, and its current chat models are listed.
+     *
+     * @return list<array{id: string, name: string, created_at: ?string}>
+     */
+    private function xai(string $apiKey): array
+    {
+        try {
+            $response = Http::timeout((int) self::TIMEOUT_SECONDS)->withToken($apiKey)->acceptJson()->get('https://api.x.ai/v1/models');
+            if ($response->status() === 404) {
+                $response = Http::timeout((int) self::TIMEOUT_SECONDS)->withToken($apiKey)->acceptJson()
+                    ->post(XaiChat::URL, ['model' => 'grok-4.3', 'messages' => [['role' => 'user', 'content' => 'ok']], 'max_completion_tokens' => 16]);
+                if ($response->successful()) {
+                    return array_map(fn (string $id): array => ['id' => $id, 'name' => $id, 'created_at' => null],
+                        ['grok-4.7', 'grok-4.6', 'grok-4.5', 'grok-4.3', 'grok-4.20-0309-non-reasoning', 'grok-4.20-0309-reasoning']);
+                }
+            }
+        } catch (ConnectionException $e) {
+            throw new ProviderCheckFailed(ProviderCheckFailed::UNREACHABLE, null, $e);
+        }
+
+        if (! $response->successful()) {
+            throw ProviderCheckFailed::fromStatus($response->status());
+        }
+
+        return array_values(array_map(fn (array $m): array => ['id' => (string) $m['id'], 'name' => (string) $m['id'], 'created_at' => isset($m['created']) ? date(DATE_ATOM, (int) $m['created']) : null],
+            array_filter((array) $response->json('data', []), fn ($m): bool => is_array($m) && isset($m['id']))));
     }
 
     /**

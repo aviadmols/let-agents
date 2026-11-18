@@ -9,6 +9,7 @@ return [
         'gemini' => 'Vectors for product pictures, to find products that look alike and search pictures by words.',
         'replicate' => 'Makes pictures: the Try-On of a product on the shopper or in their room.',
         'voyage' => 'Vectors for words: another embedding model, to measure against the one in use.',
+        'xai' => 'xAI\'s Grok: another answer writer, to measure its speed and quality against the one in use.',
     ],
     'statuses' => [
         'untested' => 'Not tested',
