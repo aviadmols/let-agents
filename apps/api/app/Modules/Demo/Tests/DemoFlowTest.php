@@ -139,6 +139,7 @@ final class DemoFlowTest extends TestCase
 
         $shop = Shop::query()->whereKey($site->refresh()->shop_id)->sole();
         $this->assertEquals([12.0, true], [Settings::get('ai.shop_monthly_cap_usd', $shop->id), Settings::get('search.store_currency', $shop->id)]);
+        $this->assertTrue(Features::enabled('enrichment.auto_review', $shop->id), 'what a demo\'s pictures say is checked by the second model (as Aviad decided, 18.11)');
         $this->assertSame('USD', DemoSite::chosenCurrency($site));
 
         $site->forceFill(['choices' => ['budget_usd' => 500, 'currency' => 'usd'] + (array) $site->choices])->save();

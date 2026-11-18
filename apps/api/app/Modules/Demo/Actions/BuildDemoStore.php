@@ -30,7 +30,7 @@ final class BuildDemoStore
     /** Off in every demo store: work a night, a team or a live store does, never a demo. */
     private const OFF = [
         'enrichment.nightly', 'enrichment.weekly_audit', 'enrichment.auto_highlights', 'enrichment.search_summary',
-        'enrichment.section_questions', 'enrichment.picture_suggestions', 'enrichment.web_lookup', 'enrichment.auto_review', 'enrichment.auto_publish_rules',
+        'enrichment.section_questions', 'enrichment.picture_suggestions', 'enrichment.web_lookup', 'enrichment.auto_publish_rules',
         'retrieval.ai_matching', 'catalog.sample_pages', 'catalog.page_choices', 'catalog.daily_sync', 'catalog.stock_checks', 'catalog.live_sync', 'catalog.refresh',
         'assistant.ask_review', 'assistant.team_drafts', 'assistant.search_whatsapp', 'assistant.on_products', 'assistant.on_content',
         'search.resolve_empty', 'search.ai_share', 'search.agent_connector', 'search.share_results', 'search.nudge', 'search.take_over_field',
@@ -39,6 +39,13 @@ final class BuildDemoStore
         // choices (14K, 18K, its colours) were never there to filter by (Jean Rachel, Naot, 15.11)
         'enrichment.batch_reading',
     ];
+
+    /**
+     * On in every demo store, whatever the platform's default (as Aviad decided, 18.11): what its pictures say of each product
+     * is checked by the second model before it is a filter value. Me369's demo had 591 values waiting with no one to check
+     * them; the check of its 300 products cost $0.53.
+     */
+    private const ON = ['enrichment.auto_review'];
 
     public function __construct(
         private readonly CreatesShops $shops,
@@ -115,6 +122,11 @@ final class BuildDemoStore
         foreach (self::OFF as $key) {
             if (app(FeatureRegistry::class)->has($key)) {
                 Features::override($key, false, $shop->id);
+            }
+        }
+        foreach (self::ON as $key) {
+            if (app(FeatureRegistry::class)->has($key)) {
+                Features::override($key, true, $shop->id);
             }
         }
         foreach (['search.photos', 'retrieval.image_index', 'retrieval.image_captions'] as $key) {
