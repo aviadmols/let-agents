@@ -431,14 +431,15 @@
     // unless its attribute has a choice already, where it is another of them
     var chosenIn = {};
     codesOn(c).forEach(function (code) { chosenIn[Math.floor(code / 1000)] = true; });
-    // In the filter sheet (max 0) every value some result carries stays where it is, one that would show nothing greyed
-    // with its 0: a press never brings a new tag in under the finger, nor takes one away (Jean Rachel QA, 16.11: "Organic"
-    // pressed brought "STERLING SILVER" in under it). The row over the results offers only what narrows.
+    // In the filter sheet (max 0) a value is offered while choosing it shows something: one that would show nothing is not
+    // there at all, never greyed with its "(0)" (Aviad, 18.11: a sheet of "(0)" stones and colours). A value chosen stays
+    // where it is, so it can be taken off; the order is the results', so nothing moves, a value only leaves or comes back
+    // (a new one never comes in under the finger: Jean Rachel QA, 16.11). The row over the results offers only what narrows.
     var codes = Object.keys(counts).map(Number).filter(function (code) {
       var g = Math.floor(code / 1000), facet = S.facets[g], value = facet && facet.v[code % 1000];
       if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
       if (onCode(c, code)) { return true; }
-      if (!max) { return (held[code] || 0) > 0; }
+      if (!max) { return (held[code] || 0) > 0 && counts[code] > 0; }
       return counts[code] >= 2 && ((chosenIn[g] && !andGroup(g)) || counts[code] < now);
     });
     // what the words come close to naming first ("ספרי מופת" puts "ספרי מופת מתורגמים" in the row), then the most held.

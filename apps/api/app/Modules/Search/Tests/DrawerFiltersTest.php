@@ -77,9 +77,9 @@ class DrawerFiltersTest extends TestCase
         // the store's tags narrow together, and each is counted within what the others show: Sandals chosen, Organic
         // counts the one sandal that is organic, never every organic product; chosen, the two together show that one
         $this->assertSame([1, ['Arthur']], self::drawer("(function () { var x = turn('', [1, 6, 7, 9], { f: { 2000: true } }); var w = T.wouldCounts(x, x.ids.map(function (i) { return S.records[i]; })); var y = turn('', [1, 6, 7, 9], { f: { 2000: true, 2003: true } }); return [w.counts[2003], titles(y)]; })()"));
-        // in the sheet a value that would show nothing stays in its place, counted 0 (greyed), never taken out from under
-        // the finger, nor a new one brought in
-        $this->assertSame([true, 0], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001]]; })()"));
+        // in the sheet a value that would show nothing is not offered, never a greyed "(0)" (Aviad, 18.11); the values
+        // chosen stay, each in its place, so they can be taken off
+        $this->assertSame([false, 0, true, true], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001], fc.codes.indexOf(2000) >= 0, fc.codes.indexOf(2003) >= 0]; })()"));
     }
 
     public function test_a_sets_count_in_the_answer_is_the_cards_it_shows(): void
