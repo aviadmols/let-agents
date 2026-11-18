@@ -155,6 +155,10 @@ return [
         'label' => 'Answer code rules: the conversation\'s kind, a least price, "nothing written"',
         'description' => '1 turns them on: a reply keeps the conversation\'s kind of product, an offer from a least price says the amount, and "nothing written" counts as unanswered. Measured on the quality baseline before it is turned on.',
     ],
+    'knowledge_by_search' => [
+        'label' => 'The store\'s general text only when it speaks of the question',
+        'description' => 'What the store\'s team wrote and the lines every product page repeats go to the answer\'s writer only when they speak of the question, by its words or by the search by meaning, and then first. A question about the store itself (address, hours, a visit) is given all of it, as before.',
+    ],
     'products_by_search' => [
         'label' => 'A question\'s products from the store\'s search',
         'description' => 'For each question, the products the store\'s search finds by its words and its meaning go to the topic check and to the answer\'s writer, before those shown on the screen while it was typed.',

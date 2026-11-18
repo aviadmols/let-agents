@@ -1385,6 +1385,21 @@ final class AnswerSiteQuestion implements TriesQuestions
 
             return false;
         };
+        // The store's general text by what speaks of the question, never all of it in every answer (Aviad, 18.11: the same
+        // certificate and installments lines under every answer): a row the question's words name, or one the search by
+        // meaning found near it; a question about the store itself (its address, its hours, a visit) still reads it all.
+        // What is kept goes first, as the store's word (assistant.knowledge_by_search).
+        $bySearch = (bool) Settings::get('assistant.knowledge_by_search', $shopId)
+            && ! self::asksOfTheStore($question) && ! self::asksIfOpen($question) && ! self::asksAboutVisit($question);
+        $near = function (CatalogContent $entry) use ($found): string {
+            return implode("\n", array_map(fn (array $p): string => (string) $p['text'], array_filter($found,
+                fn (array $p): bool => ($p['source'] ?? null) === 'content' && (string) ($p['source_id'] ?? '') === (string) $entry->id)));
+        };
+        $relevant = function (string $row, string $near) use ($speaks): bool {
+            $line = trim((string) preg_replace('/^\s*-\s*/u', '', $row));
+
+            return $line !== '' && ($speaks($line) || ($near !== '' && mb_strpos($near, mb_substr($line, 0, 60)) !== false));
+        };
 
         foreach ($entries as $entry) {
             $text = self::withoutThisProduct(trim((string) $entry->body));
@@ -1456,6 +1471,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $rows = $said;
                     $said = [];
                 }
+                if ($bySearch) {
+                    $nearText = $near($entry);
+                    $rows = array_values(array_filter($rows, fn (string $row): bool => $relevant($row, $nearText)));
+                    $said = [];
+                }
                 if ($said !== [] && count($said) < count($rows)) {
                     $first[] = $passage($whole($said));
                     $rows = array_values(array_filter($rows, fn (string $row): bool => ! $speaks($row)));
@@ -1471,6 +1491,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             if ($entry->external_id === BuildShopKnowledge::REPEATED) {
                 // and only what tells of its service: a heading or a line of its screens, read before, is not its word
                 $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => ! Dated::past($line) && RepeatedText::fact($line)));
+                if ($bySearch) {
+                    $nearText = $near($entry);
+                    $text = implode("\n", array_filter(explode("\n", $text), fn (string $line): bool => $relevant($line, $nearText)));
+                }
             }
 
             if ($text !== '') {
@@ -3524,10 +3548,11 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public static function withoutRefs(string $text): string
     {
-        // "(p5)", "(p5, p6)", "[s2]", "(ref p5)", " - p5" at the end of a clause.
-        $text = (string) preg_replace('~\s*[(\[]\s*(?:ref\s*)?[ps]\d{1,2}(?:\s*[,/]\s*[ps]\d{1,2})*\s*[)\]]~iu', '', $text);
+        // "(p5)", "(p5, p6)", "[s2]", "(ref p5)", " - p5" at the end of a clause; and the same in Hebrew letters, "(פ10)",
+        // "(ס2)", as a writer wrote them in a Hebrew answer (Grok, Rocks 18.11)
+        $text = (string) preg_replace('~\s*[(\[]\s*(?:ref\s*)?[psפס]\d{1,2}(?:\s*[,/]\s*[psפס]\d{1,2})*\s*[)\]]~iu', '', $text);
         // Only a dash or colon that stands apart (" - p5"): "מ-p3" is a prefix glued to the ref, a ref used as a word.
-        $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[ps]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
+        $text = (string) preg_replace('~(?<=\s)[-–—:]\s*[psפס]\d{1,2}(?=[\s.,;!?]|$)~iu', '', $text);
 
         return trim((string) preg_replace('/[ \t]{2,}/u', ' ', $text));
     }

@@ -253,6 +253,9 @@ final class SiteQuestionTest extends TestCase
 
         // Model numbers and sizes are not refs.
         $this->assertSame('ביט PH2 של WERA, 25 מ"מ, למברגה 12V', AnswerSiteQuestion::withoutRefs('ביט PH2 של WERA, 25 מ"מ, למברגה 12V'));
+        // A ref in Hebrew letters is a ref too (Grok, Rocks 18.11): "(פ10)" beside the product it names
+        $this->assertSame('- טבעת וינטאג פרח משובצת יהלום – עיצוב קלאסי.', AnswerSiteQuestion::withoutRefs('- טבעת וינטאג פרח משובצת יהלום (פ10) – עיצוב קלאסי.'));
+        $this->assertSame('מדריך הטיפול שלנו.', AnswerSiteQuestion::withoutRefs('מדריך הטיפול שלנו (ס2).'));
         $this->assertFalse(AnswerSiteQuestion::hasRef('ביט PH2 של WERA 12V'));
     }
 
