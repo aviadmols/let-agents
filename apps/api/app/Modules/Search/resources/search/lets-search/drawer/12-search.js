@@ -8,6 +8,8 @@
     var lv = S.live && S.live.q === q ? S.live : null;
     var carried = lv ? JSON.parse(JSON.stringify(lv.c)) : (S.pendingC || null);
     S.pendingC = null;
+    // what the store's search showed for these very words, kept for the answer to show while it is written (askTurn)
+    S.liveShown = lv && (lv.ids || []).length ? { q: q, ids: (lv.ids || []).slice(0, 8) } : null;
     INPUT.value = ''; FIELD.classList.remove('has-text'); hideLive();
     S.tab = 'chat'; S.wide = null;
     if (kind === 'ask' && off('ask') && !(about || S.askMode)) { kind = 'search'; }

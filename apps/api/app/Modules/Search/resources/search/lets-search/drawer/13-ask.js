@@ -39,7 +39,24 @@
     }
     var turn = addTurn(Object.assign({ kind: 'answer', q: q, shown: S.askAs && S.askAs !== q ? S.askAs : undefined, loading: true, ctx: about && S.ctx ? S.ctx : null, anim: 1 }, mark || {}));
     announce(t('announceSearching'));
-    if (!turn.ctx && !(extra && extra.thread)) { preFor(turn, q); }
+    // the products the store's search already showed for these very words stay in sight while the answer is written, never
+    // a moment of nothing (Gueta, 18.11: "מה הכי טוב ליונים?" showed the spikes, took them away, and the answer came seconds
+    // later). Not under a question of how, why or when, nor one about the store itself (returns, shipping): those
+    // products are not its answer. Else the search asked for it, as before.
+    var shown = S.liveShown && S.liveShown.q === q ? S.liveShown.ids : [];
+    S.liveShown = null;
+    // ...and only those whose own name says a word of the question, in any of its forms: what meaning alone brought for
+    // "כמה עולה משלוח לחיפה?" is no product the answer is about
+    var asked = {};
+    wordsOf(q).forEach(function (w) { if (w.length >= 3 && !WRAPS.test(w)) { wordForms(w).forEach(function (f) { if (f.length >= 3) { asked[f] = 1; } }); } });
+    var seen = shown.filter(function (id) {
+      var x = rec(id);
+      return x && x.t === 'product' && wordsOf(decode(x.title || '')).some(function (w) { return wordForms(w).some(function (f) { return asked[f] === 1; }); });
+    }).slice(0, 4);
+    var aboutTheStore = false;
+    try { aboutTheStore = !!(S.engine && S.engine.aboutStore && S.engine.aboutStore(q)); } catch (e) { aboutTheStore = false; }
+    if (!turn.ctx && !(extra && extra.thread) && seen.length && !ASKS_HOW.test(String(q).trim()) && !aboutTheStore) { update(turn, { pre: seen }); }
+    else if (!turn.ctx && !(extra && extra.thread)) { preFor(turn, q); }
     var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from). A reply to an answer
