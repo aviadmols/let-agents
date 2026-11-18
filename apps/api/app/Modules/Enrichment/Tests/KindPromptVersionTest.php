@@ -49,7 +49,22 @@ final class KindPromptVersionTest extends TestCase
         $extraction = $this->batch(TaskType::ProductExtraction, $vocabulary);
         $this->assertSame(3, $extraction->prompt_version);
         $this->assertSame(self::EXTRACTION_PROMPT_HASH, $extraction->prompt_hash);
-        $this->assertSame(self::EXTRACTION_INPUT_HASH, $this->inShop(fn () => $extraction->items()->sole())->input_hash, 'no product is read again');
+        // A product's reading is now counted by what can change its answer (its type's attributes), not the whole prompt
+        // (18.11). One read before by the old count, with nothing of it changed, is not asked again: its facts move to the
+        // new count.
+        $item = $this->inShop(fn () => $extraction->items()->sole());
+        $this->assertNotSame(self::EXTRACTION_INPUT_HASH, $item->input_hash);
+        $this->inShop(fn () => EnrichmentFact::query()->create([
+            'shop_id' => $this->shop->id, 'product_id' => $item->subject_id, 'vocabulary_id' => $vocabulary->id, 'kind' => 'choice', 'key' => 'cover',
+            'value_text' => 'softcover', 'quote' => 'כריכה רכה', 'origin' => 'model', 'status' => 'approved', 'input_hash' => self::EXTRACTION_INPUT_HASH,
+        ]));
+        $this->inShop(function () use ($extraction): void {
+            $extraction->items()->delete();
+            $extraction->delete();
+        });
+        $again = app(CreateTaskFile::class)->handle($this->shop->id, TaskType::ProductExtraction, $vocabulary->id, 1, ['include_done' => false]);
+        $this->assertNull($again['batch'], 'no product is read again');
+        $this->assertSame($item->input_hash, $this->inShop(fn () => EnrichmentFact::query()->where('key', 'cover')->value('input_hash')));
 
         $this->waitingChoice($vocabulary);
         $review = $this->batch(TaskType::FactReview, $vocabulary);

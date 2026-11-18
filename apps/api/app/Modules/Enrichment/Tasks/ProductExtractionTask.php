@@ -81,10 +81,21 @@ final class ProductExtractionTask implements AgentTask
         $products = VocabularyBranch::products($vocabulary)->when($only !== [], fn ($q) => $q->whereIn('id', $only));
 
         foreach ($products->lazyById(200) as $product) {
-            $digest = ProductDigest::build($product, $vocabulary, $maxChars, $batch->prompt_hash, $boilerplate, $this->known($product->id, $vocabulary));
+            $known = $this->known($product->id, $vocabulary);
+            $digest = ProductDigest::build($product, $vocabulary, $maxChars, self::scope($batch, $vocabulary, $known), $boilerplate, $known);
 
             if (! $includeDone && $this->alreadyRead($product->id, $digest->inputHash)) {
                 continue;
+            }
+            // read before by the whole prompt's hash, and nothing of it changed since: the same answer, kept under its own
+            // scope from now on, never asked again only because the way of counting changed
+            if (! $includeDone) {
+                $before = ProductDigest::build($product, $vocabulary, $maxChars, $batch->prompt_hash, $boilerplate, $known);
+                if ($this->alreadyRead($product->id, $before->inputHash)) {
+                    EnrichmentFact::query()->where('product_id', $product->id)->where('input_hash', $before->inputHash)->update(['input_hash' => $digest->inputHash]);
+
+                    continue;
+                }
             }
 
             yield new TaskRequest(
@@ -112,9 +123,33 @@ final class ProductExtractionTask implements AgentTask
         }
 
         $maxChars = (int) Settings::get('enrichment.max_agent_text_chars', $batch->shop_id);
-        $digest = ProductDigest::build($product, $vocabulary, $maxChars, $batch->prompt_hash, (array) ($batch->scope['boilerplate'] ?? []), $this->known($product->id, $vocabulary));
+        $known = $this->known($product->id, $vocabulary);
+        $digest = ProductDigest::build($product, $vocabulary, $maxChars, self::scope($batch, $vocabulary, $known), (array) ($batch->scope['boilerplate'] ?? []), $known);
 
         return $digest->inputHash !== $item->input_hash;
+    }
+
+    /**
+     * What a product's reading depends on, beside its own text: the task and its prompt's version, and of the vocabulary
+     * only what the model may answer for this product (its type's attributes and their values; for a product of no type,
+     * the types too). Not the whole prompt's hash: one value added to rings sent every earring and necklace back to the
+     * model, paid for again, on a bank's every new version (Aviad, 18.11).
+     *
+     * @param  array<string, mixed>  $known
+     */
+    public static function scope(EnrichmentBatch $batch, VocabularyDefinition $vocabulary, array $known): string
+    {
+        $type = isset($known['type']) ? (string) $known['type'] : null;
+        $definition = $vocabulary->toArray();
+        $attributes = array_values(array_filter((array) ($definition['attributes'] ?? []), fn (array $a): bool => $vocabulary->appliesTo((string) $a['key'], $type)));
+
+        return hash('sha256', implode('|', [
+            $batch->task->value,
+            (string) $batch->prompt_version,
+            $vocabulary->key(),
+            $type ?? (string) json_encode(array_column($vocabulary->productTypes(), 'key')),
+            (string) json_encode($attributes, JSON_UNESCAPED_UNICODE),
+        ]));
     }
 
     public function apply(EnrichmentBatch $batch, EnrichmentBatchItem $item, array $output, string $model): ItemOutcome
