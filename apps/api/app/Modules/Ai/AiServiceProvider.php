@@ -19,6 +19,7 @@ use App\Modules\Ai\Contracts\WebSearchModel;
 use App\Modules\Ai\Support\AllowanceHome;
 use App\Modules\Ai\Support\Drivers\AnthropicBatches;
 use App\Modules\Ai\Support\Drivers\AnthropicChat;
+use App\Modules\Ai\Support\Drivers\GeminiChat;
 use App\Modules\Ai\Support\Drivers\GeminiEmbeddings;
 use App\Modules\Ai\Support\Drivers\OpenAiBatches;
 use App\Modules\Ai\Support\Drivers\OpenAiChat;
@@ -44,7 +45,7 @@ final class AiServiceProvider extends ModuleServiceProvider
      * One class per provider and job. A new provider is a case in AiProviderName and a driver
      * here; the settings that name a provider and model then reach it without other changes.
      */
-    public const CHAT_DRIVERS = [OpenAiChat::class, AnthropicChat::class];
+    public const CHAT_DRIVERS = [OpenAiChat::class, AnthropicChat::class, GeminiChat::class];
 
     /** Providers with a batch API: many questions at once, answered within a day at half price. */
     public const BATCH_DRIVERS = [OpenAiBatches::class, AnthropicBatches::class];
