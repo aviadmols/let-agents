@@ -208,7 +208,10 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28], 'verify_site' => [36, 37]];
+
+    /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
+    public const NO_CHECK = 0;
 
     private const THREAD_QUESTION_CHARS = 300;
 
@@ -2310,6 +2313,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                         // nothing": its line is the shopper's all the same ("אין באתר המלצה אחת…")
                         $notFound = in_array($refusal, ['not_found', 'no_answer', 'cites_nothing'], true) && ! $unfit
                             ? self::notFoundLine(trim((string) ($reply->data['not_found'] ?? '')) !== '' ? (string) $reply->data['not_found'] : (string) ($screened['missing'] ?? ''), $question) : null;
+                    } elseif (($this->promptVersions['verify_site'] ?? null) === self::NO_CHECK) {
+                        // a comparison only (replay with verify_site 0): the writer's answer after code's checks, no model's
+                        // check, to measure what the check adds and what it costs in time. Never a shopper's answer.
+                        $checked['skipped'] = 'no_check';
+                        $refusal = $answerRefusal;
                     } else {
                         $started = hrtime(true);
 
@@ -2512,7 +2520,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // comparison of "v35" ran the released writer with the new checker, 18.11)
         $versions = array_filter(($answerVersion === null ? [] : ['answer_site' => $answerVersion]) + $versions, fn ($v): bool => $v !== null);
         foreach ($versions as $prompt => $version) {
-            if (! in_array((int) $version, self::promptVersions((string) $prompt), true)) {
+            if (! ($prompt === 'verify_site' && (int) $version === self::NO_CHECK) && ! in_array((int) $version, self::promptVersions((string) $prompt), true)) {
                 throw new \InvalidArgumentException("{$prompt} v{$version} does not exist.");
             }
         }

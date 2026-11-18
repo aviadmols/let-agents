@@ -251,7 +251,10 @@
       e.preventDefault();
       var a = S.records[d.savedAnswer];
       INPUT.value = ''; hideLive(); FIELD.classList.remove('has-text');
-      alsoFor(addTurn({ kind: 'answer', q: a.title, answer: a.ans, picks: [], sources: a.src || [], anim: 1, oneProduct: a.ak === 'product' }));
+      // with the products the answer picked, as it was given: shown from here it had none (Rocks, 18.11: two 21K pendants named,
+      // no card); one no longer in the store is left out
+      var kept = (a.pk || []).filter(function (id) { return !!rec(id); }).map(function (id) { return { id: pid(id) }; });
+      alsoFor(addTurn({ kind: 'answer', q: a.title, answer: a.ans, picks: kept, sources: a.src || [], anim: 1, oneProduct: a.ak === 'product' }));
       return;
     }
     if (d.unrecent) { e.preventDefault(); S.recent = S.recent.filter(function (x) { return x !== d.unrecent; }); store('local', 'ls_searches', S.recent); render(); return; }

@@ -51,7 +51,8 @@ final class SearchAnswersTest extends TestCase
             ], $extra));
 
             $answer(['question' => 'כל כמה זמן צריך לשמן דק?', 'question_key' => 'k1', 'answer' => 'פעם בשנה, לפני הקיץ.', 'product_id' => $product->id, 'asked_count' => 4]);
-            $answer(['question' => 'כמה ברגים צריך למטר דק?', 'question_key' => 'k2', 'answer' => 'בערך 30.', 'sources' => [['title' => 'כמה ברגים צריך למטר דק', 'url' => 'https://www.store.test/g/600', 'type' => 'content']]]);
+            $answer(['question' => 'כמה ברגים צריך למטר דק?', 'question_key' => 'k2', 'answer' => 'בערך 30.', 'sources' => [['title' => 'כמה ברגים צריך למטר דק', 'url' => 'https://www.store.test/g/600', 'type' => 'content']],
+                'picks' => [['external_id' => '201', 'title' => 'עץ איפאה לדק', 'why' => 'לדק']]]);
             $answer(['question' => 'האם מגיע עם אחריות?', 'question_key' => 'k3', 'answer' => 'הוסתר.', 'status' => AssistantAnswer::HIDDEN]);
             $answer(['question' => 'האם יש משלוח?', 'question_key' => 'k4', 'answer' => null, 'outcome' => AssistantAnswer::NO_INFO]);
             // One visitor's answer, not yet shared: never in the box, however often they asked it.
@@ -83,6 +84,9 @@ final class SearchAnswersTest extends TestCase
         $kinds = array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'ak', 'title');
         $this->assertSame(['כל כמה זמן צריך לשמן דק?' => 'product', 'כמה ברגים צריך למטר דק?' => 'store'], array_intersect_key($kinds, ['כל כמה זמן צריך לשמן דק?' => 1, 'כמה ברגים צריך למטר דק?' => 1]));
         $this->assertContainsOnly('int', array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'an'));
+        // and the products it picked, by their codes: pressed in the drawer, the answer shows their cards (Rocks, 18.11)
+        $picked = array_column(array_filter($index['items'], fn (array $i): bool => $i['t'] === 'answer'), 'pk', 'title');
+        $this->assertSame(['כמה ברגים צריך למטר דק?' => ['201']], $picked);
         $this->assertTrue($index['config']['ask'], 'the box may send a question, on Enter');
         $this->assertNull($index['config']['whatsapp'], 'no WhatsApp until the shop sets one');
 

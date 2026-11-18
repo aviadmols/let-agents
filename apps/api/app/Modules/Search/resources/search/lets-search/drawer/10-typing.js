@@ -40,6 +40,13 @@
     var telling = said.filter(function (w) { return w.length >= 3 && !/\d/.test(w) && !STOP.test(w); });
     return telling.length > localUnknown(q).length;
   }
+  // whether these words will be asked of the AI by themselves once the typing rests: then no button is shown for them, only
+  // that the store's pages are being checked (Gueta, 18.11: "מה הכי טוב ליונים?" showed the button, and a moment later the
+  // answer began on its own beside it)
+  function willAskAtRest(q) {
+    return S.open && !off('ask') && !(S.config && S.config.suggest === false) && String(q || '').replace(/[^\p{L}\p{N}]/gu, '').length >= 4
+      && restAsks() < REST_ASKS && asksInWords(q);
+  }
   function askAtRest() {
     clearTimeout(restTimer);
     var q = INPUT.value.trim();
@@ -53,7 +60,7 @@
       // only what reads as a question: letters struck at random, a few letters, or words that found nothing ("ווכמקן",
       // "חולצה" in a hardware store) wait for the shopper's own press, as before (as Aviad asked, 17.11)
       if (!asksInWords(q)) { return; }
-      var card = askCardFor(q), btn = !card ? SUG.querySelector('.ls-askcard__btn[data-ask]') : null;
+      var card = askCardFor(q), btn = !card ? SUG.querySelector('.ls-askcard__btn[data-ask], [data-ask-pending]') : null;
       if (!card && !btn) { return; }
       restAsked++;
       try { win.sessionStorage.setItem('ls_rest_asks', String(restAsks() + 1)); } catch (e) { /* counted in memory */ }
@@ -61,8 +68,15 @@
     };
     restTimer = setTimeout(go, REST_ASK_MS);
   }
+  // the words that only wrap a question around what it asks ("מה הכי טוב…", "what is the best…"): until a word of what it asks
+  // is typed, nothing is shown for it. "מה הכי טוב " showed eight products and the button, both gone a word later (Gueta, 18.11)
+  var WRAPS = /^(יש|לכם|לך|לי|לנו|של|את|על|עם|איך|מה|מהו|מהי|האם|כמה|אפשר|איזה|איזו|אילו|למה|מתי|זה|הזה|הזו|גם|או|הכי|טוב|טובה|טובים|כדאי|מומלץ|מומלצת|מתאים|מתאימה|לקנות|לבחור|בשביל|the|a|an|is|are|do|does|you|have|for|of|with|how|what|which|can|best|good|should|i|to|buy)$/i;
+  function asksNothingYet(q) {
+    return isQuestion(q) && String(q || '').replace(/[?؟!.,״"']/g, ' ').split(/\s+/).filter(Boolean).every(function (w) { return WRAPS.test(w); });
+  }
   function liveFor(q) {
     if (!S.open || q === S.keptQ) { return; }
+    if (asksNothingYet(q)) { hideLive(); return; }
     if (!S.index) { loadIndex().then(onType); return; }
     if (S.tab !== 'chat' || S.wide) { S.tab = 'chat'; S.wide = null; render(); }
     // on a product page the words ask about the product, and the product's information stays as it is;
@@ -74,7 +88,9 @@
     var mayReply = conversationGoingOn() && (/^ו[֐-׿]{2,}/.test(q) || /^(and|also|plus|what|how)\b/i.test(q));
     if (!was && !mayReply && S.turns.some(function (x) { return !x.prev; })) { S.turns.forEach(function (x) { x.prev = true; }); S.showPrev = false; persist(); render(); }
     if (!was || was.q !== q) {
-      var local = hits(q).filter(function (r) { return r.t === 'product'; });
+      // a question waits for the server's products: the drawer's own index matched its words one by one ("הכי", "טוב"), showed
+      // products and took them away a moment later (Gueta, 18.11)
+      var local = isQuestion(q) ? [] : hits(q).filter(function (r) { return r.t === 'product'; });
       var localWhom = whomAlone(q, local.map(function (r) { return r.id; }));
       if (localWhom) { local = localWhom.map(rec).filter(Boolean); }
       S.live = { id: 'live', kind: 'results', q: q, ids: (was && was.q && q.indexOf(was.q) === 0 && was.server && !local.length ? was.ids : local.map(function (r) { return r.id; })), c: was ? was.c : blankC(), content: [], cats: [], server: false };
@@ -261,6 +277,12 @@
     if (saved) {
       return '<div style="padding:4px 4px 8px"><button class="ls-ask ls-ask--saved' + (active ? ' is-active' : '') + '" data-opt data-saved-answer="' + esc(saved.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__who">' + esc(t('askWho', { name: CFG.assistant })) + '</span><span class="ls-ask__q" dir="auto">' + esc(saved.title) + '</span>' +
         '<span class="ls-ask__ans' + (fresh ? ' ls-words' : '') + '" dir="auto">' + (fresh ? words(saved.ans) : esc(saved.ans)) + '</span></span><span class="ls-kbd">' + icon('enter', 'ls-icon--sm') + '</span></button></div>';
+    }
+    // to be asked by itself in a moment: the card says the pages are being checked, as the answer's own turn will
+    if (willAskAtRest(q)) {
+      return '<div class="ls-askcard" data-ask-pending="' + esc(q) + '"><p class="ls-askcard__kicker"><span class="ls-askcard__mark">' + mark() + '</span>' + esc(t('askKicker')) + '</p>' +
+        '<p class="ls-askcard__q" dir="auto">' + (/[֐-׿]/.test(String(q || '')) ? '"' : '“') + esc(String(q || '').replace(/[“”"]/g, '')) + (/[֐-׿]/.test(String(q || '')) ? '"' : '”') + '</p>' +
+        thinking(t('thinkingAsk')) + '</div>';
     }
     return askCard(q, active, 'data-ask="' + esc(q) + '"');
   }

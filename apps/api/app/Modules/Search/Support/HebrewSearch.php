@@ -31,7 +31,10 @@ final class HebrewSearch
     private const FILLER = ['איך', 'כמה', 'האם', 'למה', 'מדוע', 'מה', 'מהו', 'מהי', 'מהמ', 'איפה', 'היכנ', 'מתי', 'מי', 'איזה', 'איזו', 'אילו',
         'אפשר', 'ניתנ', 'יש', 'צריכ', 'כדאי', 'מותר', 'מתאימ', 'מתאימה', 'מתאימימ', 'הכי', 'לי', 'לנו', 'עמ', 'של', 'את', 'על', 'ליד', 'זה', 'זו',
         'טוב', 'טובה', 'לקנות', 'לבחור', 'בשביל', 'או', 'גמ', 'the', 'a', 'an', 'to', 'for', 'of', 'with', 'best', 'need', 'buy', 'i', 'my',
-        'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should'];
+        'how', 'what', 'why', 'when', 'where', 'which', 'who', 'can', 'does', 'do', 'is', 'are', 'should',
+        // the store asked about itself ("איזה מוצרים עם 21 קראט יש אצלכם?" found nothing: no product says "אצלכם", Rocks 18.11), and a
+        // letter typed apart from its word ("ב 21 קראט")
+        'לכמ', 'אצלכמ', 'אצלכ', 'לכ', 'אתמ', 'אצלנו', 'ב', 'ל', 'ו', 'ה', 'מ', 'ש', 'you', 'your', 'have', 'has', 'there', 'any'];
 
     /** Whether a normalized word only wraps a question around what it is about ("מה", "טוב", "best"). */
     public static function isFiller(string $word): bool

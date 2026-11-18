@@ -513,7 +513,7 @@ final class BuildSearchIndex
             // w: about the store, not one product or guide; ak: what it is about (product, content, store), and
             // an: how many asked it: the drawer's "what people ask here" shows the most asked, then one of each kind
             $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources'], 'w' => $answer['store'] ? 1 : null,
-                'ak' => $answer['kind'], 'an' => $answer['asked']]);
+                'ak' => $answer['kind'], 'an' => $answer['asked']] + ($answer['picks'] === [] ? [] : ['pk' => $answer['picks']]));
             $counts['answer']++;
         }
 
@@ -1024,6 +1024,9 @@ final class BuildSearchIndex
                 'sources' => $a->product !== null
                     ? [['title' => $a->product->title, 'url' => $a->product->url]]
                     : ($a->content !== null ? [['title' => $a->content->title, 'url' => $a->content->url]] : array_map(fn (array $s): array => self::source($s, $locale), (array) $a->sources)),
+                // the products it picked, by their codes, as the answer gave them: pressed in the drawer it showed their names and
+                // no card (Rocks, 18.11)
+                'picks' => array_values(array_slice(array_filter(array_map(fn ($p): string => is_array($p) ? (string) ($p['external_id'] ?? '') : '', (array) $a->picks)), 0, 3)),
             ])
             ->values()->all();
     }
