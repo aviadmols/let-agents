@@ -913,6 +913,48 @@ final class SiteQuestionTest extends TestCase
         $this->assertStringNotContainsString('הזול', $data['answer'], 'no one asked for the cheapest');
     }
 
+    public function test_a_reply_inside_the_conversations_price_keeps_its_wish_where_the_stores_products_say_it(): void
+    {
+        // Rocks, 18.11: "מה מתאים למתנה לגבר עד 2000 ש״ח?", then "איזה טבעות יש?": "228 products in your price", women's
+        // rings and a ring sizer among them, the man forgotten.
+        foreach (['971' => ['טבעת לגבר חותם', 1500], '972' => ['טבעת לגבר זהב', 1900], '973' => ['טבעת סוליטר', 1200], '974' => ['טבעת אירוסין', 900], '975' => ['טבעת לגבר כבדה', 2600], '976' => ['מדיד טבעות', 5]] as $id => [$title, $price]) {
+            $this->product((string) $id, $title, 'טבעת.', [], ['price' => $price.'.00', 'in_stock' => true]);
+        }
+        $this->app->instance(ProductsNamed::class, new class implements ProductsNamed
+        {
+            public function among(string $shopId, string $question, array $externalIds): array
+            {
+                return array_values(array_intersect($externalIds, $this->all($shopId, $question)));
+            }
+
+            public function holds(string $shopId, string $words): bool
+            {
+                return str_contains($words, 'טבע') || str_contains($words, 'לגבר');
+            }
+
+            public function namesNothing(string $shopId, string $words): bool
+            {
+                return ! $this->holds($shopId, $words);
+            }
+
+            public function all(string $shopId, string $question): array
+            {
+                if (! str_contains($question, 'טבע')) {
+                    return [];
+                }
+
+                return str_contains($question, 'לגבר') ? ['971', '972', '975'] : ['971', '972', '973', '974', '975', '976'];
+            }
+        });
+        $thread = [['q' => 'מה מתאים למתנה לגבר עד 2000 ש״ח?', 'a' => 'כרטיס מתנה יכול להיות פתרון נפלא. יש לכם העדפה?']];
+
+        $data = $this->reply('איזה טבעות יש?', $thread)->json('data');
+
+        $this->assertSame('code', $data['from']);
+        $ids = $data['set']['ids'] ?? array_column($data['picks'], 'external_id');
+        $this->assertEqualsCanonicalizing(['971', '972'], $ids, 'the men\'s rings in the conversation\'s 2000: never the women\'s, the ring sizer or the one over the price');
+    }
+
     public function test_a_wish_with_a_price_that_names_no_product_is_chosen_from_every_kind_inside_it_a_gift_card_last(): void
     {
         // Rocks QA, 16.11: "אני רוצה לקנות לחברה שלי מתנה ליום הולדת, תקציב עד 1500" was answered with the gift card at 250,

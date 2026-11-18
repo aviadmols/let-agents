@@ -4154,6 +4154,20 @@ final class AnswerSiteQuestion implements TriesQuestions
         $byName = ((! $followUp || $ownKind) && $named !== [] && $asks !== null && app()->bound(ProductsNamed::class)
             ? app(ProductsNamed::class)->all($this->tenant->require(), $question)
             : null) ?: null;
+        // A reply whose price is a turn before's keeps that turn's wish too, where the store's products say it: "איזה טבעות
+        // יש?" after "מה מתאים למתנה לגבר עד 2000 ש״ח?" was "228 products in your price", women's rings and a ring sizer
+        // among them, the man forgotten (Rocks, 18.11). The rings the store's search finds with the wish are the answer;
+        // a wish its products say nothing of ("לאישתי" of a necklace) narrows nothing; a wish they say but none of these
+        // holds is the writer's.
+        $wish = $byName !== null && $asks === 'in_range' && $this->conversation !== [] && $this->priceInherited($question) ? $this->inheritedWish() : null;
+        if ($wish !== null) {
+            $withWish = array_values(array_intersect($byName, app(ProductsNamed::class)->all($this->tenant->require(), $question.' '.$wish)));
+            if ($withWish !== []) {
+                $byName = $withWish;
+            } elseif (app(ProductsNamed::class)->holds($this->tenant->require(), $wish)) {
+                return null;
+            }
+        }
 
         $productsByRef = [];
         foreach ($this->candidates($wholeStore ? $this->storeWide($asks, $min, $max) : ($byName ?: $shown)) as $i => $product) {
@@ -4240,6 +4254,38 @@ final class AnswerSiteQuestion implements TriesQuestions
      * fewer than three letters): what a product would have to hold. "אני מחפש מכנסיים" asks for trousers, which a product
      * holds; "מתנה לחברה שלי ליום הולדת" asks for a choice.
      */
+    /**
+     * The wish of the turn in the conversation that said the price a reply inherits ("מתנה לגבר" of "מה מתאים למתנה לגבר עד
+     * 2000"): the words left of its price that name no kind of the store's, as computed() sends such a question to the
+     * writer. Null when no turn said a price, or its words left are a kind the store holds ("שרשרת עדינה עד 2000").
+     */
+    /** Whether the question says no price of its own, so its price is the conversation's (priceRange()). */
+    private function priceInherited(string $question): bool
+    {
+        $said = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : [];
+
+        return ($said['min'] ?? null) === null && ($said['max'] ?? null) === null;
+    }
+
+    private function inheritedWish(): ?string
+    {
+        if (! app()->bound(PriceRange::class) || ! app()->bound(ProductsNamed::class)) {
+            return null;
+        }
+        foreach (array_reverse($this->conversation) as $turn) {
+            $said = app(PriceRange::class)->read((string) $turn['question']);
+            if (($said['min'] ?? null) === null && ($said['max'] ?? null) === null) {
+                continue;
+            }
+            $left = self::wishWords((string) ($said['words'] ?? ''));
+            $shopId = $this->tenant->require();
+
+            return $left !== '' && (! app(ProductsNamed::class)->holds($shopId, $left) || count(app(ProductsNamed::class)->all($shopId, $left)) < self::KIND_PRODUCTS) ? $left : null;
+        }
+
+        return null;
+    }
+
     private static function wishWords(string $words): string
     {
         $kept = array_filter(preg_split('/\s+/u', trim($words)) ?: [], function (string $w): bool {
