@@ -159,6 +159,9 @@
       lv.singleBy = lv.single ? d.single.by : null;
       lv.content = ((d.groups && d.groups.content) || []).slice(0, contentShown(ids.length)); lv.cats = ((d.groups && d.groups.category) || []).slice(0, 4);
       lv.actions = d.actions || [];
+      // the first results' stock as their pages say it, read in the background: one sold out there turns "Sold out" and
+      // leaves "In stock" as soon as it is known, while typing too (Shopify review, 18.11)
+      products(ids.slice(0, 8)).then(function () { if (S.live === lv) { refresh(lv); } });
       // Nothing by spelling, and the meaning pass still to come: still thinking, not "no results" yet
       // (it often finds what the store calls by another word). "No results" only once both found nothing.
       // The meaning pass follows every search of three letters or more: the index first, then the meaning (as

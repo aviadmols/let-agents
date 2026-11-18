@@ -191,6 +191,18 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([[], ['unicorn']], $left, 'the moon drawn on it is said; a unicorn none shows is still missing');
     }
 
+    public function test_a_product_its_page_says_is_sold_out_is_drawn_sold_out_and_left_out_of_in_stock(): void
+    {
+        // Shopify review, 18.11: the admin counted "The 3p Fulfilled Snowboard" in stock, its page said "Sold out"; with
+        // "In stock" on it was shown, offered to add, and the press only opened its page
+        $got = self::drawer("(function () { S.records['p:20'] = P(20, 'The 3p Fulfilled Snowboard', { buy: 1, url: 'https://s.test/products/3p' }); S.records['p:21'] = P(21, 'The Complete Snowboard', { buy: 1 });
+            S.products['20'] = { is_in_stock: false }; S.products['21'] = { is_in_stock: true }; T.liveStock(['p:20', 'p:21']);
+            var x = turn('snowboard', [20, 21], { stock: true });
+            var out = T.buyBtn(S.records['p:20'], '');
+            return [titles(x), out.indexOf('data-add') < 0 && /data-similar|disabled/.test(out), T.buyBtn(S.records['p:21'], '').indexOf('data-add') >= 0]; })()");
+        $this->assertSame([['The Complete Snowboard'], true, true], $got, 'out of "In stock"; before any press never offered to add (its like in stock instead, or sold out); the one in stock still adds');
+    }
+
     public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void
     {
         // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"

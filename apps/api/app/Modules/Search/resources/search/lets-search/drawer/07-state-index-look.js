@@ -157,10 +157,11 @@
 
   // store products (regular price, variations) for the cards on screen
   // live from the store, once a page view: the price and stock of today, not of last night's index
+  // (each product read live is held to its page's stock: liveStock, beside the buy button)
   function products(ids) {
     var need = ids.map(pid).filter(function (id) { return !Object.prototype.hasOwnProperty.call(S.products, id); });
     if (!need.length) { return Promise.resolve(); }
-    if (SHOPIFY) { return shopifyProducts(need); }
+    if (SHOPIFY) { return shopifyProducts(need).then(function () { liveStock(need); }); }
     if (!STORE) { return Promise.resolve(); }
     return json(STORE + '/products?include=' + need.map(encodeURIComponent).join(',') + '&per_page=' + need.length, { credentials: 'same-origin' }).then(function (r) {
       need.forEach(function (id) { S.products[id] = null; });
@@ -168,6 +169,7 @@
         S.products[String(p.id)] = p;
         if (!S.cur && p.prices) { S.cur = { prefix: p.prices.currency_prefix || '', suffix: p.prices.currency_suffix || '' }; }
       });
+      liveStock(need);
     }).catch(function () { /* cards keep the index price */ });
   }
   // Shopify has no "these products by id" for a storefront: each one's public JSON, four at a time, no token

@@ -612,6 +612,15 @@
   // the product's second picture (the index's i2), shown over the first on hover; nothing on touch
   function pic2(r) { return r && r.i2 ? '<img class="ls-pic2" src="' + esc(sized(r.i2, 480)) + '" alt="" loading="lazy" decoding="async" draggable="false">' : ''; }
   function heartBtn(id, on, float) { if (SHORT && SHORT.heartResults === false) { return ''; } return '<button class="ls-ibtn ls-ibtn--sm ls-heart' + (float ? ' ls-ibtn--float' : '') + '" aria-pressed="' + on + '" aria-label="' + esc(t('saved')) + '" data-heart="' + esc(id) + '">' + icon('heart', 'ls-icon--sm') + '</button>'; }
+  // What the store's own page says of a product, read live, is its stock: one it says is sold out is sold out here too,
+  // drawn so before anyone presses and left out of "In stock", though the index (the store's admin) counted it in stock
+  // (Shopify review, 18.11: "The 3p Fulfilled Snowboard", sellable by the admin, "Sold out" on its page).
+  function liveStock(ids) {
+    ids.forEach(function (id) {
+      var p = S.products[pid(id)], r = rec(id);
+      if (p && p.is_in_stock === false && r && r.s !== 0) { r.s = 0; r.buy = 0; }
+    });
+  }
   function buyBtn(r, cls) {
     var id = pid(r.id);
     // no cart: the product's page is the card's one action, as strong as "add to cart" where there is one
