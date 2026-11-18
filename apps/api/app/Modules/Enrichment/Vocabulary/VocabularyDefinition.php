@@ -274,7 +274,7 @@ final class VocabularyDefinition
      * Words in an attribute's key that say it is about how the product looks: what a picture can
      * show (colour, shape, pattern, material, stone, setting, the cut of a garment).
      */
-    public const LOOKS = '/(?:^|_)(?:colou?rs?|shapes?|patterns?|prints?|materials?|fabrics?|finish|texture|metals?|stones?|styles?|motifs?|setting|cut|neckline|sleeves?|collar|fit|silhouette|closure|heel|toe|design|look)(?:$|_)/';
+    public const LOOKS = '/(?:^|_)(?:colou?rs?|shapes?|patterns?|prints?|materials?|fabrics?|finish|texture|metals?|stones?|styles?|motifs?|setting|cut|neckline|sleeves?|collar|fit|silhouette|lengths?|waist|hem|straps?|rise|closure|heel|toe|design|look)(?:$|_)/';
 
     /**
      * Whether a picture may say this at all. Only how the product looks: a choice of colour,

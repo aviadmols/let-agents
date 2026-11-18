@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Scanning\BrandResolver;
 use App\Modules\Enrichment\Scanning\CodeReading;
+use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -146,12 +147,16 @@ final class ScoreSchemaProposal
         }
 
         $brands = BrandResolver::forCatalog($products);
+        $pictures = PictureText::for($products->pluck('id')->map(fn ($id): string => (string) $id)->all());
         $found = array_fill_keys(array_keys($weights), 0);
         $possible = 0.0;
         $got = 0.0;
 
         foreach ($products as $product) {
-            $reading = CodeReading::read($product, $brands, $definition, readText: true);
+            // with what its picture says, as the scan itself reads it (ReadProductsInCode): a clothing store's sleeves, necklines
+            // and colours are in its pictures, and a pilot blind to them failed a vocabulary the scan would have filled
+            // (Me369, 18.11: sleeve type found on 8 of 40, the vocabulary held at 35 of 50)
+            $reading = CodeReading::read($product, $brands, $definition, readText: true, picture: isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : null);
             $type = $reading['type']['key'] ?? null;
 
             foreach ($weights as $key => $weight) {
@@ -161,7 +166,7 @@ final class ScoreSchemaProposal
 
                 $possible += $weight;
 
-                if (isset($reading['category_choices'][$key]) || isset($reading['text_choices'][$key]) || isset($reading['specs'][$key]) || isset($reading['text_specs'][$key]) || isset($reading['flags'][$key])) {
+                if (isset($reading['category_choices'][$key]) || isset($reading['variant_choices'][$key]) || isset($reading['text_choices'][$key]) || isset($reading['specs'][$key]) || isset($reading['text_specs'][$key]) || isset($reading['flags'][$key])) {
                     $got += $weight;
                     $found[$key]++;
                 }
