@@ -59,7 +59,12 @@ final class AnswerQuestion
     // that says how it is built or worn ("מה הכוונה שני חלקים?") is told as one explanation: what the parts are, where each
     // sits, what it gives. The answer had said the phrase again in other words, in three labelled lines. Compared on 25
     // questions from Rocks, Gueta, Naot, Vans and Take Me Home (docs/eval/answers-product-v10-vs-v9.json in Let Agents).
-    public const PROMPT_VERSION = 10;
+    // v11 (18.11, as Aviad asked, after setting an answer beside the store's other chat): the piece is sold as it is answered,
+    // with the facts of its card a buyer weighs (its stones, their weight and grade, the metal, the width, a certificate) and
+    // what the answer gives in wearing it, both ways ("רק החלק הקדמי למראה עדין, או עם המניפה למראה עשיר"). v10 had answered
+    // "can I wear only the front?" with "sometimes" and no fact of the piece. Compared on 16 questions from 6 stores: shown 14
+    // and 14, the answers fuller (docs/eval/answers-product-v11-vs-v10.json in Let Agents).
+    public const PROMPT_VERSION = 11;
 
     /** How much of the lines the store's team wrote (the knowledge centre's own) the writer reads. */
     private const STORE_CHARS = 2500;

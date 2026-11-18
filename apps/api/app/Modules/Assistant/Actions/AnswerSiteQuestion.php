@@ -214,7 +214,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28], 'verify_site' => [36]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38], 'verify_site' => [36]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;

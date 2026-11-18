@@ -1,0 +1,28 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "about_this_product",
+        "consistent",
+        "on_topic",
+        "safe",
+        "injection"
+    ],
+    "properties": {
+        "about_this_product": {
+            "type": "boolean"
+        },
+        "consistent": {
+            "type": "boolean"
+        },
+        "on_topic": {
+            "type": "boolean"
+        },
+        "safe": {
+            "type": "boolean"
+        },
+        "injection": {
+            "type": "boolean"
+        }
+    }
+}
