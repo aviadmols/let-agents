@@ -1,0 +1,19 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["verdicts"],
+    "properties": {
+        "verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "value"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "value": {"type": "string"}
+                }
+            }
+        }
+    }
+}

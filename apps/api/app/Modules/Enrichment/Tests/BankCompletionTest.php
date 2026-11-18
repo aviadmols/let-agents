@@ -31,6 +31,9 @@ final class BankCompletionTest extends TestCase
     /** @var list<string> the system prompts asked, in order */
     public array $asked = [];
 
+    /** @var array<string, mixed>|null what the writer proposes, when a test sets it */
+    public ?array $proposal = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -65,7 +68,13 @@ final class BankCompletionTest extends TestCase
 
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                $this->test->asked[] = str_contains($system, 'You complete') ? 'writer' : 'auditor';
+                $this->test->asked[] = str_contains($system, 'You complete') ? 'writer' : (str_contains($system, 'were missed') ? 'recall' : 'auditor');
+                if (str_contains($system, 'were missed')) {
+                    return new ModelReply(['verdicts' => array_map(fn (array $i): array => ['id' => $i['id'], 'value' => 'none'], (array) (json_decode($user, true)['items'] ?? []))], 1000, 100);
+                }
+                if (str_contains($system, 'You complete') && $this->test->proposal !== null) {
+                    return new ModelReply($this->test->proposal, 3000, 800);
+                }
                 if (str_contains($system, 'You complete')) {
                     $label = fn (string $en): array => ['label_he' => $en, 'label_en' => $en];
 
@@ -105,7 +114,9 @@ final class BankCompletionTest extends TestCase
     {
         app(CompleteVocabulary::class)->handle($this->shop->id, false, $report);
 
-        $this->assertSame(['writer', 'auditor'], $this->asked, 'one request to write, one to audit');
+        $this->assertSame(['writer', 'auditor', 'recall'], $this->asked, 'one request to write, one to audit, one to look for missed tags');
+        $this->assertSame(2, $report['missed']['sleeve_type']['without'] ?? null, 'the scarves (sleeves apply to every type here): read, and found to have none');
+        $this->assertSame(0, $report['missed']['sleeve_type']['estimated_missed'] ?? null);
         $this->assertSame(['type scarf', 'sleeve_type.sleeveless'], array_column($report['added'], 'label'));
         $this->assertContains('sleeve_type.strappy', array_column($report['rejected'], 'item'), 'the auditor found what it tags wrong');
         $this->assertSame(2, $report['untyped_before']);
@@ -120,6 +131,28 @@ final class BankCompletionTest extends TestCase
         $this->assertSame(2, $active->version);
         $this->assertContains('scarf', array_column($active->definition()->productTypes(), 'key'));
         $this->assertSame(['long_sleeve', 'short_sleeve', 'sleeveless'], array_column($active->definition()->attribute('sleeve_type')['values'], 'key'));
+    }
+
+    public function test_a_new_value_never_changes_what_a_product_had_nor_a_new_attribute_repeats_one(): void
+    {
+        $label = fn (string $en): array => ['label_he' => $en, 'label_en' => $en];
+        $this->proposal = ['types' => [], 'values' => [
+            // the title says "Belted": read before the picture's "long sleeves", it would turn Gwen's long sleeves into another value
+            ['attribute' => 'sleeve_type', 'key' => 'belted_sleeve', 'patterns' => ['\bbelted\b'], 'same_as' => ''] + $label('Belted'),
+        ], 'attributes' => [
+            // the sleeves again, under another name
+            ['key' => 'sleeve_length', 'applies_to' => [], 'visible' => true, 'values' => [
+                ['key' => 'long', 'patterns' => ['\blong sleeves?\b']] + $label('Long'),
+                ['key' => 'short', 'patterns' => ['\bshort sleeves?\b']] + $label('Short'),
+            ]] + $label('Sleeve length'),
+        ]];
+
+        app(CompleteVocabulary::class)->handle($this->shop->id, false, $report);
+
+        $why = array_column($report['rejected'], 'why', 'item');
+        $this->assertStringStartsWith('changes or takes what 1 products had', $why['sleeve_type.belted_sleeve'] ?? '', 'what a product had stays as it was');
+        $this->assertStringStartsWith('repeats the attribute sleeve_type', $why['attribute sleeve_length'] ?? '');
+        $this->assertSame([], $report['added']);
     }
 
     public function test_a_value_that_is_another_under_a_new_name_joins_it(): void

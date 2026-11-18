@@ -68,6 +68,12 @@ final class CompleteVocabulary
     /** Two values are one when the products of each are this much the products of both (Jaccard). */
     public const SAME_VALUE = 0.9;
 
+    /** Of the products an attribute leaves with no value, this many read for a missed one. */
+    public const MISSED_SAMPLE = 6;
+
+    /** An attribute is checked for missed tags when it tags at least this share of the products it is about. */
+    public const MISSED_MIN_SHARE = 0.1;
+
     private const AUDIT_BATCH = 60;
 
     private const WRITER_TOKENS = 8000;
@@ -148,7 +154,7 @@ final class CompleteVocabulary
             }
             // two values left that read the same products of a single choice hide each other there (read as none): the one
             // that tags fewer products alone goes, until none hides another
-            while (($hidden = self::hidden($added, $after)) !== null) {
+            while (($hidden = self::hidden($added, $gaps['read'], $after)) !== null) {
                 [$candidate, $added] = self::without($candidate, $added, [$hidden => 'hides another value on the same products']);
                 $rejected[] = ['item' => $hidden, 'why' => 'reads the same products as another value of the same choice, and fewer'];
                 $after = $this->readAll($candidate, $products, $pictures, $brands);
@@ -165,6 +171,13 @@ final class CompleteVocabulary
 
         $report += ['added' => $added, 'rejected' => $rejected, 'audit' => $audit, 'changes' => self::changes($gaps['read'], $after)];
         $report['untyped_after'] = count(array_filter($after, fn (array $r): bool => ($r['type']['key'] ?? null) === null));
+        // a check only, nothing written: of the products the completed bank leaves with no value of an attribute about their
+        // kind, a sample the auditor reads for a value that was missed
+        try {
+            $report['missed'] = $this->missed($run, $auditor, $candidate, $after, $products, $pictures, $report);
+        } catch (SpendCapReached|ModelCallFailed) {
+            $report['missed'] = null;
+        }
 
         $activated = null;
         if ($activate && $added !== []) {
@@ -233,7 +246,7 @@ final class CompleteVocabulary
             $at = $same === '' ? null : array_search($same, array_column($changed['product_types'], 'key'), true);
             if ($at !== null && $at !== false) {
                 $changed['product_types'][$at]['patterns'] = array_values(array_unique([...(array) ($changed['product_types'][$at]['patterns'] ?? []), ...$patterns($p)]));
-                $try($changed, ['kind' => 'type_words', 'key' => $same, 'label' => 'type '.$same.' + '.implode(', ', $patterns($p))]);
+                $try($changed, ['kind' => 'type_words', 'key' => $same, 'label' => 'type '.$same.' + '.implode(', ', $patterns($p)), 'patterns' => $patterns($p)]);
 
                 continue;
             }
@@ -254,7 +267,7 @@ final class CompleteVocabulary
             $vat = $same === '' ? false : array_search($same, array_column($values, 'key'), true);
             if ($vat !== false) {
                 $changed['attributes'][$at]['values'][$vat]['patterns'] = array_values(array_unique([...(array) ($values[$vat]['patterns'] ?? []), ...$patterns($p)]));
-                $try($changed, ['kind' => 'value_words', 'attribute' => $p['attribute'], 'key' => $same, 'label' => $p['attribute'].'.'.$same.' + '.implode(', ', $patterns($p))]);
+                $try($changed, ['kind' => 'value_words', 'attribute' => $p['attribute'], 'key' => $same, 'label' => $p['attribute'].'.'.$same.' + '.implode(', ', $patterns($p)), 'patterns' => $patterns($p)]);
 
                 continue;
             }
@@ -297,8 +310,10 @@ final class CompleteVocabulary
             [$tagged, $lost] = self::alone($item, $candidate, $added, $before, $byId, $pictures, $brands);
             $min = $item['kind'] === 'type_words' || $item['kind'] === 'value_words' ? 1 : self::MIN_PRODUCTS;
             $fromStore = array_filter($tagged, fn (string $id): bool => in_array(self::sourceOf($item, $after[$id] ?? []), ['field', 'store_type', 'category', 'variant'], true));
+            $repeats = $item['kind'] === 'attribute' ? self::repeats($item, $bank, $tagged, $before) : null;
             $reason = match (true) {
-                $lost > 0 => "takes from {$lost} products what they had",
+                $lost > 0 => "changes or takes what {$lost} products had",
+                $repeats !== null => "repeats the attribute {$repeats}: its values belong there",
                 count($tagged) < $min && $fromStore === [] => 'tags '.count($tagged).' products',
                 default => null,
             };
@@ -409,14 +424,75 @@ final class CompleteVocabulary
     }
 
     /**
+     * Missed tags, estimated: for each choice attribute of the completed bank that tags at least MISSED_MIN_SHARE of the
+     * products it is about, a sample of those it left with no value (MISSED_SAMPLE), read by the auditor for a value
+     * plainly true of them. Nothing is written: it says how many products each attribute likely misses.
+     *
+     * @return array<string, array{about: int, without: int, checked: int, missed: int, none: int, unsure: int, estimated_missed: int, examples: list<string>}>
+     */
+    private function missed(RunContext $run, AgentModel $auditor, VocabularyDefinition $bank, array $after, Collection $products, array $pictures, array &$report): array
+    {
+        $byId = $products->keyBy(fn (CatalogProduct $p): string => (string) $p->id);
+        $items = [];
+        $counts = [];
+        foreach ($bank->attributes() as $attribute) {
+            $key = (string) $attribute['key'];
+            if (($attribute['type'] ?? null) !== 'enum' || ($attribute['read_by'] ?? null) === VocabularyDefinition::READ_BY_MODEL) {
+                continue;
+            }
+            $about = array_keys(array_filter($after, fn (array $r): bool => $bank->appliesTo($key, $r['type']['key'] ?? null)));
+            $without = array_values(array_filter($about, fn ($id): bool => ! isset($after[$id]['text_choices'][$key]) && ! isset($after[$id]['variant_choices'][$key]) && ! isset($after[$id]['category_choices'][$key])));
+            if ($about === [] || (count($about) - count($without)) / count($about) < self::MISSED_MIN_SHARE || $without === []) {
+                continue;
+            }
+            usort($without, fn ($a, $b): int => strcmp(md5((string) $a), md5((string) $b)));
+            $labels = array_map(fn (array $v): string => (string) ($v['label']['en'] ?? $v['key']), (array) $attribute['values']);
+            $counts[$key] = ['about' => count($about), 'without' => count($without), 'checked' => 0, 'missed' => 0, 'none' => 0, 'unsure' => 0, 'estimated_missed' => 0, 'examples' => []];
+            foreach (array_slice($without, 0, self::MISSED_SAMPLE) as $id) {
+                $product = $byId->get((string) $id);
+                if ($product !== null) {
+                    $items[] = ['id' => (string) count($items), 'key' => $key, 'title' => (string) $product->title, 'product' => self::described($product, $pictures[(string) $id] ?? null),
+                        'attribute' => (string) ($attribute['label']['en'] ?? $key), 'values' => $labels];
+                }
+            }
+        }
+        foreach (array_chunk($items, self::AUDIT_BATCH) as $batch) {
+            $reply = $this->ask($run, $auditor, 'reviewer', 'bank_recall', ['items' => array_map(fn (array $i): array => array_diff_key($i, ['key' => 1, 'title' => 1]), $batch)], self::AUDIT_TOKENS, $report);
+            $said = array_column((array) ($reply['verdicts'] ?? []), 'value', 'id');
+            foreach ($batch as $i) {
+                $value = trim((string) ($said[$i['id']] ?? 'unsure'));
+                $c = &$counts[$i['key']];
+                $c['checked']++;
+                if (in_array($value, $i['values'], true)) {
+                    $c['missed']++;
+                    if (count($c['examples']) < 3) {
+                        $c['examples'][] = $i['title'].' → '.$value;
+                    }
+                } elseif ($value === 'none') {
+                    $c['none']++;
+                } else {
+                    $c['unsure']++;
+                }
+                unset($c);
+            }
+        }
+        foreach ($counts as $key => $c) {
+            $counts[$key]['estimated_missed'] = $c['checked'] === 0 ? 0 : (int) round($c['without'] * $c['missed'] / $c['checked']);
+        }
+
+        return $counts;
+    }
+
+    /**
      * A new value that tags fewer products in the completed bank than alone, because another value of its choice reads the
      * same products: of the values so hidden, the one that tags fewest alone (its label). Null when none is.
      */
-    private static function hidden(array $added, array $after): ?string
+    private static function hidden(array $added, array $before, array $after): ?string
     {
         $short = [];
         foreach ($added as $item) {
-            if ($item['kind'] === 'value' && isset($item['ids']) && count(self::tagged($item, $after)) < count($item['ids'])) {
+            // hidden by another (fewer products than alone), or, together with the others, changing what a product had
+            if (in_array($item['kind'], ['value', 'type'], true) && isset($item['ids']) && (count(self::tagged($item, $after)) < count($item['ids']) || self::lost($item, $before, $after) > 0)) {
                 $short[$item['label']] = count($item['ids']);
             }
         }
@@ -517,22 +593,60 @@ final class CompleteVocabulary
         return null;
     }
 
-    /** The products that had a type or a value of the item's attribute before and have none after. */
+    /**
+     * The products whose type or value of the item's attribute was there before and is gone or another after: what a
+     * product had stays as it was (the bank is completed, never rewritten). A value found in the title that hid the value
+     * the picture gave is such a change ("cropped fit" over "relaxed fit": Me369, 18.11).
+     */
     private static function lost(array $item, array $before, array $after): int
     {
         $lost = 0;
+        $valuesOf = function (array $r, string $a): ?array {
+            foreach (['category_choices', 'variant_choices', 'text_choices'] as $where) {
+                $held = $r[$where][$a] ?? null;
+                if ($held !== null) {
+                    $values = is_array($held) ? array_map('strval', (array) ($held['values'] ?? [$held['value'] ?? ''])) : [(string) $held];
+                    sort($values);
+
+                    return $values;
+                }
+            }
+
+            return null;
+        };
         foreach ($before as $id => $r) {
             if (in_array($item['kind'], ['type', 'type_words'], true)) {
-                $lost += (($r['type']['key'] ?? null) !== null && ($after[$id]['type']['key'] ?? null) === null) ? 1 : 0;
+                $was = $r['type']['key'] ?? null;
+                $lost += $was !== null && ($after[$id]['type']['key'] ?? null) !== $was ? 1 : 0;
             } elseif ($item['kind'] !== 'attribute') {
                 $a = (string) $item['attribute'];
-                $had = isset($r['text_choices'][$a]) || isset($r['category_choices'][$a]) || isset($r['variant_choices'][$a]);
-                $has = isset($after[$id]['text_choices'][$a]) || isset($after[$id]['category_choices'][$a]) || isset($after[$id]['variant_choices'][$a]);
-                $lost += $had && ! $has ? 1 : 0;
+                $had = $valuesOf($r, $a);
+                $lost += $had !== null && $valuesOf($after[$id] ?? [], $a) !== $had ? 1 : 0;
             }
         }
 
         return $lost;
+    }
+
+    /**
+     * An existing attribute a new one repeats: they share a word of their keys ("neckline_style" and "neckline") and most
+     * of the products the new one tags already have a value of the old. Its values belong there, never beside it.
+     */
+    private static function repeats(array $item, VocabularyDefinition $bank, array $tagged, array $before): ?string
+    {
+        $words = array_filter(explode('_', (string) $item['key']), fn (string $w): bool => mb_strlen($w) >= 4);
+        foreach ($bank->attributes() as $attribute) {
+            $key = (string) $attribute['key'];
+            if (array_intersect($words, array_filter(explode('_', $key), fn (string $w): bool => mb_strlen($w) >= 4)) === [] || $tagged === []) {
+                continue;
+            }
+            $has = count(array_filter($tagged, fn (string $id): bool => isset($before[$id]['text_choices'][$key]) || isset($before[$id]['category_choices'][$key]) || isset($before[$id]['variant_choices'][$key])));
+            if ($has / count($tagged) >= 0.5) {
+                return $key;
+            }
+        }
+
+        return null;
     }
 
     /** The value of the same attribute whose products are almost all the new value's and the other way round, if any. */
