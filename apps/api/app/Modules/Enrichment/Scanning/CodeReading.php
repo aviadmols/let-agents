@@ -204,7 +204,11 @@ final class CodeReading
                         $union[$valueKey] = $quote;
                         $by[$valueKey] = $source;
                     }
-                    if ($source === 'image') {
+                    // What the store's own fields name is the whole list: its "זהב צהוב" is not joined by the title's
+                    // bare "זהב", nor by a metal its description speaks of in passing (Rocks, 18.11: "gold" beside
+                    // "yellow gold" on 1,979 products). The title and the description are read together only where the
+                    // fields name none.
+                    if ($source === 'image' || ($source === 'field' && $union !== [])) {
                         break;
                     }
                 }
