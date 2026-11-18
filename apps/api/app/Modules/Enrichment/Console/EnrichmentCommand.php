@@ -65,7 +65,7 @@ final class EnrichmentCommand extends Command
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
         {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only)}
-        {--force : structure: also when a vocabulary already covers the whole catalog}
+        {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
         {--include-done : ask again about products already read with the same input}
         {--all-products : nightly: every product a model has not read, not only a night of them (the first scan)}
@@ -177,6 +177,12 @@ final class EnrichmentCommand extends Command
         $shop = $this->shop();
         if (! $shop) {
             return $this->failWith('Shop not found.');
+        }
+        // in the first scan, as every store's flag says (enrichment.bank_completion); asked by hand with --force, always
+        if (! $this->option('force') && ! Features::enabled('enrichment.bank_completion', $shop->id)) {
+            $this->line('Bank completion is off for this shop.');
+
+            return self::SUCCESS;
         }
         $run = app(CompleteVocabulary::class)->handle($shop->id, (bool) $this->option('activate'), $report);
         $this->line((string) $run->summary());

@@ -19,6 +19,7 @@ use App\Modules\Enrichment\Scanning\CodeReading;
 use App\Modules\Enrichment\Scanning\PatternMatch;
 use App\Modules\Enrichment\Scanning\PictureText;
 use App\Modules\Enrichment\Scanning\TextNormalizer;
+use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
@@ -101,17 +102,40 @@ final class CompleteVocabulary
         );
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Each active bank completed over its own branch's products: a store with two banks (a baby store's bags and its
+     * bedding) had every product of the other branch read as untyped by the first, and types proposed for them there.
+     *
+     * @return array<string, mixed>
+     */
     private function complete(RunContext $run, string $shopId, bool $activate): array
     {
-        $vocabulary = EnrichmentVocabulary::query()->where('active', true)->latest('version')->first();
-        if ($vocabulary === null) {
+        $vocabularies = EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get();
+        if ($vocabularies->isEmpty()) {
             $run->output(['outcome' => 'no_vocabulary'])->summary('enrichment::runs.completion_no_vocabulary');
 
             return ['outcome' => 'no_vocabulary'];
         }
+        if ($vocabularies->count() === 1) {
+            return $this->completeOne($run, $shopId, $vocabularies->first(), $activate);
+        }
+
+        $banks = [];
+        foreach ($vocabularies as $vocabulary) {
+            $banks[(string) $vocabulary->key] = $this->completeOne($run, $shopId, $vocabulary, $activate);
+        }
+        $outcomes = array_column($banks, 'outcome');
+        $outcome = in_array('activated', $outcomes, true) ? 'activated' : (in_array('ready', $outcomes, true) ? 'ready' : (string) ($outcomes[0] ?? 'complete'));
+        $run->output(['outcome' => $outcome, 'banks' => array_map(fn (array $r): array => array_intersect_key($r, array_flip(['outcome', 'products', 'untyped_before', 'untyped_after', 'version'])), $banks)]);
+
+        return ['outcome' => $outcome, 'banks' => $banks];
+    }
+
+    /** @return array<string, mixed> */
+    private function completeOne(RunContext $run, string $shopId, EnrichmentVocabulary $vocabulary, bool $activate): array
+    {
         $before = $vocabulary->definition();
-        $products = CatalogProduct::query()->whereNull('removed_at')->with('variants')->orderBy('id')->get();
+        $products = VocabularyBranch::products($before)->with('variants')->orderBy('id')->get();
         $pictures = PictureText::for();
         $brands = BrandResolver::forCatalog($products);
         $gaps = BankGaps::find($before, $products, $pictures, $brands);

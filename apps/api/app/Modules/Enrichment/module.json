@@ -53,6 +53,10 @@
             "default": true
         },
         {
+            "name": "bank_completion",
+            "default": true
+        },
+        {
             "name": "picture_suggestions",
             "default": true
         },

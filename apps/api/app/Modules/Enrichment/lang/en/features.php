@@ -33,6 +33,10 @@ return [
         'label' => 'Nightly review of waiting details',
         'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',
     ],
+    'bank_completion' => [
+        'label' => 'Completing the attribute bank from every product',
+        'description' => 'In the first scan, once every product was read: the kinds and values the products say that the bank has no place for are proposed, checked on a sample by a model of another family, and join the bank only when they tag rightly.',
+    ],
     'search_summary' => [
         'label' => 'A short, clear description of every product, for search',
         'description' => 'In the nightly reading: one to three sentences on what the product is, what it is for and where it fits, only from its description and approved details, resting on quotes. A model of another family reviews it. It joins the search by meaning only; the description on the site does not change.',
