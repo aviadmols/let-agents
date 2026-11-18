@@ -12,7 +12,11 @@
   }
   // (results only typed are no kept turn: how far their list was opened and what was chosen in their filters is kept here,
   // and given back to them when they are drawn again: backLive)
-  function keepBackTo(turn, card) { store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, wide: S.wide === turn.id, card: card || null, more: turn.more || null, c: turn === S.live ? turn.c || null : null, y: BODY.scrollTop, at: Date.now() }); }
+  // an answer comes back with the conversation it closed, as it was on screen, and goes on with it (Rocks, 18.11)
+  function keepBackTo(turn, card) {
+    var conv = turn.kind === 'answer' ? chatTurns().filter(function (x) { return !x.prev && x.kind !== 'about' && x !== turn; }).map(function (x) { return x.id; }) : [];
+    store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, tids: conv.length ? conv : null, wide: S.wide === turn.id, card: card || null, more: turn.more || null, c: turn === S.live ? turn.c || null : null, y: BODY.scrollTop, at: Date.now() });
+  }
   function backTo() {
     var b = store('local', 'ls_back');
     return b && b.at && Date.now() - b.at < BACK_MS && (b.q || b.tid) ? b : null;
@@ -45,7 +49,11 @@
       if (back) {
         var bt = back.tid ? turnById(back.tid) : null;
         if (bt) {
-          bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt; }).concat([bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
+          // the conversation the answer closed, in its order, still this one's: a next question goes on with it
+          var conv = (back.tids || []).map(turnById).filter(function (x) { return x && x !== bt; });
+          if (bt.kind === 'answer') { conv.concat([bt]).forEach(function (x) { x.earlier = false; }); }
+          conv.forEach(function (x) { x.prev = false; });
+          bt.prev = false; S.turns = S.turns.filter(function (x) { return x !== bt && conv.indexOf(x) < 0; }).concat(conv, [bt]); S.tab = 'chat'; S.wide = back.wide && !isPhone() ? bt.id : null;
           // a search comes back with its words in the field, as they were left
           if (bt.kind === 'results' && bt.q) { keepInField(bt.q); restored = true; }
         }
@@ -68,7 +76,7 @@
     if (opts.text != null) { INPUT.value = opts.text; }
     render();
     // back at the product the shopper left the list through, not at its top
-    if (back && back.card) { requestAnimationFrame(function () { var cd = D.querySelector('[data-card="' + String(back.card).replace(/["\\]/g, '') + '"]'); if (cd && cd.scrollIntoView) { cd.scrollIntoView({ block: 'center' }); } }); }
+    if (back && back.card) { requestAnimationFrame(function () { var key = String(back.card).replace(/["\\]/g, ''), cd = D.querySelector('[data-card="' + key + '"]') || D.querySelector('.ls-pick [data-after="' + key + '"]'); if (cd && cd.scrollIntoView) { cd.scrollIntoView({ block: 'center' }); } }); }
     var focusField = function () {
       if (opts.focus === false) { return; }
       INPUT.focus({ preventScroll: true });

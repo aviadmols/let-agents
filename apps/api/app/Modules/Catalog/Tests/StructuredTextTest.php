@@ -33,6 +33,13 @@ final class StructuredTextTest extends TestCase
         ]), HtmlText::from($html));
     }
 
+    public function test_a_row_whose_tr_was_dropped_is_still_a_row(): void
+    {
+        $html = '<table><tr><td>שיטה</td><td>עלות</td></tr><tr><td>שליח</td><td>45 ש"ח</td></tr><td>הובלה</td><td>350 ש"ח</td></tr><tr><td>איסוף</td><td>ללא עלות</td></table>';
+
+        $this->assertSame("| שיטה | עלות |\n| --- | --- |\n| שליח | 45 ש\"ח |\n| הובלה | 350 ש\"ח |\n| איסוף | ללא עלות |", HtmlText::from($html));
+    }
+
     public function test_a_table_without_header_cells_reads_its_first_row_as_the_header(): void
     {
         $this->assertSame("| עובי | שימוש |\n| --- | --- |\n| 9 | חיפוי |", HtmlText::from('<table><tr><td><b>עובי</b></td><td>שימוש</td></tr><tr><td>9</td><td>חיפוי</td></tr></table>'));

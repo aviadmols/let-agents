@@ -234,7 +234,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @var array<string, list<int>>
      */
     // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
