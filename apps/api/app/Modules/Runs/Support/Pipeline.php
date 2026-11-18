@@ -62,7 +62,7 @@ final class Pipeline
             'assistant.review_asks' => ['model' => 'assistant.review_model'],
         ],
         'live' => [
-            'assistant.answer' => ['model' => 'assistant.answer_model'],
+            'assistant.answer' => ['model' => 'assistant.product_answer_model'],
             'assistant.answer_site' => ['model' => 'assistant.answer_model'],
             'retrieval.embed_queries' => ['model' => 'retrieval.embedding_model'],
         ],

@@ -151,8 +151,14 @@ final class AnswerSiteQuestion implements TriesQuestions
      * on the screen is the one asked about. With it, in code: the store's own search feeds the writer first, and a karat is
      * one thing however it is written ("21 קארט" is 21K). Compared on 35 questions from 6 stores
      * (docs/eval/answers-v35-vs-v34.json in Let Agents).
+     *
+     * v37 (verify_site only; the writer stays v35), 18.11, as Aviad asked: the checker stops only what is off the question,
+     * wrong or unsafe, and never writes the answer again; code takes out the sentences it names. On 50 real questions from 7
+     * stores the full checker (v35) rewrote 17 answers, mostly in wording and in some for the worse (a right 30-day return
+     * window turned into "the team will confirm"), taking 4.0 s at the median; v37 took 2.6 s and stopped one
+     * (docs/eval/checker-arms-v35-v36-v37-none.json in Let Agents).
      */
-    public const PROMPT_VERSION = 35;
+    public const PROMPT_VERSION = 37;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -208,7 +214,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @var array<string, list<int>>
      */
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28], 'verify_site' => [36, 37]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28], 'verify_site' => [36]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;

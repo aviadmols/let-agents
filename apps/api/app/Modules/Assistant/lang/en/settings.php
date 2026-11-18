@@ -39,6 +39,18 @@ return [
         'label' => 'The same, for open questions and recommendations',
         'description' => 'Dynamic only. Lower, so a recommendation sees more products.',
     ],
+    'product_answer_model' => [
+        'label' => 'Model that writes answers on a product page',
+        'description' => 'An OpenAI model id for answers about one product on its own page, e.g. gpt-5.4. The site search uses the model in the setting above.',
+    ],
+    'product_answer_input_usd_per_million' => [
+        'label' => 'Product page model input price per million tokens',
+        'description' => 'From OpenAI\'s price list. Used for the estimate before each call and for the recorded cost. Better too high than too low.',
+    ],
+    'product_answer_output_usd_per_million' => [
+        'label' => 'Product page model output price per million tokens',
+        'description' => 'From OpenAI\'s price list. Used for the estimate before each call and for the recorded cost. Better too high than too low.',
+    ],
     'answer_input_usd_per_million' => [
         'label' => 'Writing model input price per million tokens',
         'description' => 'From OpenAI\'s price list. Used for the estimate before each call and for the recorded cost. Better too high than too low.',

@@ -205,7 +205,9 @@ final class AnswerQuestion
             trigger: RunTrigger::Webhook,
             input: [$subject->kind => $subject->externalId, 'question' => $question],
             work: function (RunContext $run) use ($shopId, $subject, $question, $locale, $visitorHash, &$result): void {
-                $answerModel = (string) Settings::get('assistant.answer_model');
+                // the product page's own writer (product_answer_model): its input is one product, small, and its answers read better on
+                // gpt-5.4; the search box's writer is the faster one (answer_model), as Aviad decided 18.11
+                $answerModel = (string) Settings::get('assistant.product_answer_model');
                 $checkModel = (string) Settings::get('assistant.scope_model');
                 $maxOutput = (int) Settings::get('assistant.answer_max_output_tokens');
                 $effort = (string) Settings::get('assistant.reasoning_effort');
@@ -387,6 +389,9 @@ final class AnswerQuestion
 
     private function price(string $name): float
     {
+        // the writer here is the product page's own, at its own prices (product_answer_*)
+        $name = str_starts_with($name, 'answer_') ? 'product_'.$name : $name;
+
         return (float) Settings::get("assistant.{$name}_usd_per_million");
     }
 

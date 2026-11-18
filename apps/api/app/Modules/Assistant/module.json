@@ -87,7 +87,7 @@
         {
             "name": "answer_model",
             "type": "string",
-            "default": "gpt-5.4",
+            "default": "gpt-5.4-mini",
             "min": 1,
             "max": 120,
             "scope": "global"
@@ -148,7 +148,15 @@
             "scope": "shop"
         },
         {
-            "name": "answer_input_usd_per_million",
+            "name": "product_answer_model",
+            "type": "string",
+            "default": "gpt-5.4",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "product_answer_input_usd_per_million",
             "type": "float",
             "default": 2.5,
             "min": 0,
@@ -157,9 +165,27 @@
             "unit": "usd"
         },
         {
-            "name": "answer_output_usd_per_million",
+            "name": "product_answer_output_usd_per_million",
             "type": "float",
             "default": 15,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 100,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "answer_output_usd_per_million",
+            "type": "float",
+            "default": 8,
             "min": 0,
             "max": 400,
             "scope": "global",
@@ -949,10 +975,10 @@
                 {
                     "role": "writer",
                     "provider": "answer_provider",
-                    "model": "answer_model",
+                    "model": "product_answer_model",
                     "prices": [
-                        "answer_input_usd_per_million",
-                        "answer_output_usd_per_million"
+                        "product_answer_input_usd_per_million",
+                        "product_answer_output_usd_per_million"
                     ],
                     "prompts": [
                         "answer",
