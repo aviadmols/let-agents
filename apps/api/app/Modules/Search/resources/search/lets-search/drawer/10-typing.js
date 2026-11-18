@@ -308,6 +308,36 @@
       '<button class="ls-askcard__btn' + (active ? ' is-active' : '') + '" data-opt ' + act + '><span>' + esc(t('askBtn')) + '</span></button>' +
       '<p class="ls-askcard__sub">' + esc(t('askSub', { name: CFG.assistant })) + '</p></div>';
   }
+  // No exact match for the words (the design of 18.11, docs: lets-no-exact-match): says so plainly, with one quiet action,
+  // the store's AI search for the same words. A light card, a white button with the lime sparkle that turns like a coin.
+  // The words in the title are cut at about 30 letters and clamped to 3 lines, so the button never leaves the screen; the
+  // words and the store's name are their own direction (bdi). act: the button's data-* (askFind). The sparkle's ids are
+  // this card's own: two on a page share none.
+  var aiCards = 0;
+  function noMatchCard(q, active, act) {
+    var n = ++aiCards, g = 'lsAiG' + n, m = 'lsAiM' + n, rtl = DIR === 'rtl';
+    var words = String(q || '').replace(/[“”"״]/g, '').trim(), short = words.length > 30 ? words.slice(0, 29).replace(/\s+\S*$/, '') + '…' : words;
+    var star = 'M12 4c1 3.9 4.1 7 8 8-3.9 1-7 4.1-8 8-1-3.9-4.1-7-8-8 3.9-1 7-4.1 8-8z';
+    var place = function (s, k, html) { return esc(s).split('@@' + k + '@@').join(html); };
+    return '<div class="ls-nomatch">' +
+      '<p class="ls-nomatch__title">' + place(t('noMatchTitle', { q: '@@q@@' }), 'q', '<bdi>' + esc(short) + '</bdi>') + '</p>' +
+      '<button type="button" class="ls-nomatch__btn' + (active ? ' is-active' : '') + '" data-opt ' + act + '>' +
+        '<span class="ls-nomatch__ic" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="' + g + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2ff78"/><stop offset="1" stop-color="#bfe83a"/></linearGradient>' +
+        '<mask id="' + m + '"><path fill="#fff" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" d="' + star + '"/></mask></defs>' +
+        '<path fill="url(#' + g + ')" stroke="url(#' + g + ')" stroke-width="2.6" stroke-linejoin="round" d="' + star + '"/><g mask="url(#' + m + ')"><rect class="ls-nomatch__glint" x="0" y="-4" width="4" height="32" fill="#ffffff"/></g></svg></span>' +
+        '<span>' + esc(t('noMatchBtn')) + '</span>' +
+        '<svg class="ls-nomatch__arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + (rtl ? 'M14.5 6.5 9 12l5.5 5.5' : 'M9.5 6.5 15 12l-5.5 5.5') + '"/></svg>' +
+      '</button>' +
+      '<p class="ls-nomatch__from">' + place(t('noMatchFrom', { store: '@@store@@' }), 'store', '<bdi>' + esc(String((S.config && S.config.shopName) || '').trim() || String(CFG.assistant || '')) + '</bdi>') + '</p></div>';
+  }
+  // Letters struck at random ("כרקכרקגכרכר", "ferfrere"): one word of three letters or more, no number, that the store has
+  // nothing close to. Then no AI card, only that nothing was found and the popular searches. Unsure: it has intent.
+  function gibberish(q) {
+    var said = String(q || '').replace(/[?؟!.,״"'׳]/g, ' ').split(/\s+/).filter(Boolean);
+    if (said.length !== 1 || isQuestion(q) || /\d/.test(said[0]) || said[0].length < 3) { return false; }
+    var unknown = localUnknown(q);
+    return unknown.length === 1;
+  }
   // a quieter way to ask, under results that may not be it: "Not it? Ask Lets · Search the site for me"
   function askSmall(act) {
     return '<div style="padding:4px 0"><button class="ls-row ls-row--ask" data-opt ' + act + '><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span>' +

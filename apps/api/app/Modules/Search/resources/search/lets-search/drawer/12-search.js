@@ -850,6 +850,12 @@
     return pop.length ? '<div class="ls-sec__title">' + esc(t('popular')) + '</div><div class="ls-chips" style="margin-bottom:14px">' +
       pop.map(function (x) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(x) + '">' + icon('trend', 'ls-icon--sm') + esc(x) + '</button>'; }).join('') + '</div>' : '';
   }
+  // nothing found for letters at random (the design of 18.11): said plainly, with the popular searches to start from
+  function noResultsHtml() {
+    var pop = (S.config.popular || []).slice(0, 5);
+    return '<div class="ls-noresults"><p class="ls-noresults__title">' + esc(t('noResultsTitle')) + '</p>' + (pop.length ? '<p class="ls-noresults__try">' + esc(t('noResultsTry')) + '</p><div class="ls-chips" style="margin-bottom:14px">' +
+      pop.map(function (x) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(x) + '">' + icon('trend', 'ls-icon--sm') + esc(x) + '</button>'; }).join('') + '</div>' : '') + '</div>';
+  }
   function resultsHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
@@ -866,6 +872,9 @@
         list = own.length ? own : [s];
       }
     }
+    // letters at random that no product holds: what is near them by meaning is no find ("ferfrere" showed 31 embroidered
+    // shirts, Me369 QA, 18.11), so nothing is shown but that nothing was found
+    if (!turn.single && gibberish(turn.q)) { return html + noResultsHtml(); }
     // no product, and articles or pages found: those, with the quiet way to ask under them, never "nothing found" over
     // what was found (Profimex, 16.11: 49 posts for "השקעה בנדל״ן", the drawer showed only the card that asks the AI)
     var onlyGuides = !total ? guidesFor(turn) : [];
@@ -877,11 +886,13 @@
         html += '<p class="ls-noanswer__text">' + esc(t('didYouMean', { q: turn.q })) + '</p><div class="ls-chips" style="margin-bottom:14px">' +
           turn.focus.options.map(function (o) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(o.query) + '">' + esc(o.query) + ' <span class="ls-chip__count ls-num">(' + o.count + ')</span></button>'; }).join('') +
           (turn.focus.category ? '<button class="ls-chip ls-chip--quiet" data-q="' + esc(turn.focus.category.title) + '">' + esc(t('category', { t: turn.focus.category.title })) + '</button>' : '') + '</div>';
-      } else if (!turn.askShown) {
-        html += popularHtml();
+        return html + (off('ask') || turn.askShown ? '' : '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q, true)) + '</div>');
       }
-      html += off('ask') ? '' : askCardHtml(turn.q, '', turn.askShown, true);
-      return html;
+      // letters at random: no AI card, that nothing was found and the popular searches (the design of 18.11)
+      if (gibberish(turn.q)) { return html + noResultsHtml(); }
+      // words with intent: the card that runs the AI search, then the popular searches as before
+      if (!off('ask') && !turn.askShown) { html += '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q, true)) + '</div>'; }
+      return html + (turn.askShown ? '' : popularHtml());
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
     // names it almost word for word (90% or more) and better than any product does; "טבעת זהב" keeps the products first
@@ -894,7 +905,7 @@
     // no product holds the words at all (only what is near by meaning, "מכניסים"): the card that asks the AI to search the
     // site comes first, above what may not be it (as Aviad asked, 16.11), and not again under the products
     var askTop = !off('ask') && !turn.askShown && turn.held === 0 && !!turn.askBelow;
-    if (askTop) { html += '<div style="margin:4px 0 18px">' + askCard(turn.q, false, askFind(turn.q)) + '</div>'; }
+    if (askTop) { html += '<div style="margin:4px 0 18px">' + noMatchCard(turn.q, false, askFind(turn.q)) + '</div>'; }
     html += '<div class="ls-summary"><div class="ls-summary__count ls-num">' + esc(countText(list.length)) + '</div>' +
       '<button class="ls-btn ls-btn--ghost ls-btn--sm" data-sort="' + turn.id + '">' + esc(sortLabel(sortOf(C(turn)))) + icon('down', 'ls-icon--sm') + '</button></div>';
     html += chipRow(turn);
