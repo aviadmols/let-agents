@@ -203,6 +203,17 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([['The Complete Snowboard'], true, true], $got, 'out of "In stock"; before any press never offered to add (its like in stock instead, or sold out); the one in stock still adds');
     }
 
+    public function test_every_consent_to_keep_details_links_the_stores_privacy_policy_when_it_is_known(): void
+    {
+        // Shopify review, 18.11: the form took a name and a phone or an email with a consent box, and no privacy policy beside it
+        $got = self::drawer("(function () { var none = T.privacyLink(); S.config.privacyUrl = 'https://s.test/policies/privacy-policy'; var link = T.privacyLink(); S.config.privacyUrl = 'javascript:alert(1)'; return [none, link, T.privacyLink()]; })()");
+        $this->assertSame('', $got[0], 'none known, none linked');
+        $this->assertStringContainsString('href="https://s.test/policies/privacy-policy"', $got[1]);
+        $this->assertStringContainsString('Privacy policy', $got[1]);
+        $this->assertStringContainsString('target="_blank"', $got[1], 'opens apart: the form keeps what was typed');
+        $this->assertSame('', $got[2], 'only a web address');
+    }
+
     public function test_a_word_read_in_the_stores_language_is_said_by_what_says_its_reading(): void
     {
         // Rocks QA, 16.11: "gold hoop earrings" over the hoops was told "without hoop"

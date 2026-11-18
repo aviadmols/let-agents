@@ -1,5 +1,11 @@
   // ---------------------------------------------------------------- tiny helpers
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]; }); }
+  // The store's privacy policy, a link after every "keep my details" consent (Shopify review, 18.11); none when the store
+  // has none we know of. It opens apart, so the form keeps what was typed.
+  function privacyLink() {
+    var u = S.config && S.config.privacyUrl;
+    return u && /^https?:\/\//i.test(String(u)) ? ' <a class="ls-link" href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(t('privacy')) + '</a>' : '';
+  }
   // A title with its HTML entities read ("&amp;" is "&"), once per title: the cards, the filters and the reading of the
   // words ask it of the same products on every key (Rocks, 1.11: a second of a phone's time over two searches).
   // memo(): a value worked out once per input, forgotten all at once past MEMO_MAX inputs.

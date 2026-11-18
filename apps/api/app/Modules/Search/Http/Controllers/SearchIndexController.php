@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Settings\ValueSource;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsPopularity;
+use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
@@ -83,6 +84,9 @@ final class SearchIndexController
             'noAnswer' => self::noAnswer($shopId),
             // The shop's own "leave details" form: its fields in order, each required or not; null: the plain one.
             'leadForm' => app(DescribesLeadForm::class)->forShop($shopId, $locale),
+            // The store's own privacy policy, linked beside every "keep my details" consent (Shopify review, 18.11): its
+            // page read with the catalog (Shopify's /policies/privacy-policy, a WordPress /privacy-policy); null: none known.
+            'privacyUrl' => Cache::remember('search:privacy:'.$shopId.':'.$index->hash, 3600, fn (): ?string => $tenant->run($shopId, fn (): ?string => self::privacyUrl())),
             // The shop's name, for the drawer's conversation: "Rocks and Gold AI".
             'shopName' => (string) (Shop::query()->whereKey($shopId)->value('name') ?? ''),
             // "Popular in the store" on the empty drawer: this shop's own searches, never sample words.
@@ -305,6 +309,17 @@ final class SearchIndexController
         $held = array_flip(array_column((array) (json_decode($index, true)['items'] ?? []), 'id'));
 
         return array_slice(array_values(array_filter($ids, fn (string $id): bool => isset($held[$id]))), 0, $shown);
+    }
+
+    /** The address of the store's privacy policy page, as its catalog read it; null when the store has none we know. */
+    private static function privacyUrl(): ?string
+    {
+        $url = CatalogContent::query()->whereNull('removed_at')->whereNotNull('url')
+            ->where(fn ($q) => $q->where('url', 'like', '%/policies/privacy-policy%')->orWhere('url', 'like', '%privacy-policy%')->orWhere('url', 'like', '%privacy%'))
+            ->orderByRaw("case when url like '%/policies/privacy-policy%' then 0 when url like '%privacy-policy%' then 1 else 2 end")
+            ->orderBy('id')->value('url');
+
+        return is_string($url) && preg_match('~^https?://~i', $url) === 1 ? $url : null;
     }
 
     private static function popular(string $shopId, string $index): array
