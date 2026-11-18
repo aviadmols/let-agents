@@ -2258,6 +2258,11 @@ final class AnswerSiteQuestion implements TriesQuestions
                     $corrected = self::corrected($question, $scope->data['corrected'] ?? null);
                     // a reply, as it stands alone (scope_site v8; v9 keeps what a narrowing reply does not change): "כמה פעמים כדאי לקחת את הקורדיספס?", what is searched and answered
                     $corrected = $this->conversation === [] ? $corrected : (self::standalone($scope->data['standalone'] ?? null) ?? $corrected);
+                    // a price alone ("מה יש לכם עד 1500?") goes on with what the conversation was about, whatever the model
+                    // wrote: the search had searched the price alone and found a gift card (Rocks, rubies, 18.11)
+                    if ($this->conversation !== [] && $corrected !== null && app()->bound(PriceRange::class) && (bool) Settings::get('assistant.reply_keeps_subject', $shopId)) {
+                        $corrected = self::carriedSubject($corrected, $this->conversation, fn (string $text): array => app(PriceRange::class)->read($text)) ?? $corrected;
+                    }
                     // the check read the reply and left it as it is: it stands alone, and is never glued to the question before
                     $readAlone = true;
                     if ($corrected !== null && $remember && $keep && $viewing === null && $visitorHash !== null
@@ -2719,6 +2724,51 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         return $ids === [] ? [] : ['named' => ['names' => array_values($names), 'ids' => array_slice($ids, 0, self::NAMED_SHOWN)]];
+    }
+
+    /** Words that say nothing of what is asked for, in a reply of any store: asking, wanting, showing, "and", "something". */
+    private const REPLY_FILLER = ['מה', 'ומה', 'יש', 'ויש', 'לכם', 'לך', 'אצלכם', 'משהו', 'משהוא', 'עוד', 'אפשר', 'ואפשר', 'תראו', 'תראה', 'תראי', 'להראות', 'לראות',
+        'אשמח', 'רוצה', 'רוצים', 'מחפש', 'מחפשת', 'לי', 'גם', 'אולי', 'רק', 'עם', 'של', 'ואם', 'אם', 'כן', 'בטח', 'תודה', 'אז', 'איזה', 'איזו', 'אילו', 'ואיזה', 'כזה',
+        'בתקציב', 'תקציב', 'מחיר', 'במחיר', 'בטווח', 'שח', 'שקל', 'שקלים', 'what', 'and', 'do', 'you', 'have', 'got', 'any', 'anything', 'something', 'else',
+        'show', 'me', 'is', 'there', 'are', 'with', 'for', 'in', 'a', 'some', 'please', 'ok', 'yes', 'maybe', 'budget', 'price', 'nis', 'usd', 'what\'s'];
+
+    /**
+     * A reply that asks only a price ("מה יש לכם עד 1500 ש״ח?", "anything under 50?") is the conversation's subject at that
+     * price: the last question asked in it with words of its own ("יש לכם טבעות עם רובי?"; "אשמח לראות" has none), with the
+     * reply's price. Null when the reply names a price and anything else, or no price, or nothing before has words of its own.
+     *
+     * @param  list<array{question: string, answer: string}>  $conversation
+     * @param  callable(string): array{min: float|null, max: float|null, words?: string}  $readPrice
+     */
+    public static function carriedSubject(string $reply, array $conversation, callable $readPrice): ?string
+    {
+        $said = $readPrice($reply);
+        if (($said['min'] ?? null) === null && ($said['max'] ?? null) === null) {
+            return null;
+        }
+        $own = fn (string $text): array => array_values(array_filter(preg_split('/[^\p{L}\p{N}\']+/u', mb_strtolower($text)) ?: [],
+            fn (string $w): bool => mb_strlen($w) >= 2 && ! in_array($w, self::REPLY_FILLER, true) && preg_match('/^\d+$/u', $w) !== 1));
+        if ($own((string) ($said['words'] ?? $reply)) !== []) {
+            return null;
+        }
+
+        $amount = fn (?float $n): string => number_format((float) $n, 0, '.', '');
+        $hebrew = preg_match('/\p{Hebrew}/u', $reply) === 1;
+        $price = match (true) {
+            $said['min'] !== null && $said['max'] !== null => $hebrew ? 'בין '.$amount($said['min']).' ל-'.$amount($said['max']).' ש"ח' : 'between '.$amount($said['min']).' and '.$amount($said['max']),
+            $said['max'] !== null => $hebrew ? 'עד '.$amount($said['max']).' ש"ח' : 'under '.$amount($said['max']),
+            default => $hebrew ? 'מעל '.$amount($said['min']).' ש"ח' : 'over '.$amount($said['min']),
+        };
+
+        foreach (array_reverse($conversation) as $turn) {
+            $before = $readPrice((string) ($turn['question'] ?? ''));
+            $words = trim((string) preg_replace('/[\s?!.,]+$/u', '', (string) ($before['words'] ?? $turn['question'] ?? '')));
+            if ($own($words) !== []) {
+                return $words.' '.$price;
+            }
+        }
+
+        return null;
     }
 
     /** A reply written to stand alone by the topic check, plain and short; null when it gave none. */

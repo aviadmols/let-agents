@@ -163,6 +163,10 @@ return [
         'label' => 'The checker takes no sentence out only for a detail left out',
         'description' => 'A sentence the checker marked only "incomplete" stays in the answer and is logged. Measured 18.11: in 68 of 70 such answers the sentence was right. Off brings the earlier behaviour back at once.',
     ],
+    'reply_keeps_subject' => [
+        'label' => 'A reply that asks only a price goes on with the conversation\'s subject',
+        'description' => '"What do you have up to 1500?" after a conversation about ruby rings searches ruby rings up to 1500, not the price alone. Only when the reply holds no word but the price.',
+    ],
     'products_by_search' => [
         'label' => 'A question\'s products from the store\'s search',
         'description' => 'For each question, the products the store\'s search finds by its words and its meaning go to the topic check and to the answer\'s writer, before those shown on the screen while it was typed.',

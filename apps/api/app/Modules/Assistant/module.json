@@ -434,6 +434,12 @@
             "scope": "shop"
         },
         {
+            "name": "reply_keeps_subject",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "site_similarity_drop",
             "type": "float",
             "default": 0,
