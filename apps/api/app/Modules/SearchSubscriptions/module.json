@@ -1,0 +1,142 @@
+{
+    "name": "SearchSubscriptions",
+    "enabled": true,
+    "requires": [
+        "Tenancy",
+        "Connections",
+        "Catalog",
+        "Search",
+        "Shopify"
+    ],
+    "provider": "SearchSubscriptionsServiceProvider",
+    "features": [
+        {
+            "name": "enabled",
+            "default": false
+        }
+    ],
+    "settings": [
+        {
+            "name": "placement",
+            "type": "enum",
+            "options": [
+                "end",
+                "no_match"
+            ],
+            "default": "end",
+            "scope": "shop"
+        },
+        {
+            "name": "send_day",
+            "type": "enum",
+            "options": [
+                "sunday",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday"
+            ],
+            "default": "thursday",
+            "scope": "shop"
+        },
+        {
+            "name": "send_hour",
+            "type": "int",
+            "default": 10,
+            "min": 0,
+            "max": 23,
+            "scope": "shop",
+            "unit": "hours"
+        },
+        {
+            "name": "logo_url",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 500,
+            "scope": "shop"
+        },
+        {
+            "name": "reply_to",
+            "type": "string",
+            "default": "",
+            "min": 0,
+            "max": 200,
+            "scope": "shop"
+        },
+        {
+            "name": "products_per_email",
+            "type": "int",
+            "default": 6,
+            "min": 1,
+            "max": 12,
+            "scope": "global",
+            "unit": "products"
+        },
+        {
+            "name": "searches_per_email",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 30,
+            "scope": "global",
+            "unit": "searches"
+        },
+        {
+            "name": "keep_days",
+            "type": "int",
+            "default": 90,
+            "min": 30,
+            "max": 365,
+            "scope": "global",
+            "unit": "days"
+        },
+        {
+            "name": "remind_days_before",
+            "type": "int",
+            "default": 7,
+            "min": 1,
+            "max": 30,
+            "scope": "global",
+            "unit": "days"
+        },
+        {
+            "name": "unopened_stop",
+            "type": "int",
+            "default": 3,
+            "min": 1,
+            "max": 10,
+            "scope": "global",
+            "unit": "emails"
+        },
+        {
+            "name": "bulk_import_skip",
+            "type": "int",
+            "default": 100,
+            "min": 0,
+            "max": 100000,
+            "scope": "global",
+            "unit": "products"
+        },
+        {
+            "name": "signups_per_minute",
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 60,
+            "scope": "global",
+            "unit": "requests"
+        },
+        {
+            "name": "forget_after_days",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 365,
+            "scope": "global",
+            "unit": "days"
+        }
+    ]
+}
