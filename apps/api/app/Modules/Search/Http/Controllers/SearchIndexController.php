@@ -7,6 +7,7 @@ use App\Core\Facades\Settings;
 use App\Core\Settings\ValueSource;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsPopularity;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Leads\Contracts\DescribesLeadForm;
 use App\Modules\Retrieval\Contracts\SemanticSearch;
 use App\Modules\Search\Http\StorefrontSite;
@@ -102,7 +103,8 @@ final class SearchIndexController
             // a content site: the articles, posts and pages a search found come before its products (search.content_first)
             'contentFirst' => (bool) Settings::get('search.content_first', $shopId),
             // the store's own currency, for a site whose prices come with none (no Store API, no Shopify format)
-            'currency' => Settings::get('search.store_currency', $shopId) ? (string) (Shop::query()->whereKey($shopId)->value('currency') ?? '') : null,
+            'currency' => Settings::get('search.store_currency', $shopId) ? (string) (Shop::query()->whereKey($shopId)->value('currency') ?? '')
+                : (Cache::remember('search:currency:'.$shopId.':'.$index->hash, 3600, fn (): string => $tenant->run($shopId, fn (): string => self::readCurrency($shopId))) ?: null),
             // Product pictures fill their square ("cover"), or show whole in a light frame ("frame").
             'images' => (string) Settings::get('search.image_fit', $shopId),
             // square, or upright (4:5) for clothes photographed on a model
@@ -142,6 +144,22 @@ final class SearchIndexController
             // its word families, offered to choose beside a word of one
             'families' => $data['families'] ?? null,
         ], 200, $headers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The currency every product of the store was read in, when it is the store's own and not shekels; else none, and the
+     * drawer writes ₪ as it did. Me369's demo, 18.11: read in dollars, its prices were shown as "₪217" because only a
+     * currency the team had set by hand was told to the drawer.
+     */
+    private static function readCurrency(string $shopId): string
+    {
+        $own = strtoupper((string) (Shop::query()->whereKey($shopId)->value('currency') ?? ''));
+        if ($own === '' || $own === 'ILS') {
+            return '';
+        }
+        $read = CatalogProduct::query()->whereNotNull('currency')->where('currency', '!=', '')->distinct()->limit(2)->pluck('currency')->all();
+
+        return count($read) === 1 && strtoupper((string) $read[0]) === $own ? $own : '';
     }
 
     /**

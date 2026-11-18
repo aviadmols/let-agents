@@ -34,8 +34,12 @@ final class WordMeanings
      *
      * v3: letters struck at random are no word, and are read as none: v2 read "גדששד" as the store's "אחר", and 22 products
      * that say "אחר" were shown for it (Gueta, 17.11).
+     *
+     * v4: the translation is always in the store's language and letters, the language told by its name: v3 left a Hebrew
+     * word in Hebrew in an English store two times in three ("אדומה" stayed "אדומה", "שימלה" became "שמלה"), so "שימלה אדומה"
+     * read no "dress" and no "red" (Me369, 18.11). A reply still written in the shopper's letters is asked once more.
      */
-    public const PROMPT = 'word_meaning.v3';
+    public const PROMPT = 'word_meaning.v4';
 
     /**
      * The gate's version, beside the prompt's: "+forms" also takes what the word plainly means when the store writes it in
@@ -79,7 +83,9 @@ final class WordMeanings
         $saved = SearchWordMeaning::query()->where('word', $word)->first();
         // an answer read with another version of the question is read again (once, within the day's words)
         $read = (string) $saved?->model;
-        if ($saved !== null && ! str_ends_with($read, '@'.self::PROMPT) && ! str_ends_with($read, '@'.self::PROMPT.self::GATE)) {
+        if ($saved !== null && ! str_ends_with($read, '@'.self::PROMPT) && ! str_ends_with($read, '@'.self::PROMPT.self::GATE)
+            // a word an older version found stays found: only its "none" is read again
+            && ! ($saved->term !== null && isset($byKey[HebrewSearch::normalize($saved->term)]))) {
             $saved = null;
         }
         if ($saved !== null) {
@@ -102,21 +108,29 @@ final class WordMeanings
         if ($provider === null || $model === '' || $system === '') {
             return null;
         }
-        $user = (string) json_encode(['word' => $word, 'language' => $locale, 'store_words' => $words], JSON_UNESCAPED_UNICODE);
+        $user = (string) json_encode(['word' => $word, 'language' => ['en' => 'English'][$locale] ?? 'Hebrew', 'store_words' => $words], JSON_UNESCAPED_UNICODE);
         $in = (float) Settings::get('search.word_reader_input_usd_per_million');
         $out = (float) Settings::get('search.word_reader_output_usd_per_million');
         $max = (int) Settings::get('search.word_reader_max_output_tokens');
         $schema = json_decode((string) @file_get_contents(__DIR__.'/../Prompts/'.self::PROMPT.'.schema.json'), true);
 
-        try {
-            $this->spend->assertCanSpend(forShopper: true, estimatedUsd: ((mb_strlen($system) + mb_strlen($user)) / 2 * $in + $max * $out) / 1_000_000);
-            $reply = is_array($schema) && $this->chat instanceof StructuredChatModel
-                ? $this->chat->structured($provider, $model, $system, $user, $schema, $max)
-                : $this->chat->json($provider, $model, $system, $user, $max);
-        } catch (SpendCapReached|ModelCallFailed) {
-            return null;
+        // the store's letters: a translation with none of them, of a word typed in other letters, was not translated
+        $own = $locale === 'he' ? '/[א-ת]/u' : '/[a-z]/i';
+        foreach ([1, 2] as $try) {
+            try {
+                $this->spend->assertCanSpend(forShopper: true, estimatedUsd: ((mb_strlen($system) + mb_strlen($user)) / 2 * $in + $max * $out) / 1_000_000);
+                $reply = is_array($schema) && $this->chat instanceof StructuredChatModel
+                    ? $this->chat->structured($provider, $model, $system, $user, $schema, $max)
+                    : $this->chat->json($provider, $model, $system, $user, $max);
+            } catch (SpendCapReached|ModelCallFailed) {
+                return null;
+            }
+            Run::recordUsage($shopId, self::AGENT, self::ACTION, $provider->value, $model, $reply->inputTokens, $reply->outputTokens, $reply->costUsd($in, $out));
+            $translation = trim((string) ($reply->data['translation'] ?? ''));
+            if ($translation === '' || preg_match($own, $translation) === 1 || preg_match($own, $word) === 1) {
+                break;
+            }
         }
-        Run::recordUsage($shopId, self::AGENT, self::ACTION, $provider->value, $model, $reply->inputTokens, $reply->outputTokens, $reply->costUsd($in, $out));
 
         // code's gate: a word of the store's own, as the store writes it, that names exactly what the shopper's word does
         // (same), or none

@@ -57,7 +57,7 @@ final class CrossLanguageSearchTest extends TestCase
                     return new ModelReply(['translation' => self::SHY[$input['word']], 'term' => '', 'same' => false], 300, 5);
                 }
                 $term = self::SAYS[$input['word']] ?? '';
-                $term = $input['language'] === 'he' && preg_match('/^[a-z]/', $term) === 1 ? '' : $term;
+                $term = $input['language'] === 'Hebrew' && preg_match('/^[a-z]/', $term) === 1 ? '' : $term;
                 $held = array_map(fn (string $w): string => mb_strtolower($w), $input['store_words']);
 
                 return new ModelReply(['translation' => $term, 'term' => in_array($term, $held, true) ? $term : '', 'same' => $term !== ''], 300, 5);

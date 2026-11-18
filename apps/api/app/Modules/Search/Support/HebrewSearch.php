@@ -839,18 +839,21 @@ final class HebrewSearch
     }
 
     /**
-     * The best places of a value's words among the typed ones: the most words, the closest together, the closest read.
+     * The best places of a value's words among the typed ones: the most words, the closest together, the closest read. A
+     * value's words follow one another, a number between them aside ("זהב 14k לבן"); a word between them names something
+     * else, and the word after it is said of that: "טבעת עם זהב ואבן אדומה" is a red stone, never red gold (Rocks, 18.11).
      *
      * @param  array<string, list<array{0: int, 1: int}>>  $places
      * @param  list<string>  $lw
+     * @param  list<string>  $tw  the typed words
      * @return array{at: list<int>, tiers: list<int>, ks: list<int>}
      */
-    private static function placeWords(array $places, array $lw): array
+    private static function placeWords(array $places, array $lw, array $tw = []): array
     {
         $lists = array_map(fn (string $w): array => $places[$w] ?? [], $lw);
         $best = ['at' => [], 'tiers' => [], 'ks' => []];
         $spread = fn (array $at): int => $at === [] ? 0 : $at[count($at) - 1] - $at[0];
-        $walk = function (int $k, array $at, array $tiers, array $ks) use (&$walk, &$best, $lists, $lw, $spread): void {
+        $walk = function (int $k, array $at, array $tiers, array $ks) use (&$walk, &$best, $lists, $lw, $tw, $spread): void {
             if ($k === count($lw)) {
                 if (count($at) > count($best['at']) || (count($at) === count($best['at']) && ($spread($at) < $spread($best['at'])
                     || ($spread($at) === $spread($best['at']) && array_sum($tiers) < array_sum($best['tiers']))))) {
@@ -862,7 +865,8 @@ final class HebrewSearch
             $walk($k + 1, $at, $tiers, $ks);
             foreach ($lists[$k] as [$i, $tier]) {
                 $last = $at === [] ? -1 : $at[count($at) - 1];
-                if ($i <= $last || ($at !== [] && $i - $last > 2)) {
+                if ($i <= $last || ($at !== [] && ($i - $last > 2 || ($i - $last === 2 && $tw !== [] && $k - $ks[count($ks) - 1] === 1 && preg_match('/\d/', $tw[$last + 1] ?? '') !== 1
+                    && self::colorOf($tw[$last + 1] ?? '') === null && self::colorOf(self::readBare($tw[$last + 1] ?? '') ?? '') === null)))) {
                     continue;
                 }
                 $walk($k + 1, [...$at, $i], [...$tiers, $tier], [...$ks, $k]);
@@ -1014,7 +1018,7 @@ final class HebrewSearch
             if ($value['k'] === 'length') {
                 $read = $days !== null && self::lengthHolds($value['key'], $days['days']) ? ['at' => $days['at'], 'tiers' => [0], 'part' => false] : null;
             } elseif (mb_strlen(implode('', $lw)) >= 2 && array_any($lw, fn (string $w): bool => isset($places[$w]))) {
-                $placed = self::placeWords($places, $lw);
+                $placed = self::placeWords($places, $lw, $tw);
                 $n = count($placed['at']);
                 $of = count($lw);
                 // a word of the name not typed: one that says what the filter's values all are ("Tours"), or the one left of

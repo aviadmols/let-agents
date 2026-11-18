@@ -1092,8 +1092,12 @@
     return -1;
   }
 
-  /** The best places of a value's words among the typed ones: the most words, the closest together, the closest read. */
-  function placeWords(places, lw) {
+  /**
+   * The best places of a value's words among the typed ones: the most words, the closest together, the closest read. A
+   * value's words follow one another, a number between them aside ("זהב 14k לבן"); a word between them names something
+   * else, and the word after it is said of that: "טבעת עם זהב ואבן אדומה" is a red stone, never red gold (Rocks, 18.11).
+   */
+  function placeWords(places, lw, tw) {
     var lists = lw.map(function (w) { return places[w] || []; });
     var best = { at: [], tiers: [], ks: [] };
     var spread = function (at) { return at.length ? at[at.length - 1] - at[0] : 0; };
@@ -1108,7 +1112,7 @@
       walk(k + 1, at, tiers, ks);
       lists[k].forEach(function (place) {
         var last = at.length ? at[at.length - 1] : -1;
-        if (place[0] <= last || (at.length && place[0] - last > 2)) {
+        if (place[0] <= last || (at.length && (place[0] - last > 2 || (place[0] - last === 2 && tw && k - ks[ks.length - 1] === 1 && !/\d/.test(tw[last + 1] || '') && colorOf(tw[last + 1] || '') === null && colorOf(readBare(tw[last + 1] || '') || '') === null)))) {
           return;
         }
         at.push(place[0]); tiers.push(place[1]); ks.push(k);
@@ -1231,7 +1235,7 @@
       if (value.k === 'length') {
         read = days && lengthHolds(value.key, days.days) ? { at: days.at, tiers: [0], part: false } : null;
       } else if (value.lw.join('').length >= 2 && value.lw.some(function (w) { return places[w]; })) {
-        var placed = placeWords(places, value.lw);
+        var placed = placeWords(places, value.lw, tw);
         var n = placed.at.length, of = value.lw.length;
         // a word of the name not typed: one that says what the filter's values all are ("Tours"), or the one left of
         // three or more; never one of another filter (a colour, a metal), which the shopper did not ask
