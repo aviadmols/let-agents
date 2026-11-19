@@ -210,6 +210,10 @@ final class SearchSubscriptionsAccessTest extends TestCase
             ->assertSee('Jeans jacket')
             ->assertSee('אדם אחד עוקב אחרי')
             ->assertSee('בשעה 10:00')
+            // who signed up, to which search, and where it stands
+            ->assertSee('מי נרשם')
+            ->assertSee('d@example.com')
+            ->assertSee('רשום')
             ->set('data.enabled', true)
             ->set('data.send_day', 'sunday')
             ->set('data.reply_to', 'not an address')

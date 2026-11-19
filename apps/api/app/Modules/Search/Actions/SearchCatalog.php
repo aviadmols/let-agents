@@ -299,6 +299,11 @@ final class SearchCatalog
         if (count($words) < 2) {
             return $result;
         }
+        // nor a search for an exact value (HebrewSearch::PRECISE): "טבעת זהב 21 קראט" with "21" left out was "טבעת זהב קראט",
+        // and found the 95 diamond rings whose stones weigh in carats (Rocks, 18.11). Its narrower searches are offered.
+        if (array_filter(explode(' ', HebrewSearch::normalize($raw)), fn (string $w): bool => preg_match(HebrewSearch::PRECISE, $w) === 1) !== []) {
+            return $result;
+        }
         // narrower searches already offered ("למה התכוונתם?") stay what is offered, unless one word of them tells few products apart (below)
         $offered = ($result['focus']['options'] ?? []) !== [];
         $index = $this->tenant->run($shopId, fn (): ?array => LoadedIndex::for($shopId));

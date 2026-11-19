@@ -86,7 +86,7 @@ final class KaratTest extends TestCase
         // Rocks, 18.11: "טבעת 21K" showed 46 rings of 9K, 14K and 18K, the words and the meaning both widened past the karat
         LoadedIndex::forget();
         $shop = Shop::factory()->create(['content_locale' => 'he']);
-        $titles = ['1' => 'טבעת סוליטר משובצת יהלום - זהב 14K', '2' => 'טבעת איטרנטי - זהב 18K', '3' => 'שרשרת חוליות - זהב 21K', '4' => 'טבעת חלקה - זהב 24K', '5' => 'טבעת נישואין - זהב 21K'];
+        $titles = ['1' => 'טבעת סוליטר משובצת יהלום - זהב 14K', '2' => 'טבעת איטרנטי - זהב 18K', '3' => 'שרשרת חוליות - זהב 21K', '4' => 'טבעת חלקה - זהב 24K', '5' => 'טבעת נישואין - זהב 21K', '6' => 'טבעת יהלום במשקל 0.5 קראט - זהב 14K'];
         app(TenantContext::class)->run($shop->id, function () use ($shop, $titles): void {
             foreach ($titles as $id => $title) {
                 CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://b.test/p/$id", 'price' => 80, 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => []]);
@@ -100,5 +100,7 @@ final class KaratTest extends TestCase
         $this->assertNotContains('1', $found('טבעת 22K'), 'none of 22K: never the 14K, 18K or 24K ring instead');
         $this->assertNotContains('2', $found('טבעת 22K'));
         $this->assertNotContains('4', $found('טבעת 22K'), 'nor 24K, close to it by spelling');
+        // nothing of 22K: never loosened to "טבעת זהב קראט", every ring whose stone weighs in carats
+        $this->assertSame([], $found('טבעת זהב 22 קראט'));
     }
 }

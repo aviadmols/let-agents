@@ -21,6 +21,29 @@ final class FollowedSearches
     public function __construct(private readonly TenantContext $tenant) {}
 
     /**
+     * When the store's subscriptions last changed (a sign-up, a confirmation, a stop from any door): what the page's
+     * counts are kept under, so a sign-up shows at once (Rocks, 19.11: confirmed, and the page said 0 for five minutes).
+     */
+    public function stamp(string $shopId): string
+    {
+        return (string) $this->tenant->run($shopId, fn () => SearchSubscription::query()->max('updated_at'));
+    }
+
+    /**
+     * The latest sign-ups, for the store's own page: who (the address the shopper gave this store), to which search,
+     * since when and where it stands. Newest first.
+     *
+     * @return list<array{email: string, query: string, status: string, at: CarbonInterface|null}>
+     */
+    public function recent(string $shopId, int $limit): array
+    {
+        return $this->tenant->run($shopId, fn (): array => SearchSubscription::query()->latest('created_at')->limit($limit)
+            ->get(['email', 'query', 'status', 'created_at', 'confirmed_at'])
+            ->map(fn (SearchSubscription $s): array => ['email' => (string) $s->email, 'query' => Subscribers::cut((string) $s->query, 60), 'status' => (string) $s->status, 'at' => $s->confirmed_at ?? $s->created_at])
+            ->all());
+    }
+
+    /**
      * @return list<array{query: string, people: int}> the most followed first; each search as most of its followers typed it
      */
     public function top(string $shopId, int $limit): array

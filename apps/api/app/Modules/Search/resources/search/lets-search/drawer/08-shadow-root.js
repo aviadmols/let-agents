@@ -93,14 +93,24 @@
   // shrank under the shopper's first letter (Aviad, 30.10). A field lower down (a reply) still has it fit above.
   // Both as they were before the keyboard: a site that has its page resized by the keyboard shrinks "100svh" too.
   var fullH = 0, sheetH = 0;
+  // the keyboard is up: what can be seen is much shorter than the layer without it. A field focused with no keyboard (iOS
+  // gives focus without one outside a tap) is no keyboard: the sheet was fitted to a keyboard that was not there, and opened
+  // as a low half sheet (Gueta, 19.11)
+  function keyboardUp(vv) { return !!vv && (fullH <= 0 || vv.height < fullH * 0.82); }
   function fitViewport() {
     var a = root.activeElement, typing = !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName);
-    var vv = win.visualViewport, phone = isPhone() && vv && typing, keep = phone && a === INPUT && fullH > 0 && sheetH > 0;
+    var vv = win.visualViewport, phone = isPhone() && vv && typing && keyboardUp(vv), keep = phone && a === INPUT && fullH > 0 && sheetH > 0;
     R.style.top = phone ? vv.offsetTop + 'px' : '';
     R.style.height = keep ? fullH + 'px' : phone ? vv.height + 'px' : '';
     R.style.bottom = phone ? 'auto' : '';
     if (!phone) { fullH = R.offsetHeight || fullH; sheetH = D.offsetHeight || sheetH; }
     // otherwise the sheet keeps the small viewport's height (CSS): the same whether the toolbar is in or out
     if (phone) { D.style.setProperty('--ls-vh', (keep ? sheetH + 8 : vv.height) + 'px'); } else { D.style.removeProperty('--ls-vh'); }
+    // and never with its top above what can be seen: the field and the close button out of reach, the sheet could not be
+    // closed (Rocks, 19.11, a first opening on a phone). Then it is as tall as what is seen. Only ever smaller.
+    if (isPhone() && vv && S.open) {
+      var top = D.getBoundingClientRect().top;
+      if (top < vv.offsetTop - 2) { D.style.setProperty('--ls-vh', vv.height + 'px'); }
+    }
   }
 

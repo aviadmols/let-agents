@@ -42,4 +42,15 @@ return [
         'none' => 'No one follows a search yet. Followed searches will show here.',
         'row' => '{1} One person follows “:query”|[2,*] :count people follow “:query”',
     ],
+    'people' => [
+        'title' => 'Who signed up',
+        'help' => 'The latest sign-ups (up to :n): the email the shopper left, the search, when, and where it stands.',
+        'none' => 'No sign-ups yet.',
+        'status' => [
+            'pending' => 'Waiting for email confirmation',
+            'active' => 'Subscribed',
+            'stopped' => 'Stopped',
+            'expired' => 'Ended',
+        ],
+    ],
 ];

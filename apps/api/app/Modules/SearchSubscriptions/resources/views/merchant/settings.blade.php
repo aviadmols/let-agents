@@ -46,6 +46,26 @@
                 </div>
             @endif
         </section>
+
+        @php($people = $this->people())
+        <section class="lp-card" data-signed-up>
+            <div class="lp-card-t"><h2>{{ $t('people.title') }}</h2></div>
+            <p class="lp-set-help">{{ $t('people.help', ['n' => \App\Modules\SearchSubscriptions\Filament\Merchant\Pages\SearchSubscriptionsSettings::PEOPLE]) }}</p>
+            @if ($people === [])
+                <p class="lp-note" style="margin: 16px 0 0">{{ $t('people.none') }}</p>
+            @else
+                <div style="margin-top: 8px" data-signed-up-list>
+                    @foreach ($people as $p)
+                        <div class="lp-row" style="gap: 12px; flex-wrap: wrap">
+                            <bdi dir="ltr" style="flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere">{{ $p['email'] }}</bdi>
+                            <bdi dir="auto" style="flex: 1 1 160px; min-width: 0; font-weight: 600">{{ $p['query'] }}</bdi>
+                            <span style="flex: 0 0 auto; color: var(--lp-muted, #6b6b70)">{{ $p['at']?->timezone(config('app.timezone'))->format('d.m.Y') }}</span>
+                            <span style="flex: 0 0 auto">{{ $t('people.status.'.$p['status']) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
     </div>
 
     <x-lp::save />

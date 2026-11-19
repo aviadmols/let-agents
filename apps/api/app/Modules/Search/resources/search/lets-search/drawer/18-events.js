@@ -416,6 +416,11 @@
   // keep the field above the phone keyboard
   if (win.visualViewport) {
     win.visualViewport.addEventListener('resize', fitViewport); win.visualViewport.addEventListener('scroll', fitViewport);
+    // the field focused with no keyboard (a focus iOS gave outside a tap): the tap lets it go first, so the phone focuses it
+    // as its own and raises the keyboard, instead of "Paste AutoFill" (Rocks, 19.11)
+    INPUT.addEventListener('touchstart', function () {
+      if (isPhone() && root.activeElement === INPUT && !keyboardUp(win.visualViewport)) { INPUT.blur(); }
+    }, { passive: true });
   }
   win.addEventListener('resize', placePill);
 

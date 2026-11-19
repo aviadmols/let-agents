@@ -9,6 +9,7 @@ use App\Modules\SearchSubscriptions\Support\Availability;
 use App\Modules\SearchSubscriptions\Support\FollowedSearches;
 use App\Modules\Tenancy\Models\Shop;
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -30,6 +31,9 @@ class SearchSubscriptionsSettings extends Page
 
     /** The searches listed under "Searches people follow". */
     public const TOP = 8;
+
+    /** The latest sign-ups listed under "Who signed up". */
+    public const PEOPLE = 50;
 
     public static string $sideGroup = 'store';
 
@@ -93,13 +97,27 @@ class SearchSubscriptionsSettings extends Page
     /** @return list<array{query: string, people: int}> */
     public function followed(): array
     {
-        return Cache::remember('search-subscriptions:top:'.$this->shopId(), 300, fn (): array => app(FollowedSearches::class)->top($this->shopId(), self::TOP));
+        return Cache::remember('search-subscriptions:top:'.$this->shopId().':'.$this->stamp(), 300, fn (): array => app(FollowedSearches::class)->top($this->shopId(), self::TOP));
     }
+
+    /** @return list<array{email: string, query: string, status: string, at: CarbonInterface|null}> the latest sign-ups */
+    public function people(): array
+    {
+        return app(FollowedSearches::class)->recent($this->shopId(), self::PEOPLE);
+    }
+
+    /** The subscriptions' last change, once a request: every count is kept under it, so none is stale. */
+    private function stamp(): string
+    {
+        return $this->stamp ??= app(FollowedSearches::class)->stamp($this->shopId());
+    }
+
+    private ?string $stamp = null;
 
     /** @return array{following: int, signups: int, sent: int, opened: int, clicked: int, revenue: float} */
     public function numbers(): array
     {
-        return Cache::remember('search-subscriptions:numbers:'.$this->shopId(), 300,
+        return Cache::remember('search-subscriptions:numbers:'.$this->shopId().':'.$this->stamp(), 300,
             fn (): array => app(FollowedSearches::class)->numbers($this->shopId(), now()->subDays(self::DAYS), now()));
     }
 

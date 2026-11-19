@@ -94,10 +94,13 @@
       // phone raises its keyboard (a focus a moment later is refused there), then as before, and once more when the opening
       // is done, if the theme took the focus back meanwhile; never over another field of ours the shopper is in
       if (opts.focus !== false) { try { INPUT.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ } }
-      setTimeout(focusField, isPhone() ? 60 : 30);
+      // ...on a phone never after the tap: iOS gives that focus with no keyboard, and a tap on the field then shows "Paste
+      // AutoFill" and never the keyboard (Rocks, 19.11, a first opening). There the field waits for the shopper's own tap.
+      var later = isPhone() && root.activeElement !== INPUT;
+      setTimeout(later ? onType : focusField, isPhone() ? 60 : 30);
       setTimeout(function () {
         var here = INPUT.getRootNode && INPUT.getRootNode().activeElement;
-        if (S.open && opts.focus !== false && !(here && /^(INPUT|TEXTAREA|SELECT)$/.test(here.tagName))) { INPUT.focus({ preventScroll: true }); }
+        if (S.open && !isPhone() && opts.focus !== false && !(here && /^(INPUT|TEXTAREA|SELECT)$/.test(here.tagName))) { INPUT.focus({ preventScroll: true }); }
       }, 520);
     }
   }
