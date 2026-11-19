@@ -15,6 +15,7 @@ final class TaskRegistry
             TaskType::ProductHighlights => ProductHighlightsTask::class,
             TaskType::ProductSummary => ProductSummaryTask::class,
             TaskType::SectionQuestions => SectionQuestionsTask::class,
+            TaskType::TypeAudit => TypeAuditTask::class,
         });
     }
 }

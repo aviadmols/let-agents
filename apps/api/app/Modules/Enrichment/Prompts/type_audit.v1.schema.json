@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "type", "confidence", "why"],
+    "properties": {
+        "id": {"type": "string"},
+        "type": {"type": "string"},
+        "confidence": {"type": "integer"},
+        "why": {"type": "string"}
+    }
+}
