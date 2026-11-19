@@ -57,7 +57,13 @@
     try { aboutTheStore = !!(S.engine && S.engine.aboutStore && S.engine.aboutStore(q)); } catch (e) { aboutTheStore = false; }
     if (!turn.ctx && !(extra && extra.thread) && seen.length && !ASKS_HOW.test(String(q).trim()) && !aboutTheStore) { update(turn, { pre: seen }); }
     else if (!turn.ctx && !(extra && extra.thread)) { preFor(turn, q); }
-    var slow = setTimeout(function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (el) { el.textContent = t('slow'); } }, 8000);
+    // a wait longer than usual: lines that take turns until the answer comes (as Aviad asked, 19.11), each kept a few seconds;
+    // they stop with the waiting line itself, once the answer is drawn in its place
+    var slow = setTimeout(function () {
+      var lines = t('slowLines').split('|'), i = 0, turnLine = null;
+      var next = function () { var el = BODY.querySelector('[data-tid="' + turn.id + '"] .ls-think__text'); if (!el) { clearInterval(turnLine); return; } el.textContent = lines[i++ % lines.length]; };
+      turnLine = setInterval(next, 3000); next();
+    }, 8000);
     // about this product: the product page's own ask, so the answer is kept with the product (its questions,
     // "questions shoppers asked", the suggestions, and the gaps the daily review learns from). A reply to an answer
     // there goes with its conversation to the site's assistant, which reads it about this product (page=1) and keeps nothing.
