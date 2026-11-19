@@ -5474,7 +5474,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             : array_values(array_filter(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), (array) ($result['picks'] ?? []))));
         if (! Features::enabled('assistant.answer_searches', $shopId) || ! app()->bound(AnswerSearches::class)
             || $result['outcome'] !== AssistantAnswer::ANSWERED || ($set !== null && ($set['search'] ?? null) !== null) || $shown === [] || ! self::aboutProducts($question)
-            || $this->conversation !== [] || $this->onShown || ($bound && $this->goesWith === null)) {
+            // "…שתתאים לעגילים האלה?" points at the product of the page, not at results shown: a match asked for keeps its searches
+            // (Rocks, 19.11: the earrings' necklaces came with no button)
+            || $this->conversation !== [] || ($this->onShown && $this->goesWith === null) || ($bound && $this->goesWith === null)) {
             return [];
         }
 

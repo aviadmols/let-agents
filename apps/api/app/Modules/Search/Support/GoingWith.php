@@ -73,6 +73,13 @@ final class GoingWith implements ProductsGoingWith
     /** A filter whose key says it is a size, a measure, a price or the stock. */
     private const MEASURE_KEY = '/(?:^|[_:\s-])(?:size|sizes|length|width|height|weight|price|stock|availability|sale|discount|deal)(?:$|[_:\s-])|מיד[הת]|מידות|אורך|רוחב|משקל|מחיר|מלאי|מבצע/iu';
 
+    /** A filing name that tells where a product stands in the store: its price or a range of prices, newly in, a best seller. */
+    private const STANDING = '/מחיר|לאחרונה|הגיע|רבי?\s*(?:ה)?מכר|הנמכר|נמכרי|פופולר|מומלצ|במלאי|₪|ש["״]ח|שקל|(?:^|\s)(?:עד|מתחת|מעל|החל)\s*(?:מ|ל)?-?\s*\d|\b(?:price\w*|nis|best\s*sell\w*|bestsell\w*|arriv\w*|popular|featured|in\s*stock|under\s*\d|up\s*to\s*\d|from\s*\d)\b|[$€£]/iu';
+
+    /** Words that measure a product (its size, width, thickness, shape), never a motif: "בגודל", "ובעובי", "בצורת". */
+    private const MEASURE_WORDS = ['גודל', 'עובי', 'צורה', 'צורת', 'רוחב', 'אורך', 'קוטר', 'משקל', 'מידה', 'מידות', 'גדלים', 'גדלי', 'גובה', 'עומק', 'נפח',
+        'size', 'sizes', 'width', 'thickness', 'shape', 'length', 'diameter', 'weight', 'height', 'depth', 'volume'];
+
     /** Words that tie a sentence together, in either language, never a motif. */
     private const LINK_WORDS = ['the', 'and', 'with', 'for', 'of', 'an', 'in', 'on', 'to', 'by', 'this', 'that', 'it', 'is', 'are', 'set', 'new',
         'עמ', 'של', 'את', 'על', 'או', 'גמ', 'זה', 'זו', 'הזה', 'הזאת', 'סט', 'כל', 'בלי', 'ללא', 'מאוד', 'יותר', 'אשר'];
@@ -125,13 +132,19 @@ final class GoingWith implements ProductsGoingWith
         // what the product says that few others do, by key, with how it writes it
         $ownTitle = self::keyed((string) ($own['title'] ?? ''));
         $ownOther = self::keyed((string) ($own['kw'] ?? '').' '.($anchor === null ? '' : $anchor->shortDescription().' '.$anchor->description()));
-        $kindKeys = self::kindKeys($facets);
+        // ...never a word of the kinds, nor of a name that files where products stand ("הגיעו לאחרונה", "מחיר מלא")
+        $kindKeys = self::kindKeys($facets) + self::standingKeys($facets);
         $rare = fn (string $key): bool => ! isset($kindKeys[$key]) && ($words['df'][$key] ?? 0) >= 1 && ($words['df'][$key] ?? 0) <= max(1, (int) floor($total * self::COMMON_SHARE));
         $ownTitle = array_filter($ownTitle, $rare, ARRAY_FILTER_USE_KEY);
         $ownOther = array_diff_key(array_filter($ownOther, fn (string $key): bool => $rare($key) && ($words['df'][$key] ?? 0) >= 2, ARRAY_FILTER_USE_KEY), $ownTitle);
+        $locale = (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he');
+        // a keyword in a script neither the product's name nor the store writes in is for search engines, never a motif
+        // ("золотые" in a Hebrew store's keywords, Rocks 19.11)
+        $written = self::writtenIn((string) ($own['title'] ?? ''), $locale);
+        $ownOther = array_filter($ownOther, fn (string $surface): bool => preg_match($written, $surface) === 1);
         $idf = fn (int $n): float => log(1 + $total / max(1, $n));
         $ownPrice = isset($own['pr']) ? (float) $own['pr'] : null;
-        $pairedLabel = (string) __('search::storefront.goes_with_paired', [], (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he'));
+        $pairedLabel = (string) __('search::storefront.goes_with_paired', [], $locale);
 
         $scored = [];
         foreach ($products as $id => $record) {
@@ -388,10 +401,26 @@ final class GoingWith implements ProductsGoingWith
             return false;
         }
         if (in_array($key, ['category', 'store_tags'], true) || str_starts_with($key, 'tag:')) {
-            return ! $kinds->campaign($label) && ! $kinds->onlyWhom($label);
+            return self::filesWhatItIs($kinds, $label);
         }
 
         return true;
+    }
+
+    /**
+     * Whether a category's or tag's name says what a product is ("זהב 14 קארט", "עגילים זהב צהוב"), not where it stands in
+     * the store: a campaign or a season, whom it is for, its price or a price range, newly in, a best seller. A number
+     * is a campaign's only as a year or a percent: "זהב 14 קארט" is gold, "מחיר מלא" is no match (Rocks, 19.11: the
+     * earrings' necklaces were offered as "שרשרת · מחיר מלא", and the karat they shared was refused for its digits).
+     */
+    private static function filesWhatItIs(ProductKinds $kinds, string $label): bool
+    {
+        if (preg_match(self::STANDING, $label) === 1 || $kinds->onlyWhom($label)) {
+            return false;
+        }
+        $probe = preg_match('/%|(?<!\d)(?:19|20)\d\d(?!\d)/u', $label) === 1 ? $label : trim((string) preg_replace('/\d+(?:[.,]\d+)?/u', ' ', $label));
+
+        return preg_match('/\p{L}/u', $probe) === 1 && ! $kinds->campaign($probe);
     }
 
     /** @return list<int> the filter values a record carries, less those a check refused for it */
@@ -433,6 +462,69 @@ final class GoingWith implements ProductsGoingWith
     }
 
     /**
+     * The words of the categories' and tags' names that tell where a product stands in the store (STANDING), by key.
+     *
+     * @param  list<array<string, mixed>>  $facets
+     * @return array<string, true>
+     */
+    private static function standingKeys(array $facets): array
+    {
+        $out = [];
+        foreach ($facets as $facet) {
+            $key = (string) ($facet['k'] ?? '');
+            if (! in_array($key, ['category', 'store_tags'], true) && ! str_starts_with($key, 'tag:')) {
+                continue;
+            }
+            foreach ((array) ($facet['v'] ?? []) as $value) {
+                if (preg_match(self::STANDING, (string) ($value['l'] ?? '')) === 1) {
+                    foreach (array_keys(self::keyed((string) $value['l'])) as $word) {
+                        $out[$word] = true;
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The pattern of a word written in the scripts the product's name uses, Latin (names, brands) and the store's language.
+     */
+    private static function writtenIn(string $title, string $locale): string
+    {
+        $scripts = ['Latin' => true];
+        foreach (['Hebrew', 'Arabic', 'Cyrillic', 'Greek'] as $script) {
+            if (preg_match('/\p{'.$script.'}/u', $title) === 1) {
+                $scripts[$script] = true;
+            }
+        }
+        $byLocale = ['he' => 'Hebrew', 'ar' => 'Arabic', 'ru' => 'Cyrillic', 'uk' => 'Cyrillic', 'el' => 'Greek'];
+        if (isset($byLocale[strtolower(substr($locale, 0, 2))])) {
+            $scripts[$byLocale[strtolower(substr($locale, 0, 2))]] = true;
+        }
+
+        return '/^(?:[^\p{L}]|'.implode('|', array_map(fn (string $s): string => '\p{'.$s.'}', array_keys($scripts))).')+$/u';
+    }
+
+    /** Whether a normalized word is a measure (MEASURE_WORDS), with up to two letters before it ("ובעובי", "בגודל"). */
+    private static function measures(string $word): bool
+    {
+        static $measures = null;
+        $measures ??= array_flip(array_map(fn (string $w): string => HebrewSearch::normalize($w), self::MEASURE_WORDS));
+        for ($i = 0; $i <= 2 && mb_strlen($word) - $i >= 3; $i++) {
+            $rest = mb_substr($word, $i);
+            if (isset($measures[$rest])) {
+                return true;
+            }
+            if (preg_match('/^[והבלמשכ]/u', $rest) !== 1) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The words of shared values, by key: a word they already say ("זהב" of "זהב 14K") is not said again as a word.
      *
      * @param  list<string>  $labels
@@ -463,7 +555,9 @@ final class GoingWith implements ProductsGoingWith
         foreach (preg_split('/[^\p{L}\p{N}\'"׳״`]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $raw) {
             $word = HebrewSearch::normalize($raw);
             if ($word === '' || str_contains($word, ' ') || mb_strlen($word) < 3 || preg_match('/^\d+$/', $word) === 1
-                || HebrewSearch::saysNothing($word) || in_array($word, self::LINK_WORDS, true)) {
+                || HebrewSearch::saysNothing($word) || in_array($word, self::LINK_WORDS, true) || self::measures($word)
+                // a word that tells where a product stands ("הגיעו", "לאחרונה" in its keywords) is never a motif
+                || preg_match(self::STANDING, $word) === 1) {
                 continue;
             }
             // the quotes around it off, by letters: trim() would cut a byte of "׳" and break the text

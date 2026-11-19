@@ -141,6 +141,36 @@ final class AnswerSearchesTest extends TestCase
         $this->assertSame(['type', 'metal', 'karat'], array_column($data['searches'][0]['chips'], 'k'), 'never the sale or the size the bracelet is filed under');
         $this->assertNull($data['searches'][0]['price']);
         $this->assertCount(2, $this->calls, 'one writer, one checker: no model call added');
+
+        // "…לצמידים האלה" points at the product of the page, not at results shown: the same searches (Rocks, 19.11)
+        $this->calls = [];
+        $these = $this->ask('יש לך טבעת שיכולה להתאים לצמידים האלה?', ['17156', 'b2'], page: true)->assertOk()->json('data');
+        $this->assertSame(['r1'], array_column($these['picks'], 'external_id'));
+        $this->assertSame(['טבעת · זהב דו-גוני · 14K', "טבעת · וינטג'"], array_column($these['searches'] ?? [], 'label'));
+    }
+
+    public function test_a_match_is_searched_by_what_the_products_are_never_by_their_price_category(): void
+    {
+        // the earrings are filed only by the store's categories and tags (Rocks, 19.11): a karat tag is what they share with
+        // the necklaces, "מחיר מלא" is where all of them stand
+        $facets = [
+            ['k' => 'type', 'l' => 'סוג', 'v' => [['k' => 'necklace', 'l' => 'שרשרת'], ['k' => 'earrings', 'l' => 'עגילים']]],
+            ['k' => 'category', 'l' => 'קטגוריה', 'v' => [['k' => 'full', 'l' => 'מחיר מלא'], ['k' => 'yellow_earrings', 'l' => 'עגילים זהב צהוב']]],
+            ['k' => 'tag:gold_karat', 'l' => 'קראט', 'v' => [['k' => '14', 'l' => 'זהב 14 קארט'], ['k' => '18', 'l' => 'זהב 18 קארט']]],
+        ];
+        $this->index($facets, [
+            ['a1', 'עגילי חישוק חלולים', [1000, 1001, 2000], 2400],
+            ['n1', 'שרשרת חוליות חלולה', [0, 1000, 2000], 3100],
+            ['n2', 'שרשרת וינטג', [0, 1000, 2000], 2900],
+            ['n3', 'שרשרת חבל', [0, 1000, 2000], 2500],
+            ['n4', 'שרשרת חוליות 18K', [0, 1000, 2001], 4200],
+            ['n5', 'שרשרת דקה', [0, 1000], 900],
+        ]);
+
+        $searches = $this->inShop(fn (): array => app(AnswerSearches::class)->searches($this->shop->id, 'יש לך שרשרת שיכולה להתאים לעגילים האלה?', ['n1', 'n2'], ['anchor' => 'a1', 'ids' => ['n1', 'n2']], 3, 2));
+
+        $this->assertSame(['שרשרת · זהב 14 קארט'], array_column($searches, 'label'), 'the karat, never the price category every necklace stands in');
+        $this->assertSame(3, $searches[0]['count']);
     }
 
     public function test_a_question_of_the_stores_gets_no_search(): void

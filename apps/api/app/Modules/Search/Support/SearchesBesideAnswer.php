@@ -25,6 +25,9 @@ final class SearchesBesideAnswer implements AnswerSearches
     /** The values a goes-with button joins beside the kind, the most shared first. */
     private const MAX_TOGETHER = 3;
 
+    /** A value this share of the kind's products (or more) hold is no filter of it. */
+    private const NARROWS = 0.9;
+
     public function __construct(private readonly ProductKinds $kinds) {}
 
     public function searches(string $shopId, string $question, array $picks, ?array $goesWith, int $max, int $min, bool $beyond = true): array
@@ -141,6 +144,11 @@ final class SearchesBesideAnswer implements AnswerSearches
                 if ($n > 0) {
                     $shares[$code] = $n;
                 }
+            }
+            // a value nearly every product of the kind holds narrows nothing: its button would be the kind alone
+            if ($base !== []) {
+                $all = $count($base);
+                $shares = array_filter($shares, fn (int $code): bool => $count([...$base, $code]) < $all * self::NARROWS, ARRAY_FILTER_USE_KEY);
             }
             uksort($shares, fn (int $a, int $b): int => $shares[$b] <=> $shares[$a] ?: $a <=> $b);
             $together = [];

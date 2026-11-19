@@ -9,6 +9,7 @@ use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Contracts\ProductsGoingWith;
 use App\Modules\Assistant\Models\AssistantAnswer;
 use App\Modules\Assistant\Models\AssistantGoesWithRules;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -262,6 +263,41 @@ final class GoesWithTest extends TestCase
         $this->assertSame('', $writer['analysis']['goes_with']['kind']);
         $this->assertTrue($writer['analysis']['goes_with']['complement']);
         $this->assertSame(['Black'], $writer['analysis']['goes_with']['matches'][0]['shares']);
+    }
+
+    /**
+     * What a necklace shares with the earrings is what it is: a karat, a motif. Never where both stand in the store ("מחיר
+     * מלא", "הגיעו לאחרונה") nor how they are measured ("בגודל", "ובעובי"): Rocks' earrings matched necklaces by those
+     * (19.11). Any store.
+     */
+    public function test_a_match_is_by_what_the_products_are_never_by_their_measures_or_where_they_stand(): void
+    {
+        $facets = [
+            ['k' => 'type', 'l' => 'סוג', 'v' => [['k' => 'necklace', 'l' => 'שרשרת'], ['k' => 'earrings', 'l' => 'עגילים'], ['k' => 'pendant', 'l' => 'תליון']]],
+            ['k' => 'category', 'l' => 'קטגוריה', 'v' => [['k' => 'full', 'l' => 'מחיר מלא'], ['k' => 'new', 'l' => 'הגיעו לאחרונה'], ['k' => 'yellow_earrings', 'l' => 'עגילים זהב צהוב']]],
+            ['k' => 'tag:gold_karat', 'l' => 'קראט', 'v' => [['k' => '14', 'l' => 'זהב 14 קארט'], ['k' => '18', 'l' => 'זהב 18 קארט']]],
+        ];
+        $items = [
+            ['a1', 'עגילי חישוק חלולים בגודל 3 ס"מ ובעובי 3 מ"מ הגיעו לאחרונה בגדלים שונים', [1, 1000, 1001, 1002, 2000], 2400],
+            ['n1', 'שרשרת חוליות חלולים בגודל 45 ס"מ ובעובי 2 מ"מ', [0, 1000, 2000], 3100],
+            ['n2', 'שרשרת חבל בגודל 50 ס"מ ובעובי 3 מ"מ הגיעו לאחרונה בגדלים', [0, 1000, 1001, 2001], 2500],
+        ];
+        foreach (range(1, 10) as $i) {
+            $items[] = ['t'.$i, 'תליון לב '.$i, [2, 1000, 2001], 1200];
+        }
+        $this->index($facets, $items);
+
+        $found = $this->inShop(fn () => app(ProductsGoingWith::class)->goingWith($this->shop->id, 'a1', 'יש שרשרת שתתאים לעגילים?', 6, []));
+
+        $this->assertSame(['n1', 'n2'], $found['ids']);
+        $this->assertContains('זהב 14 קארט', $found['shares']['n1'], 'a karat tag is gold, whatever its digits');
+        $this->assertContains('חלולים', $found['shares']['n1']);
+        foreach (['n1', 'n2'] as $id) {
+            foreach (['מחיר מלא', 'הגיעו לאחרונה', 'הגיעו', 'לאחרונה', 'בגודל', 'ובעובי', 'בגדלים'] as $never) {
+                $this->assertNotContains($never, $found['shares'][$id], $id.' shares no '.$never);
+            }
+        }
+        $this->assertSame([], $found['shares']['n2'], 'the rope chain shares nothing the earrings are');
     }
 
     public function test_nothing_of_another_kind_shares_anything_is_said_as_none(): void
