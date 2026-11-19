@@ -253,6 +253,10 @@ final class EnrichmentCommand extends Command
         // a demo's scan (FirstScan 'bank'): a bank that passed its checks is the store's vocabulary at once, and the
         // products are read by it in code, so the search built next files them by it. One that did not pass changes nothing.
         if ($this->option('activate-passed') && $stored !== null && $stored->status === EnrichmentExpertBank::PASSED) {
+            // a bank already active (a scan again, a rebuild) gives way to the one that passed now
+            if (EnrichmentExpertBank::query()->where('shop_id', $shop->id)->where('status', EnrichmentExpertBank::ACTIVATED)->exists()) {
+                $this->line((string) app(ActivateExpertBank::class)->deactivate($shop->id)['run']->summary());
+            }
             ['run' => $activated, 'vocabulary' => $vocabulary] = app(ActivateExpertBank::class)->activate($shop->id, (string) $stored->id);
             $this->line((string) $activated->summary());
             if ($vocabulary !== null && Features::enabled('enrichment.read_text_in_code', $shop->id)) {

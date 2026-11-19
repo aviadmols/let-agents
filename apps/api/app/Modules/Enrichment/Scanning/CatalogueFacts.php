@@ -64,7 +64,12 @@ final class CatalogueFacts
                 $title = TextNormalizer::clean((string) $product->title);
                 $type = self::tidy((string) ($product->payload['product_type'] ?? ''));
                 $tags = array_values(array_unique(array_filter(array_map(fn ($t): string => self::tidy((string) $t), (array) ($product->payload['tags'] ?? [])), fn (string $t): bool => $t !== '')));
-                $categories = array_values(array_unique(array_filter(array_map(fn (array $path): string => self::tidy((string) end($path)), array_filter($product->categoryPaths())), fn (string $c): bool => $c !== '')));
+                // a tag written as a path ("Women > Sandals > Elegant Collection") is a category in all but name: its parts say
+                // what the product is, as a category does (Naot, 19.11: every type found no evidence, the kinds were in such tags)
+                $paths = array_values(array_filter($tags, fn (string $t): bool => str_contains($t, ' > ')));
+                $tags = array_values(array_diff($tags, $paths));
+                $fromPaths = array_merge(...array_map(fn (string $t): array => array_map(fn (string $p): string => self::tidy($p), explode(' > ', $t)), $paths ?: ['']));
+                $categories = array_values(array_unique(array_filter([...array_map(fn (array $path): string => self::tidy((string) end($path)), array_filter($product->categoryPaths())), ...$fromPaths], fn (string $c): bool => $c !== '')));
                 $attributes = [];
                 foreach ($product->storeAttributes() as $attribute) {
                     $name = self::tidy($attribute['name']);

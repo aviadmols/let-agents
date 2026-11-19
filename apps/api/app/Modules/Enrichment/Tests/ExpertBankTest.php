@@ -607,6 +607,22 @@ final class ExpertBankTest extends TestCase
         $this->assertSame(['bad_key', 'duplicate', 'no_label', 'no_words', 'no_type', 'no_values'], array_column($removed, 'why'));
     }
 
+    public function test_a_tag_written_as_a_path_says_what_the_product_is_like_a_category(): void
+    {
+        // Naot, 19.11: the titles are model names ("Abbie"), the kinds are in tags like "Women > Sandals > Elegant Collection",
+        // and every type of the bank found no evidence
+        $this->jewellery();
+        $this->product('12', 'Abbie', '', [], ['payload' => ['title' => 'Abbie', 'description' => '', 'tags' => ['SALE > Women Sale > Sandals', 'Women > Sandals > Elegant Collection', 'women-sandals'], 'attributes' => [], 'meta' => []]]);
+
+        ['facts' => $facts, 'texts' => $texts] = $this->inShop(fn () => CatalogueFacts::of(CatalogProduct::query()->where('external_id', '12')->get(), 20, 'en'));
+
+        $this->assertStringContainsString('sandals', $texts[0]['head'], 'the path\'s parts are read as categories');
+        $this->assertStringContainsString('elegant collection', $texts[0]['head']);
+        $this->assertStringNotContainsString('women-sandals', $texts[0]['head'], 'a plain tag is not what it is');
+        $this->assertSame(['SALE', 'Women Sale', 'Sandals', 'Women'], $facts['sample'][0]['categories']);
+        $this->assertSame(['women-sandals'], $facts['sample'][0]['tags']);
+    }
+
     public function test_the_checklist_points_at_what_the_numbers_show(): void
     {
         $this->jewellery();

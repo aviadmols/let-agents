@@ -7,6 +7,22 @@ use PHPUnit\Framework\TestCase;
 
 final class VariantRowsTest extends TestCase
 {
+    public function test_a_value_sent_as_a_slug_reads_as_the_store_wrote_it(): void
+    {
+        // Gueta, 19.11: WooCommerce keeps a custom attribute's value on a variation as a slug, and 62 sizes read "%D7%9E%D7%A11"
+        $this->assertSame('מס 1', VariantRows::readable('%d7%9e%d7%a1-1', ['מס 1', 'מס 2']), 'the product\'s own option that makes the slug');
+        $this->assertSame('גדול Shore 55', VariantRows::readable('%d7%92%d7%93%d7%95%d7%9c-shore-55', ['גדול Shore 55', 'קטן Shore 35']));
+        $this->assertSame('מילוי 7', VariantRows::readable('%d7%9e%d7%99%d7%9c%d7%95%d7%99-7'), 'no option: decoded, hyphens as spaces');
+        $this->assertSame('XL', VariantRows::readable('XL', ['XL']), 'a plain value is itself');
+        $this->assertSame('2 אינץ׳', VariantRows::readable('2 אינץ׳'));
+
+        $rows = VariantRows::fromPayload(['attributes' => [['name' => 'מידה', 'key' => 'מידה', 'values' => ['מס 1', 'מס 2'], 'used_for_variations' => true]], 'variations' => [
+            ['external_id' => '1', 'attributes' => [['key' => 'מידה', 'name' => 'מידה', 'value' => '%d7%9e%d7%a1-1']], 'stock' => ['in_stock' => true]],
+            ['external_id' => '2', 'attributes' => [['key' => 'מידה', 'name' => 'מידה', 'value' => '%d7%9e%d7%a1-2']], 'stock' => ['in_stock' => true]],
+        ]]);
+        $this->assertSame(['מס 1', 'מס 2'], array_column($rows, 'size_label'));
+    }
+
     public function test_a_shirt_in_colours_and_sizes_has_a_row_for_each_with_its_own_stock(): void
     {
         $rows = collect(VariantRows::fromPayload($this->shirt()))->keyBy('external_id');
