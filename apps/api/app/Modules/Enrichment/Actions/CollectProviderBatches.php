@@ -96,7 +96,8 @@ final class CollectProviderBatches
                             $this->apply($run, $batch, $provider, $counts);
                         });
                         $counts['collected']++;
-                        $readings += $batch->task === TaskType::FactReview ? 0 : 1;
+                        // a review, or a type audit (a verdict applied, nothing to review), is no reading to review
+                        $readings += in_array($batch->task, [TaskType::FactReview, TaskType::TypeAudit], true) ? 0 : 1;
                     } catch (ModelCallFailed $e) {
                         $counts['errors'][] = $e->reason;
                     }

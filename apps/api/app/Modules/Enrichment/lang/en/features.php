@@ -69,4 +69,8 @@ return [
         'label' => 'Attribute bank written for the store itself (experiment)',
         'description' => 'A dry run only, on request: an advanced model that knows the trade writes the bank from the store\'s own words, code measures every value on its products, and a model of another family scores every tag. The result is kept as a report. Nothing is activated on the store. Off by default.',
     ],
+    'type_audit' => [
+        'label' => 'Audit of the product types the categories gave',
+        'description' => 'A product whose type was read from a category or a tag only, whose title does not say it (and whose picture is silent too, or which the store files under two types), is put once to a model of another family than the one that wrote the bank: which type of the bank it is, or none. Code replaces or removes the type only at high confidence, and the search follows the audited type. Usually a few percent of the products. Off by default.',
+    ],
 ];

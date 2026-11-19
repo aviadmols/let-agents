@@ -263,6 +263,24 @@ final class ProductExporter {
 	}
 
 	/**
+	 * The option of a product's custom attribute a variation's slug value was made from ("מס 1" for "%d7%9e%d7%a1-1"),
+	 * matched the way WooCommerce makes the slug (sanitize_title); a slug no option makes reads decoded, its hyphens as
+	 * spaces, never as the slug itself.
+	 */
+	private function option_for_slug( WC_Product $product, string $key, string $slug ): string {
+		$attribute = $product->get_attribute( $key );
+		$options   = '' === $attribute ? array() : array_map( 'trim', explode( ',', $attribute ) );
+
+		foreach ( $options as $option ) {
+			if ( sanitize_title( $option ) === $slug || $option === $slug ) {
+				return $option;
+			}
+		}
+
+		return preg_match( '/%[0-9a-f]{2}/i', $slug ) ? str_replace( '-', ' ', rawurldecode( $slug ) ) : $slug;
+	}
+
+	/**
 	 * @return list<array{name: string, key: string, taxonomy: bool, values: list<string>, used_for_variations: bool, visible: bool, swatches?: array<string, string>}>
 	 */
 	private function attributes( WC_Product $product ): array {
@@ -469,6 +487,10 @@ final class ProductExporter {
 				if ( '' !== $value && taxonomy_exists( (string) $taxonomy ) ) {
 					$term  = get_term_by( 'slug', (string) $value, (string) $taxonomy );
 					$label = $term ? $term->name : $value;
+				} elseif ( '' !== $value ) {
+					// A custom attribute's value is kept as a slug ("%d7%9e%d7%a1-1" for "מס 1"): the option of the
+					// product's own attribute it was made from, so the size reads as the store wrote it (Gueta, 19.11).
+					$label = $this->option_for_slug( $product, (string) $taxonomy, (string) $value );
 				}
 
 				$attributes[] = array(

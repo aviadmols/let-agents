@@ -69,7 +69,7 @@ final class VariantRows
         $rows = [];
 
         foreach ($variations as $position => $variant) {
-            $options = self::options($variant);
+            $options = self::options($variant, $attributes);
             $colorLabel = $color !== null ? ($options[$color]['value'] ?? '') : (string) $sharedColor;
             $sizeLabel = $size !== null ? ($options[$size]['value'] ?? '') : '';
             $read = $colorLabel === '' ? ['shades' => [], 'patterns' => []] : ColorWords::read($colorLabel);
@@ -176,9 +176,10 @@ final class VariantRows
      * A variant's chosen value of each option, by the option's id.
      *
      * @param  array<string, mixed>  $variant
+     * @param  array<string, array<string, mixed>>  $attributes  the product's own attributes (productAttributes), each with its values
      * @return array<string, array{name: string, value: string}>
      */
-    private static function options(array $variant): array
+    private static function options(array $variant, array $attributes = []): array
     {
         $out = [];
 
@@ -192,11 +193,33 @@ final class VariantRows
 
             if ($id !== '') {
                 // An empty value is "any": the shopper picks it on the page.
-                $out[$id] = ['name' => $name !== '' ? $name : $id, 'value' => trim((string) ($attribute['value'] ?? ''))];
+                $out[$id] = ['name' => $name !== '' ? $name : $id, 'value' => self::readable(trim((string) ($attribute['value'] ?? '')), array_map('strval', (array) ($attributes[$id]['values'] ?? [])))];
             }
         }
 
         return $out;
+    }
+
+    /**
+     * A value a store sent as a slug ("%d7%9e%d7%a1-1": WooCommerce keeps a custom attribute's value that way, lowercased,
+     * percent-encoded, hyphens for spaces) as the store wrote it: the product's own option that makes that slug, else the
+     * slug decoded with its hyphens as spaces (Gueta, 19.11: 62 sizes read "%D7%9E%D7%A11"). Any other value is itself.
+     *
+     * @param  list<string>  $options  the attribute's values on the product
+     */
+    public static function readable(string $value, array $options = []): string
+    {
+        if (preg_match('/%[0-9a-f]{2}/i', $value) !== 1) {
+            return $value;
+        }
+        $slug = fn (string $text): string => strtolower(str_replace('%20', '-', rawurlencode(mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $text))))));
+        foreach ($options as $option) {
+            if ($slug($option) === strtolower($value) || $slug($option) === strtolower(str_replace('-', '%20', $value))) {
+                return $option;
+            }
+        }
+
+        return trim(str_replace('-', ' ', rawurldecode($value)));
     }
 
     /**
@@ -211,7 +234,7 @@ final class VariantRows
         $values = [];
         $names = [];
         foreach ($variations as $variant) {
-            foreach (self::options($variant) as $id => $option) {
+            foreach (self::options($variant, $attributes) as $id => $option) {
                 $names[$id] = $option['name'];
                 if ($option['value'] !== '') {
                     $values[$id][$option['value']] = true;
@@ -286,7 +309,7 @@ final class VariantRows
         }
 
         foreach ($variations as $variant) {
-            $value = self::options($variant)[$id]['value'] ?? '';
+            $value = self::options($variant, $attributes)[$id]['value'] ?? '';
             if ($value !== '' && ! in_array($value, $list, true)) {
                 $list[] = $value;
             }

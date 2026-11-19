@@ -42,6 +42,7 @@ final class WhatShoppersSee extends Page
         'photos' => ['feature:search.photos'],
         'price' => ['setting:search.show_price'],
         // the parts of the screen a new search opens on (as Aviad asked, 19.11)
+        'start_welcome' => ['setting:search.start_welcome'],
         'start_popular' => ['setting:search.start_popular'],
         'start_recent' => ['setting:search.start_recent'],
         'start_products' => ['setting:search.start_products'],

@@ -110,6 +110,9 @@ final class SearchDisplayTest extends TestCase
         ]);
         Settings::set('search.show_price', false, $shop->id);
         Settings::set('search.image_fit', 'frame', $shop->id);
+        // the opening screen's heading and recent searches hidden (19.11): only the parts turned off are sent
+        Settings::set('search.start_welcome', false, $shop->id);
+        Settings::set('search.start_recent', false, $shop->id);
         // results wait for Enter (What shoppers see: "Suggestions while typing" off)
         Features::override('search.suggest', false, $shop->id);
 
@@ -121,6 +124,7 @@ final class SearchDisplayTest extends TestCase
         $this->assertFalse($index['config']['suggest']);
         $this->assertTrue($index['config']['cart']);
         $this->assertSame('frame', $index['config']['images']);
+        $this->assertSame(['welcome' => false, 'recent' => false], $index['config']['start']);
         // Only what the drawer reads: the old search box's display modes are gone.
         foreach (['results', 'modeChoice', 'dropdown', 'suggestions', 'perGroup', 'drawerSide', 'drawerColumns', 'groups', 'hover', 'buttonColor'] as $gone) {
             $this->assertArrayNotHasKey($gone, $index['config']);

@@ -22,6 +22,7 @@ return [
         'matters_kinds' => ['look' => 'המראה', 'content' => 'התוכן', 'both' => 'שניהם'],
         'languages' => 'שפות החנות',
         'main' => 'עיקרית',
+        'make_main' => 'לחיצה הופכת לשפה העיקרית',
         'sells' => 'מה מוכרים',
         'language' => 'שפה',
         'field' => 'תחום',

@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\ActivateExpertBank;
 use App\Modules\Enrichment\Actions\AuditContentReading;
+use App\Modules\Enrichment\Actions\AuditProductTypes;
 use App\Modules\Enrichment\Actions\BuildCards;
 use App\Modules\Enrichment\Actions\BuildExpertBank;
 use App\Modules\Enrichment\Actions\BuildStructure;
@@ -29,6 +30,7 @@ use App\Modules\Enrichment\Enums\TaskType;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
 use App\Modules\Enrichment\Models\EnrichmentExpertBank;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
+use App\Modules\Enrichment\Models\EnrichmentTypeAudit;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BranchPlan;
 use App\Modules\Enrichment\Scanning\ExpertBankGate;
@@ -60,7 +62,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, type-audit, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show or --activate}
         {--template= : vocabulary template name}
@@ -75,8 +77,8 @@ final class EnrichmentCommand extends Command
         {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only); expert-bank: make the stored bank named by its id the vocabulary of the shop}
         {--deactivate : expert-bank: undo the activated bank and restore the vocabularies it replaced}
         {--activate-passed : expert-bank: a bank its checks passed becomes the vocabulary at once and the products are read by it in code (a demo store scan)}
-        {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off; expert-bank: ask again though the same facts were answered}
-        {--show : expert-bank: print a stored report as the filters a shopper would get, asking no model}
+        {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off; expert-bank: ask again though the same facts were answered; type-audit: also when the shop has it off, and ask again though the same questions were answered}
+        {--show : expert-bank: print a stored report as the filters a shopper would get, asking no model; type-audit: print the stored verdicts, asking no model}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
         {--include-done : ask again about products already read with the same input}
         {--all-products : nightly: every product a model has not read, not only a night of them (the first scan)}
@@ -106,6 +108,8 @@ final class EnrichmentCommand extends Command
             'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
             // An experiment: a bank written for this store alone, measured and checked, kept as a report. Activates nothing.
             'expert-bank' => $this->expertBank(),
+            // The types code read from the filing alone and cannot vouch for, put to the other family (AuditProductTypes).
+            'type-audit' => $this->typeAudit(),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),
@@ -253,12 +257,63 @@ final class EnrichmentCommand extends Command
         // a demo's scan (FirstScan 'bank'): a bank that passed its checks is the store's vocabulary at once, and the
         // products are read by it in code, so the search built next files them by it. One that did not pass changes nothing.
         if ($this->option('activate-passed') && $stored !== null && $stored->status === EnrichmentExpertBank::PASSED) {
+            // a bank already active (a scan again, a rebuild) gives way to the one that passed now
+            if (EnrichmentExpertBank::query()->where('shop_id', $shop->id)->where('status', EnrichmentExpertBank::ACTIVATED)->exists()) {
+                $this->line((string) app(ActivateExpertBank::class)->deactivate($shop->id)['run']->summary());
+            }
             ['run' => $activated, 'vocabulary' => $vocabulary] = app(ActivateExpertBank::class)->activate($shop->id, (string) $stored->id);
             $this->line((string) $activated->summary());
             if ($vocabulary !== null && Features::enabled('enrichment.read_text_in_code', $shop->id)) {
                 $this->line((string) app(ReadProductsInCode::class)->handle($shop->id)->summary());
             }
         }
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The type audit for one named shop: the run's lines step by step; with --show, the stored verdicts, asking no model.
+     * In the first scan (FirstScan 'type_audit') a shop with the flag off says so and changes nothing; --force asks anyway.
+     */
+    private function typeAudit(): int
+    {
+        $shop = $this->option('scheduled') ? null : $this->shop();
+        if (! $shop) {
+            return $this->failWith('Shop not found. The type audit runs for one named shop only.');
+        }
+        $he = fn (string $key, array $params = []): string => (string) trans('enrichment::runs.'.$key, $params, 'he');
+
+        if ($this->option('show')) {
+            $rows = app(TenantContext::class)->run($shop->id, fn () => EnrichmentTypeAudit::query()->with('product:id,title')->orderByDesc('updated_at')->get());
+            if ($rows->isEmpty()) {
+                $this->line($he('type_audit_show_none'));
+
+                return self::SUCCESS;
+            }
+            foreach ($rows as $row) {
+                $this->line($he('type_audit_show_row', [
+                    'status' => $row->status, 'title' => mb_substr((string) $row->product?->title, 0, 60), 'code_type' => (string) $row->code_type,
+                    'type' => (string) ($row->type ?? '?'), 'confidence' => $row->confidence === null ? '-' : $row->confidence, 'why' => (string) $row->why,
+                ]));
+            }
+
+            return self::SUCCESS;
+        }
+
+        if (! $this->option('force') && ! Features::enabled(AuditProductTypes::FEATURE, $shop->id)) {
+            $this->line($he('type_audit_off'));
+
+            return self::SUCCESS;
+        }
+        if ($this->option('force')) {
+            Features::override(AuditProductTypes::FEATURE, true, $shop->id);
+        }
+
+        $run = app(AuditProductTypes::class)->handle($shop->id, (bool) $this->option('force'));
+        foreach ((array) ($run->output['steps'] ?? []) as $step) {
+            $this->line((string) $step);
+        }
+        $this->line((string) $run->summary());
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
     }

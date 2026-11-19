@@ -51,9 +51,10 @@ final class OpenAiBatches implements BatchDriver
                             ['type' => 'text', 'text' => $request->user],
                         ]],
                     ],
-                    'response_format' => ['type' => 'json_object'],
+                    // a strict schema when the request has one (as OpenAiChat::structured sends it), a JSON object otherwise
+                    'response_format' => $request->schema === null ? ['type' => 'json_object'] : ['type' => 'json_schema', 'json_schema' => ['name' => 'reply', 'strict' => true, 'schema' => $request->schema]],
                     'max_completion_tokens' => $request->maxOutputTokens,
-                ],
+                ] + ($request->effort === null ? [] : ['reasoning_effort' => $request->effort]),
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
         }
 

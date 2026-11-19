@@ -18,4 +18,5 @@ return [
     'web_lookup' => 'Checks a missing product detail on the web',
     'colour_namer' => 'Places the store\'s colour names',
     'expert_bank' => 'Writes an attribute bank for the store itself (experiment)',
+    'type_auditor' => 'Audits the product types the categories gave',
 ];

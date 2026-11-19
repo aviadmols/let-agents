@@ -52,6 +52,8 @@ return [
         'price_text' => 'The price under each product',
         'start' => 'When a new search opens',
         'start_text' => 'Which parts the opening screen shows, before anything is typed',
+        'start_welcome' => 'The heading "What are you looking for today?"',
+        'start_welcome_text' => 'The heading and the line under it, at the top of the opening screen',
         'start_popular' => 'Popular in the store',
         'start_popular_text' => 'The words searched most in your store',
         'start_recent' => 'Recent searches',

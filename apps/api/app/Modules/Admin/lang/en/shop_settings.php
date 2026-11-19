@@ -22,6 +22,7 @@ return [
         'matters_kinds' => ['look' => 'The look', 'content' => 'The content', 'both' => 'Both'],
         'languages' => 'Store languages',
         'main' => 'main',
+        'make_main' => 'Press to make it the main language',
         'sells' => 'What you sell',
         'language' => 'language',
         'field' => 'field',

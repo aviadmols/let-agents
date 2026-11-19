@@ -143,6 +143,20 @@ class DrawerFiltersTest extends TestCase
         $this->assertLessThan($out[3], $out[2], 'and still narrows when chosen');
     }
 
+    public function test_a_search_that_states_a_side_never_shows_the_opposite_even_as_the_nearest(): void
+    {
+        // Vans, 19.11 (approved): "חולצה מכופתרת עם שרוול קצר", no short-sleeved shirt, showed the long ones under "no exact match"
+        $out = self::drawer("(function () { [P(40, 'חולצה מכופתרת ארוכה Martinez', {}), P(41, 'חולצת טי קצרה Left Chest', {}), P(42, 'חולצה מכופתרת קצרה Wayne', {}), P(43, 'חולצה מכופתרת Lawson', {})].forEach(function (r) { S.records[r.id] = r; });".
+            " var x = turn('חולצה מכופתרת עם שרוול קצר', [40, 41, 42, 43], {}); x.kind = 'results';".
+            " var y = turn('חולצה מכופתרת עם שרוול קצר', [40], {}); y.kind = 'results';".
+            " var z = turn('שמלה ארוכה עם שרוול קצר', [40], {}); z.kind = 'results';".
+            ' return [titles(x), titles(y), titles(z)]; })()');
+
+        $this->assertSame(['חולצה מכופתרת קצרה Wayne', 'חולצה מכופתרת Lawson'], $out[0], 'the long one and the tee are not shown; one that says neither stays');
+        $this->assertSame([], $out[1], 'only the opposite found: none, never it as the nearest');
+        $this->assertSame(['חולצה מכופתרת ארוכה Martinez'], $out[2], 'a search that says both sides takes neither out');
+    }
+
     public function test_a_value_chosen_in_the_row_over_the_results_stays_in_its_place_plain_and_shows_with_its_x_under_it(): void
     {
         // Aviad, 19.11: a filter chosen in the row jumped to the row of chosen filters at the start, then stayed marked: it

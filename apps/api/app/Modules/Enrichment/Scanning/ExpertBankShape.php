@@ -161,13 +161,41 @@ final class ExpertBankShape
         $quoted = [];
 
         foreach ($parts as $i => $part) {
-            $end = mb_substr($part, -1);
-            $quoted[] = $i === $last && isset(self::FINAL_LETTERS[$end])
-                ? preg_quote(mb_substr($part, 0, -1), '~').'['.$end.self::FINAL_LETTERS[$end].']'
-                : preg_quote($part, '~');
+            $quoted[] = $i === $last ? self::withSingular($part) : preg_quote($part, '~');
         }
 
         return implode('[\s\-]+', $quoted);
+    }
+
+    /** A word's last letter also in the form it takes before an ending, or as it ends a word ("אדום" "אדומ", "כפכפ" "כפכף"). */
+    private static function bothEnds(string $part): string
+    {
+        $end = mb_substr($part, -1);
+        $other = self::FINAL_LETTERS[$end] ?? array_search($end, self::FINAL_LETTERS, true);
+
+        return $other === false ? preg_quote($part, '~') : preg_quote(mb_substr($part, 0, -1), '~').'['.$end.$other.']';
+    }
+
+    /**
+     * A Hebrew plural also as its singular: the expert writes "חגורות" and "כפכפים", the store's titles say "חגורה" and
+     * "כפכפי סלייד", and the word read none of them (Vans, 19.11: five sandals and six accessories left with no type).
+     * "-ים", "-יים" read their stem, whose endings PatternMatch allows ("כפכף", "כפכפי", "כפכפים"); "-ות" also its "-ה".
+     */
+    private static function withSingular(string $part): string
+    {
+        // a final letter also in the form it takes before an ending ("אדום" reads "אדומים")
+        $quoted = self::bothEnds($part);
+        if (preg_match('/^[א-ת]+$/u', $part) !== 1) {
+            return $quoted;
+        }
+        $base = match (true) {
+            str_ends_with($part, 'יים') && mb_strlen($part) >= 5 => self::bothEnds(mb_substr($part, 0, -3)),
+            str_ends_with($part, 'ים') && mb_strlen($part) >= 5 => self::bothEnds(mb_substr($part, 0, -2)),
+            str_ends_with($part, 'ות') && mb_strlen($part) >= 5 => preg_quote(mb_substr($part, 0, -2), '~').'ה',
+            default => null,
+        };
+
+        return $base === null ? $quoted : '(?:'.$quoted.'|'.$base.')';
     }
 
     /**

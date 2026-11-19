@@ -305,7 +305,8 @@
       var about = a.ak && a.ak !== 'store' && a.src && a.src[0] && a.src[0].title ? '<span class="ls-ask__about" dir="auto">' + esc(t(a.ak === 'product' ? 'askedAboutProduct' : 'askedAbout', { t: decode(a.src[0].title) })) + '</span>' : '';
       return '<button class="ls-ask ls-ask--example" data-saved-answer="' + esc(a.id) + '"><span class="ls-ask__mark">' + mark() + '</span><span class="ls-ask__text"><span class="ls-ask__q" style="font-weight:400" dir="auto">' + esc(a.title) + '</span>' + about + '</span></button>';
     }).join('') + '</div>' : '';
-    return '<div class="ls-welcome"><h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t(welcomeSub())) + '</p>' +
+    // the heading and the line under it, unless the store hid them (search.start_welcome, as Aviad asked, 19.11)
+    return '<div class="ls-welcome">' + (shows('welcome') ? '<h2 class="ls-welcome__title">' + esc(t('welcomeTitle')) + '</h2><p class="ls-welcome__sub">' + esc(t(welcomeSub())) + '</p>' : '') +
       popular + recent + (shows('products') ? wantedHtml() : '') + asked +
       '<div class="ls-stack"><button class="ls-row" data-photo>' + icon('camera') + '<span class="ls-row__text">' + esc(t('photo')) + '</span></button></div></div>';
   }

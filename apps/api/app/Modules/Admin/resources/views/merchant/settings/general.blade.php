@@ -13,11 +13,13 @@
                 <x-lp::chips model="data.matters" :options="__('admin::shop_settings.general.matters_kinds')" />
             </x-lp::kv-row>
             <x-lp::kv-row :label="$t('languages')">
-                {{-- the first is the main one: the language the store's content is read in --}}
+                {{-- the first is the main one: the language the store's content is read in; pressing another makes it the
+                     main one (it could not be changed at all: Mycolivia, 19.11) --}}
                 <div class="lp-chips" x-data="{ v: $wire.entangle('data.languages'), adding: false, names: @js($languages) }">
                     <template x-for="(code, i) in v" :key="code">
                         <span class="lp-chip lp-chip-plus">
-                            <span x-text="names[code] + (i === 0 ? ' · ' + @js($t('main')) : '')"></span>
+                            <span x-show="i === 0" x-text="names[code] + ' · ' + @js($t('main'))"></span>
+                            <button type="button" x-show="i > 0" x-on:click="v = [code, ...v.filter((c) => c !== code)]" x-text="names[code]" title="{{ $t('make_main') }}" aria-label="{{ $t('make_main') }}" style="background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer"></button>
                             <button type="button" x-show="i > 0" x-on:click="v = v.filter((c) => c !== code)" class="lp-chip-x" aria-label="✕">✕</button>
                         </span>
                     </template>
