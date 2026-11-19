@@ -14,6 +14,7 @@ use App\Modules\Ai\Contracts\SpendCapReached;
 use App\Modules\Ai\Contracts\SpendGuard;
 use App\Modules\Ai\Contracts\StructuredChatModel;
 use App\Modules\Ai\Enums\AiProviderName;
+use App\Modules\Assistant\Contracts\AnswerSearches;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductSets;
@@ -546,6 +547,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         return $this->tenant->run($shopId, function () use ($shopId, $question, $visitorHash, $locale, $products, $followUp, $bound, $viewing): array {
             $this->answered = null;
             $this->allowed = null;
+            // what a question before found to go with its product is not this one's (an answer kept from before asks nothing)
+            $this->goesWith = null;
             $result = $this->guarded($shopId, $question, $visitorHash, $locale)
                 ?? $this->answer($shopId, $question, $visitorHash, $locale, $products, $bound, $viewing);
             $result += $followUp && $result['outcome'] === AssistantAnswer::ANSWERED ? ['context' => 'previous'] : [];
@@ -555,8 +558,12 @@ final class AnswerSiteQuestion implements TriesQuestions
             // The price the question names, as code read it: what the storefront suggests beside "not found" keeps to it.
             $range = $this->priceRange($question);
             $result += $range['min'] === null && $range['max'] === null ? [] : ['range' => $range];
+            // The store's searches the answer leads into, each with its filters chosen, as buttons under its cards
+            // (assistant.answer_searches); they stand where the chips of the store's groups would
+            $searches = $this->searchesBeside($shopId, $question, $result, $bound);
+            $result += $searches === [] ? [] : ['searches' => $searches];
             // The store's categories and tags the question is about, as chips under the answer to search by.
-            $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) ? $this->relatedChips($shopId, $question) : [];
+            $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) && $searches === [] ? $this->relatedChips($shopId, $question) : [];
             $result += $related === [] ? [] : ['related' => $related];
             // A question of the store's (shipping, returns, hours): the storefront offers no products "related" to its words
             // (Vans QA, 16.11: socks under "how much is shipping to Eilat?").
@@ -5445,6 +5452,40 @@ final class AnswerSiteQuestion implements TriesQuestions
     private static function aboutProducts(string $question): bool
     {
         return ! in_array(AnswerContext::type($question), self::NOT_ABOUT_PRODUCTS, true);
+    }
+
+    /**
+     * The store's searches an answer about products leads into (AnswerSearches, from the Search module's index, in code):
+     * where the shop has them on (assistant.answer_searches), under an answer that shows products for a question about a kind
+     * of them. Never under a question of the store's (shipping, hours), a set with a search of its own (a group the store
+     * keeps), a reply in a conversation or a question about the products already shown; on a product's page, only for a
+     * product of another kind to go with it, by what the picks share with it. A set with none (every product in a price,
+     * "יש לכם טבעת יהלום בזהב לבן עד 3000?") is shown as a grid without filters: its search may show the same products,
+     * filterable; cards must leave the search more to show.
+     *
+     * @param  array<string, mixed>  $result
+     * @return list<array<string, mixed>>
+     */
+    private function searchesBeside(string $shopId, string $question, array $result, bool $bound): array
+    {
+        $set = is_array($result['set'] ?? null) ? $result['set'] : null;
+        $shown = $set !== null
+            ? array_values(array_filter(array_map('strval', (array) ($set['ids'] ?? []))))
+            : array_values(array_filter(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), (array) ($result['picks'] ?? []))));
+        if (! Features::enabled('assistant.answer_searches', $shopId) || ! app()->bound(AnswerSearches::class)
+            || $result['outcome'] !== AssistantAnswer::ANSWERED || ($set !== null && ($set['search'] ?? null) !== null) || $shown === [] || ! self::aboutProducts($question)
+            || $this->conversation !== [] || $this->onShown || ($bound && $this->goesWith === null)) {
+            return [];
+        }
+
+        try {
+            return app(AnswerSearches::class)->searches($shopId, $question, $shown, $this->goesWith === null ? null : ['anchor' => $this->goesWith['anchor'], 'ids' => $this->goesWith['ids']],
+                (int) Settings::get('assistant.answer_searches_max', $shopId), (int) Settings::get('assistant.answer_searches_min', $shopId), $set === null);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**

@@ -444,6 +444,14 @@ return [
         'label' => 'Most rules for matching products',
         'description' => 'How many pairs of kinds and how many "never offer" lines at most a store may write in each list.',
     ],
+    'answer_searches_max' => [
+        'label' => 'Search buttons under an answer',
+        'description' => 'At most this many search buttons are shown under an answer about products.',
+    ],
+    'answer_searches_min' => [
+        'label' => 'Products a search button shows at least',
+        'description' => 'A search button under an answer is shown only when its search shows at least this many products.',
+    ],
     'prepared_per_sync' => [
         'label' => 'Ready questions per sync',
         'description' => 'At most this many questions about the store are answered ahead on each sync. One already answered whose pages did not change is not asked again.',

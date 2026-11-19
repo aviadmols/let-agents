@@ -236,6 +236,8 @@
     if (d.recent) { e.preventDefault(); submit(d.recent, 'search', false, true); return; }
     if (d.photo !== undefined) { e.preventDefault(); photoPick(); return; }
     if (d.focus !== undefined) { INPUT.focus(); return; }
+    // a search an answer leads into (answerSearchesHtml): its own search turn, its filters chosen
+    if (d.answerSearch) { e.preventDefault(); var ast = turnById(d.answerSearch); if (ast) { openAnswerSearch(ast, d.i); } return; }
     if (d.q) { e.preventDefault(); if (d.loose) { signalEvent('loose_pick', d.loose, d.q); } submit(d.q, 'search'); return; }
     if (d.notSure) { e.preventDefault(); notSure(turnById(d.notSure)); return; }
     if (d.askAbout) { e.preventDefault(); askAbout(turnById(d.askAbout), d.question); return; }
