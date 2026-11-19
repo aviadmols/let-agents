@@ -65,8 +65,15 @@ final class FirstScan
         // products say and no type or value reads, proposed by one family, audited by the other, and made the bank only
         // once they hold (CompleteVocabulary; as Aviad asked, 18.11). Before the search, which files products by it.
         'complete' => ['enrichment', ['step' => 'complete', 'target' => '{shop}', '--activate' => true]],
+        // The filters as an expert of the trade would write them, from the store's own catalogue, checked by the other
+        // family and by code (BuildExpertBank): made the vocabulary only once its checks pass, the products read by it.
+        // Only where enrichment.expert_bank is on (a demo store); elsewhere the step says so and changes nothing.
+        'bank' => ['enrichment', ['step' => 'expert-bank', 'target' => '{shop}', '--activate-passed' => true]],
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
+        // The filter screen arranged (ArrangeFilters): an order, value orders, a duplicate gone, a heap tucked away, the
+        // screen only (what a filter reaches never changes). Only where search.filter_layout is on (a demo store).
+        'layout' => ['search', ['step' => 'layout', 'target' => '{shop}']],
         'tags' => ['search', ['step' => 'tags', 'target' => '{shop}']],
         // The search tried as shoppers will try it, what fails mended for this store alone, and the team told (CheckStoreSearch).
         'check' => ['search', ['step' => 'check', 'target' => '{shop}']],
@@ -101,8 +108,10 @@ final class FirstScan
         'structure' => ['enrichment.build_structure', 'enrichment.propose_schema', 'enrichment.discover_schema', 'enrichment.score_schema', 'enrichment.import_vocabulary'],
         'products' => ['enrichment.nightly', 'enrichment.nightly_model', 'enrichment.nightly_review', 'enrichment.read_in_code', 'enrichment.build_cards', 'enrichment.collect_batches'],
         'complete' => ['enrichment.complete_vocabulary'],
+        'bank' => ['enrichment.build_expert_bank', 'enrichment.activate_expert_bank', 'enrichment.read_in_code'],
         'pages' => ['retrieval.build_index', 'retrieval.match_products'],
         'search' => ['search.build_index'],
+        'layout' => ['search.arrange_filters'],
         'tags' => ['search.write_tags'],
         'check' => ['search.scan_check', 'search.resolve'],
         'choices' => ['catalog.read_choices'],

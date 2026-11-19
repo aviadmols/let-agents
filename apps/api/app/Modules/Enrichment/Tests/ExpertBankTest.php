@@ -558,6 +558,16 @@ final class ExpertBankTest extends TestCase
         $this->assertCount(3, $this->calls, 'never for every shop');
     }
 
+    public function test_a_demo_scan_makes_a_bank_that_passed_the_vocabulary_at_once(): void
+    {
+        // FirstScan 'bank' (19.11): a demo store's scan builds the new filters with no person between
+        $this->jewellery();
+
+        $this->artisan('enrichment', ['step' => 'expert-bank', 'target' => $this->shop->slug, '--activate-passed' => true])->assertSuccessful();
+
+        $this->assertSame([EnrichmentExpertBank::ACTIVATED], $this->inShop(fn () => EnrichmentExpertBank::query()->pluck('status')->all()));
+    }
+
     public function test_a_hebrew_final_letter_is_read_with_an_ending_too_and_a_word_inside_a_word_is_not(): void
     {
         $this->assertSame('אדו[םמ]', ExpertBankShape::pattern('אדום'));

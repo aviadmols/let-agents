@@ -45,7 +45,8 @@ final class BuildDemoStore
      * is checked by the second model before it is a filter value. Me369's demo had 591 values waiting with no one to check
      * them; the check of its 300 products cost $0.53.
      */
-    private const ON = ['enrichment.auto_review'];
+    // the new filters (19.11): the expert bank, read in code from the store's text, and the filter screen arranged
+    private const ON = ['enrichment.auto_review', 'enrichment.expert_bank', 'enrichment.read_text_in_code', 'search.filter_layout'];
 
     public function __construct(
         private readonly CreatesShops $shops,

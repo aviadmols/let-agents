@@ -319,12 +319,63 @@ final class FilterLayoutGate
      * A value is matched by its key and its label both: a key alone may name another value in a later build (a store
      * field's values are keyed by their rank).
      *
+     * The layout changes the screen only, never what a filter reaches (Aviad, 19.11), checked here on the products of
+     * this build, every build:
+     * - a filter hidden as a duplicate leaves (`hide: 1`) only while each of its values lies wholly inside one value of
+     *   the filter that stays, so every product it reached is reached there; otherwise it is only tucked away;
+     * - a filter hidden for any other reason (too few products, a heap, unreadable values) is tucked away (`hide: 2`):
+     *   off the row over the results, last in the filter sheet, still there to choose;
+     * - a value moved out of a filter (`vh`) leaves only while every product of it holds the value it moved into.
+     *
      * @param  list<array<string, mixed>>  $facets
      * @param  array<string, mixed>  $applied
+     * @param  list<array<string, mixed>>  $items  the index's records (each product's `f` codes)
      * @return list<array<string, mixed>>
      */
-    public static function onFacets(array $facets, array $applied): array
+    public static function onFacets(array $facets, array $applied, array $items = []): array
     {
+        // each product's codes, grouped by filter: [filter => [value => true]]
+        $held = [];
+        foreach ($items as $item) {
+            $by = [];
+            foreach ((array) ($item['f'] ?? []) as $code) {
+                $by[intdiv((int) $code, 1000)][(int) $code % 1000] = true;
+            }
+            if ($by !== []) {
+                $held[] = $by;
+            }
+        }
+        // every value of filter $g lies wholly inside one value of filter $k
+        $inside = function (int $g, int $k) use ($held): bool {
+            $common = [];
+            foreach ($held as $by) {
+                foreach (array_keys($by[$g] ?? []) as $v) {
+                    $common[$v] = array_key_exists($v, $common) ? array_intersect_key($common[$v], $by[$k] ?? []) : ($by[$k] ?? []);
+                }
+            }
+            foreach ($common as $values) {
+                if ($values === []) {
+                    return false;
+                }
+            }
+
+            return $common !== [];
+        };
+        // every product of value $v of filter $g holds value $w of filter $k
+        $within = function (int $g, int $v, int $k, int $w) use ($held): bool {
+            $any = false;
+            foreach ($held as $by) {
+                if (isset($by[$g][$v])) {
+                    if (! isset($by[$k][$w])) {
+                        return false;
+                    }
+                    $any = true;
+                }
+            }
+
+            return $any;
+        };
+
         $at = [];
         foreach ($facets as $g => $facet) {
             $key = (string) ($facet['k'] ?? '');
@@ -348,9 +399,12 @@ final class FilterLayoutGate
             }
         }
         foreach ((array) ($applied['hide'] ?? []) as $key => $reason) {
-            if (isset($at[$key])) {
-                $facets[$at[$key]]['hide'] = 1;
+            if (! isset($at[$key])) {
+                continue;
             }
+            $kept = str_starts_with((string) $reason, 'duplicate_of:') ? substr((string) $reason, 13) : null;
+            $gone = $kept !== null && isset($at[$kept]) && ! isset($applied['hide'][$kept]) && $inside($at[$key], $at[$kept]);
+            $facets[$at[$key]]['hide'] = $gone ? 1 : 2;
         }
         foreach ((array) ($applied['values'] ?? []) as $key => $pairs) {
             if (! isset($at[$key])) {
@@ -365,7 +419,15 @@ final class FilterLayoutGate
             if (! isset($at[$key])) {
                 continue;
             }
-            $out = array_values(array_filter(array_map(fn (array $m): ?int => $position($at[$key], (string) $m[0], (string) $m[1]), (array) $moves), fn (?int $i): bool => $i !== null));
+            $out = [];
+            foreach ((array) $moves as $m) {
+                $v = $position($at[$key], (string) $m[0], (string) $m[1]);
+                $into = isset($m[2]) && isset($at[(string) $m[2]]) ? $at[(string) $m[2]] : null;
+                $w = $into === null ? null : array_search((string) ($m[3] ?? ''), array_map(fn (array $x): string => (string) ($x['k'] ?? ''), (array) ($facets[$into]['v'] ?? [])), true);
+                if ($v !== null && $w !== false && $w !== null && $within($at[$key], $v, $into, (int) $w)) {
+                    $out[] = $v;
+                }
+            }
             sort($out);
             if ($out !== []) {
                 $facets[$at[$key]]['vh'] = $out;

@@ -131,6 +131,18 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([], $out[2], 'nor in the row over the results');
     }
 
+    public function test_a_filter_tucked_away_stays_in_the_sheet_last_and_leaves_only_the_row(): void
+    {
+        // the layout's hides for a reason but a duplicate (hide 2) never take a way to narrow from the shopper (19.11)
+        $out = self::drawer("(function () { var x = turn('sandals', [1, 2, 3, 5, 6, 7, 8, 9], {}); S.facets[0].hide = 2;".
+            ' var g = T.sheetGroups(x).groups.map(function (p) { return p[0]; }), row = T.facetChips(x, 99).codes.filter(function (c) { return c < 1000; });'.
+            ' var y = turn(\'sandals\', [1, 2, 3, 5, 6, 7, 8, 9], { f: { 0: true } }); return [g, row, T.filtered(y).length, T.filtered(x).length]; })()');
+
+        $this->assertSame(0, end($out[0]), 'still in the sheet, last');
+        $this->assertSame([], $out[1], 'not offered in the row over the results');
+        $this->assertLessThan($out[3], $out[2], 'and still narrows when chosen');
+    }
+
     public function test_a_value_chosen_in_the_row_over_the_results_stays_in_its_place_and_is_not_repeated_under_it(): void
     {
         // Aviad, 19.11: a filter chosen in the row jumped to the row of chosen filters at the start

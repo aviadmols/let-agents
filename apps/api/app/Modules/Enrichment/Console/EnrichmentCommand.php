@@ -74,6 +74,7 @@ final class EnrichmentCommand extends Command
         {--model= : the model that produced the results}
         {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only); expert-bank: make the stored bank named by its id the vocabulary of the shop}
         {--deactivate : expert-bank: undo the activated bank and restore the vocabularies it replaced}
+        {--activate-passed : expert-bank: a bank its checks passed becomes the vocabulary at once and the products are read by it in code (a demo store scan)}
         {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off; expert-bank: ask again though the same facts were answered}
         {--show : expert-bank: print a stored report as the filters a shopper would get, asking no model}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
@@ -248,6 +249,15 @@ final class EnrichmentCommand extends Command
         }
         if ($stored !== null) {
             $this->showExpertBank($stored, $he);
+        }
+        // a demo's scan (FirstScan 'bank'): a bank that passed its checks is the store's vocabulary at once, and the
+        // products are read by it in code, so the search built next files them by it. One that did not pass changes nothing.
+        if ($this->option('activate-passed') && $stored !== null && $stored->status === EnrichmentExpertBank::PASSED) {
+            ['run' => $activated, 'vocabulary' => $vocabulary] = app(ActivateExpertBank::class)->activate($shop->id, (string) $stored->id);
+            $this->line((string) $activated->summary());
+            if ($vocabulary !== null && Features::enabled('enrichment.read_text_in_code', $shop->id)) {
+                $this->line((string) app(ReadProductsInCode::class)->handle($shop->id)->summary());
+            }
         }
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;

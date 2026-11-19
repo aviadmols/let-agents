@@ -431,6 +431,31 @@ final class FilterLayoutTest extends TestCase
         $this->assertSame([], $this->calls);
     }
 
+    public function test_the_layout_never_takes_a_product_out_of_reach_of_a_filter(): void
+    {
+        // Aviad, 19.11: the screen only. Karat (two filters of it, one holding a product the other has not), metal, and a
+        // kind with a value "Men" moved into the audience filter.
+        $facets = [
+            ['k' => 'karat_a', 'v' => [['k' => '14', 'l' => '14K'], ['k' => '18', 'l' => '18K']]],
+            ['k' => 'karat_b', 'v' => [['k' => '14', 'l' => '14 karat'], ['k' => '18', 'l' => '18 karat']]],
+            ['k' => 'kind', 'v' => [['k' => 'men', 'l' => 'Men'], ['k' => 'ring', 'l' => 'Rings'], ['k' => 'kids', 'l' => 'Kids']]],
+            ['k' => 'audience', 'v' => [['k' => 'men', 'l' => 'Men'], ['k' => 'kids', 'l' => 'Kids']]],
+            ['k' => 'tags', 'v' => [['k' => 'a', 'l' => 'A']]],
+        ];
+        $items = [['f' => [0, 1000, 2000, 3000]], ['f' => [1, 1001, 2001]], ['f' => [0, 1000, 2002, 3001]], ['f' => [1001, 2002, 4000]]];
+        $applied = ['order' => [], 'values' => [], 'moves' => ['kind' => [['men', 'Men', 'audience', 'men'], ['kids', 'Kids', 'audience', 'kids']]],
+            'hide' => ['karat_a' => 'duplicate_of:karat_b', 'tags' => 'too_few_products']];
+
+        $out = FilterLayoutGate::onFacets($facets, $applied, $items);
+        $this->assertSame(1, $out[0]['hide'], 'a duplicate whose every value lies inside one of the filter that stays leaves');
+        $this->assertSame(2, $out[4]['hide'], 'a filter hidden for another reason is only tucked away');
+        $this->assertSame([0], $out[2]['vh'], 'Men moves: every product of it holds Men; Kids stays, one of its products has no audience');
+
+        // the other way round, karat_b holds a product karat_a has not (the 4th): hiding it would lose that product
+        $back = FilterLayoutGate::onFacets($facets, ['order' => [], 'values' => [], 'moves' => [], 'hide' => ['karat_b' => 'duplicate_of:karat_a']], $items);
+        $this->assertSame(2, $back[1]['hide'], 'a duplicate that holds a product the other has not is only tucked away');
+    }
+
     public function test_the_index_applies_the_layout_without_moving_a_code_and_without_one_is_as_before(): void
     {
         $this->catalogue();
@@ -462,14 +487,14 @@ final class FilterLayoutTest extends TestCase
         $this->assertSame(1, $laid['o']);
         $this->assertSame(0, $after['facets'][$deal]['o']);
         $this->assertSame([array_search('Rings', array_column($values, 'l'), true), array_search('Earrings', array_column($values, 'l'), true)], $laid['vo'], 'a value whose label changed is passed over');
-        $this->assertSame([array_search('Necklaces', array_column($values, 'l'), true)], $laid['vh']);
+        $this->assertArrayNotHasKey('vh', $laid, 'a value moved into one that does not hold its products stays where it is');
         $this->assertArrayNotHasKey('hide', $laid);
 
-        // a hide marks the filter, and keeps its codes
+        // a hide for a reason but a duplicate tucks the filter away (still in the sheet), and keeps its codes
         $this->inShop(fn () => SearchFilterLayout::query()->update(['applied' => json_encode(['order' => [], 'values' => [], 'hide' => ['deal' => 'says_nothing'], 'moves' => []])]));
         app(BuildSearchIndex::class)->handle($this->shop->id);
         $hidden = $this->built();
-        $this->assertSame(1, $hidden['facets'][$deal]['hide']);
+        $this->assertSame(2, $hidden['facets'][$deal]['hide']);
         $this->assertSame(array_column($before['items'], 'f', 'id'), array_column($hidden['items'], 'f', 'id'));
 
         // the flag off, or no layout: the index exactly as before

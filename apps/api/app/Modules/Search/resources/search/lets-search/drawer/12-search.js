@@ -471,7 +471,7 @@
     // where it is, so it can be taken off; the order is the results', so nothing moves, a value only leaves or comes back
     // (a new one never comes in under the finger: Jean Rachel QA, 16.11). The row over the results offers only what narrows.
     var codes = Object.keys(counts).map(Number).filter(function (code) {
-      if (twinOfLength(Math.floor(code / 1000)) || laidAside(code)) { return false; }
+      if (twinOfLength(Math.floor(code / 1000)) || laidAside(code, !max)) { return false; }
       var g = Math.floor(code / 1000), facet = S.facets[g], value = facet && facet.v[code % 1000];
       if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
       if (onCode(c, code)) { return true; }
@@ -604,12 +604,14 @@
   // The store's filter screen as arranged (the index's layout, ArrangeFilters): a filter hidden (hide) or a value taken
   // out of a filter that another already offers (vh) is not offered, its codes kept as they are; a filter's place (o)
   // and its values' order (vo) are what the sheet shows them in. With no layout, nothing here changes a thing.
-  function laidAside(code) {
+  // gone: a duplicate whose every product the filter that stays reaches (hide 1), a value moved where all its products are
+  // (vh); tucked away (hide 2): off the row over the results, still in the sheet, last, so nothing a filter reaches is lost
+  function laidAside(code, inSheet) {
     var f = S.facets[Math.floor(code / 1000)];
-    return !!f && (!!f.hide || (!!f.vh && f.vh.indexOf(code % 1000) >= 0));
+    return !!f && ((f.hide === 2 ? !inSheet : !!f.hide) || (!!f.vh && f.vh.indexOf(code % 1000) >= 0));
   }
   function laidOut(f) { return !!f && !!f.vo && f.vo.length > 1; }
-  function facetRank(g) { var f = S.facets[g]; return f && typeof f.o === 'number' ? f.o : 1e6; }
+  function facetRank(g) { var f = S.facets[g]; return f && f.hide === 2 ? 2e6 : f && typeof f.o === 'number' ? f.o : 1e6; }
   // two values of one filter in the layout's order, those it does not name after it; with none, a numbered filter's by
   // number, any other as they came (the results' order)
   function byLayout(a, b) {

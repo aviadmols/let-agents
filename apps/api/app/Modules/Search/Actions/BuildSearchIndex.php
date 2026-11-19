@@ -536,7 +536,7 @@ final class BuildSearchIndex
         // facets as built. No code moves: a hidden filter is marked, its codes kept, so every product's f stays as it is.
         $layout = app()->bound(FilterLayouts::class) ? app(FilterLayouts::class)->applied($shopId) : null;
         if ($layout !== null) {
-            $facets['facets'] = FilterLayoutGate::onFacets($facets['facets'], $layout);
+            $facets['facets'] = FilterLayoutGate::onFacets($facets['facets'], $layout, $items);
         }
 
         $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'],
