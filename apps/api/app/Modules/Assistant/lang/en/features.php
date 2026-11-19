@@ -45,6 +45,10 @@ return [
         'label' => 'Products that go with a product',
         'description' => 'A shopper on a product page who asks for a product of another kind to go with it ("is there a ring to match this bracelet?", "matching earrings?"), or names a product by its SKU: the assistant is given the store\'s products of that kind in stock, those sharing most with it (metal, colour, style, collection, motif) first, and chooses among them. If the store has none in stock, it says none was found, never offering another kind instead.',
     ],
+    'answer_searches' => [
+        'label' => 'Search buttons under an answer about products',
+        'description' => 'Under an answer that shows products, a button for each search that holds what was asked, with its filters already chosen ("Rings · Diamond · White gold · up to ₪3,000 (12)"), so the shopper sees every matching product and narrows them. For a product to go with another, the searches are by what the products share with it. At most three, each only when it shows at least two products, more than the answer did. No button under a question about shipping, hours or a policy.',
+    ],
     'team_drafts' => [
         'label' => 'AI help writing answers to shopper questions',
         'description' => 'On the shopper questions screen: a button that drafts an answer from the product information and the store pages, or from a few words the team typed. Nothing is published without the team.',

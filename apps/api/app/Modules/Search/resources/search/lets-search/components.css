@@ -394,6 +394,12 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 .ls-set__grid { margin-top: 16px; }
 .ls-set__search { margin-top: 12px; }
 .ls-set__search .ls-btn { display: inline-flex; align-items: center; gap: 6px; }
+/* the searches an answer leads into: one clear button each, its whole label read, one under the other */
+.ls-answer-searches { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
+.ls-answer-searches .ls-block__title { margin: 0; }
+.ls-answer-search { --h: auto; min-height: 36px; max-width: 100%; padding-block: 7px; gap: 6px; white-space: normal; text-align: start; justify-content: flex-start; }
+.ls-answer-search .ls-icon { flex: none; }
+.ls-answer-search .ls-num { color: var(--ls-fg-muted); }
 .ls-understood { margin-bottom: 8px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-ask__about { display: block; margin-top: 2px; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }
 .ls-noanswer__hint { margin: 8px 0 0; font-size: var(--lsp-text-sm); color: var(--ls-fg-muted); }

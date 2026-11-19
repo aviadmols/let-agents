@@ -164,13 +164,16 @@
       // what the answer recommends by a name none of its picks has ("שיטאקה"): the products whose descriptions hold it
       var named = d.named && d.named.ids && d.named.ids.length ? d.named : null;
       var namedIds = named ? named.ids.map(function (id) { return pid(id); }) : [];
-      return (set ? loadIndex().catch(function () { /* the answer stands without it */ }) : Promise.resolve()).then(function () {
+      // the store's searches the answer leads into, each with its filters chosen (assistant.answer_searches): counted and
+      // opened from the index, so it is read first too
+      var searches = d.outcome === 'answered' && d.searches && d.searches.length ? d.searches : null;
+      return (set || searches ? loadIndex().catch(function () { /* the answer stands without it */ }) : Promise.resolve()).then(function () {
         setIds = set ? set.ids.map(function (id) { return pid(id); }).filter(function (id) { return !!rec(id); }) : null;
         return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds));
       }).then(function () {
         if (d.outcome === 'answered') {
           update(turn, { loading: false, answer: d.answer, team: !!d.team, noAnswer: d.no_answer || null, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
-            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,
+            ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question, searches: searches,
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null, alsoBudget: !!(named && named.budget) });
           announce(t('announceReady') + ': ' + plainAnswer(d.answer));
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
@@ -272,6 +275,88 @@
     return '<div class="ls-block__title" style="margin-top:14px">' + esc(t('relatedGroups')) + '</div><div class="ls-chips" style="margin-bottom:6px">' +
       list.map(function (g) { return '<button class="ls-chip ls-chip--quiet" data-q="' + esc(g.name) + '" dir="auto">' + esc(g.name) + '</button>'; }).join('') + '</div>';
   }
+  // ---------------------------------------------------------------- the searches an answer leads into
+  // Under an answer about products, a button for each of the store's searches that holds what was asked, as the server read
+  // it off the index (assistant.answer_searches, code, no model): "טבעת · יהלום · זהב לבן · עד ₪3,000 (12)". Pressed, it
+  // opens the drawer's own search turn for those words, those filters chosen as if read from them (each taken off as a word
+  // is, the search going on without it), so the shopper sees every matching product and narrows them (as Aviad asked,
+  // 19.11). Its count is what it opens, counted here from the index the drawer holds; the server offers none under two
+  // (assistant.answer_searches_min), and one the index here holds fewer of than that is not offered either.
+  var ANSWER_SEARCH_FLOOR = 2;
+  // a filter value as the server named it ({k: the filter's key, v: the value's key}), as this index codes it, or null
+  function chipCode(ch) {
+    var g = (S.facets || []).map(function (f) { return String(f.k); }).indexOf(String(ch && ch.k));
+    var i = g < 0 ? -1 : (S.facets[g].v || []).map(function (v) { return String(v.k); }).indexOf(String(ch.v));
+    return i < 0 ? null : g * 1000 + i;
+  }
+  // the price as words the search reads again (HebrewSearch::priceRange): "עד 3000", "between 500 and 3000"
+  function priceWords(p) {
+    var n = function (x) { return String(Math.round(Number(x))); };
+    return p.min != null && p.max != null ? t('priceBetweenWords', { min: n(p.min), max: n(p.max) }) : p.max != null ? t('priceUpToWords', { max: n(p.max) }) : t('priceFromWords', { min: n(p.min) });
+  }
+  // The search turn a button opens, as a search for its words would be, without asking the server: its products the index's
+  // that hold every value (as the index files it, never one a check refused) inside the price, the answer's picks first;
+  // each value chosen as read from its words; in stock by default, as every search. Null when this index lacks a value.
+  function answerSearchTurn(turn, s) {
+    var chips = (s && s.chips) || [], codes = chips.map(chipCode);
+    if (!codes.length || codes.some(function (code) { return code === null; })) { return null; }
+    var words = [], c = blankC();
+    codes.forEach(function (code, i) {
+      var w = wordsOf(String(chips[i].l || valueOf(code).value.l));
+      c.auto[code] = true;
+      c.at[code] = w.map(function (x, j) { return words.length + j; });
+      [].push.apply(words, w);
+    });
+    var base = chips.map(function (ch, i) { return String(ch.l || valueOf(codes[i]).value.l); }).join(' ');
+    var p = s.price && (s.price.min != null || s.price.max != null) ? s.price : null;
+    var min = p && p.min != null ? Number(p.min) : null, max = p && p.max != null ? Number(p.max) : null;
+    var holds = function (r) {
+      if (!r || r.t !== 'product' || r.gc) { return false; }
+      if (p && (typeof r.pr !== 'number' || (min !== null && r.pr < min) || (max !== null && r.pr > max))) { return false; }
+      return codes.every(function (code) { return (r.f || []).indexOf(code) >= 0 && (r.no || []).indexOf(code) < 0; });
+    };
+    var seen = {}, ids = [];
+    (turn.picks || []).map(function (pk) { return pk.id; }).concat(turn.ids || []).forEach(function (one) { var id = 'p:' + pid(one); if (!seen[id] && holds(rec(id))) { seen[id] = 1; ids.push(id); } });
+    Object.keys(S.records).forEach(function (id) { if (!seen[id] && holds(S.records[id])) { seen[id] = 1; ids.push(id); } });
+    var all = ids.map(rec);
+    c.autoStock = stockMeans() && all.some(function (r) { return r.s === 1; });
+    return { kind: 'results', q: p ? base + ' ' + priceWords(p) : base, loading: false, ids: ids, total: ids.length, price: p ? { min: min, max: max, rest: base } : null, c: c, fromAnswer: turn.id };
+  }
+  // the buttons an answer shows: each search with the turn it opens and how many products that shows, read once per index
+  var answerSearchMemo = {};
+  function answerSearches(turn) {
+    if (!turn || !turn.searches || !turn.searches.length || !(S.facets && S.facets.length)) { return []; }
+    var key = turn.id + '|' + Object.keys(S.records).length;
+    if (answerSearchMemo[key]) { return answerSearchMemo[key]; }
+    var out = [];
+    turn.searches.forEach(function (s, i) {
+      var built = answerSearchTurn(turn, s), n = built ? filtered(built).length : 0;
+      if (built && n >= ANSWER_SEARCH_FLOOR) { out.push({ i: i, s: s, turn: built, n: n, label: String(s.label || '') + (built.price ? ' · ' + priceLabel(built.price) : '') }); }
+    });
+    return (answerSearchMemo[key] = out);
+  }
+  function answerSearchesHtml(turn) {
+    var list = answerSearches(turn);
+    if (!list.length) { return ''; }
+    return '<div class="ls-answer-searches"><div class="ls-block__title">' + esc(t('answerSearches')) + '</div>' + list.map(function (x) {
+      return '<button type="button" class="ls-btn ls-btn--secondary ls-btn--sm ls-answer-search" data-answer-search="' + esc(turn.id) + '" data-i="' + x.i + '" dir="auto">' + icon('search', 'ls-icon--sm') +
+        '<span>' + esc(x.label) + ' <span class="ls-num">(' + x.n + ')</span></span></button>';
+    }).join('') + '</div>';
+  }
+  // the turn button i of an answer opens, a copy of its own (the shopper's filters on it are never the button's), or null
+  function answerSearchOpen(turn, i) {
+    var x = answerSearches(turn).filter(function (y) { return y.i === Number(i); })[0];
+    return x ? JSON.parse(JSON.stringify(x.turn)) : null;
+  }
+  // pressed: that search, as its own turn, its words left in the field to go on from, as a search typed is
+  function openAnswerSearch(turn, i) {
+    var built = answerSearchOpen(turn, i);
+    if (!built) { return; }
+    S.tab = 'chat'; S.wide = null;
+    keepInField(built.q);
+    addTurn(built);
+    announce(t('announceResults', { n: filtered(built).length }));
+  }
   // two products the question's words name, in stock; inside the price it named, as the server read it (range), or none
   // (Rocks, 25.10: rings at 1,000 suggested for "between 2000 and 2500")
   function related(q, range) {
@@ -343,6 +428,7 @@
       }).join('') + '</ol>';
     }
     html += setHtml(turn);
+    html += answerSearchesHtml(turn);
     html += alsoHtml(turn);
     html += relatedHtml(turn);
     // a page the shopper can open, never what Let’s gathered of the store with no page of its own ("מה שהפוסטים…")

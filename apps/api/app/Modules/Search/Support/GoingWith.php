@@ -363,7 +363,7 @@ final class GoingWith implements ProductsGoingWith
      * @param  list<array<string, mixed>>  $facets
      * @return array<int, bool>
      */
-    private static function shareable(array $facets): array
+    public static function shareable(array $facets): array
     {
         $out = [];
         foreach ($facets as $at => $facet) {
@@ -380,7 +380,7 @@ final class GoingWith implements ProductsGoingWith
     }
 
     /** A value of a filter that files products by a campaign, a sale or whom they are for says nothing of a match. */
-    private static function shareableValue(ProductKinds $kinds, array $facet, int $value): bool
+    public static function shareableValue(ProductKinds $kinds, array $facet, int $value): bool
     {
         $label = (string) ($facet['v'][$value]['l'] ?? '');
         $key = (string) ($facet['k'] ?? '');
