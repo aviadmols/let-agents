@@ -176,8 +176,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * v44 (answer_site only), 18.11, released as Aviad asked, without a comparison (he checks it on the stores): v43, and
      * the writer is told who the store is (`store`: its name, whether it sells or tells, what it sells) and to fit the
      * answer's voice to its trade. Rolled back to v43 by setting this to 43.
+     *
+     * v45 (answer_site only), 19.11, released as Aviad asked after one question checked side by side ("למה הצמיד כל כך
+     * יקר?" on Rocks' tennis bracelet, the store's own facts in both): v44, and up to four key facts in bold (drawn by the
+     * drawer, assistant.answer_bold), a salesperson's conviction drawn from the facts (the reasons a price is worth it, a
+     * line each), still no emoji. Rolled back to v44 by setting this to 44.
      */
-    public const PROMPT_VERSION = 44;
+    public const PROMPT_VERSION = 45;
 
     /**
      * How the writer is given the store's own words, kept with each saved answer: one written from less is written
@@ -234,7 +239,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @var array<string, list<int>>
      */
     // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42, 45], 'verify_site' => [36, 40], 'scope_site' => [45]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
