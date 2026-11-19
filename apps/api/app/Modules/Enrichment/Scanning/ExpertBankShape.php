@@ -40,9 +40,11 @@ final class ExpertBankShape
         foreach ((array) ($reply['types'] ?? []) as $entry) {
             $item = self::item((array) $entry, 'type', 'type:', $types, $out);
             if ($item !== null) {
-                $types[$item['key']] = $item;
+                // a broad kind ("toy") is only for the products no finer kind reads (expert_bank v5): after them, always
+                $types[$item['key']] = $item + ((((array) $entry)['broad'] ?? false) === true ? ['broad' => true] : []);
             }
         }
+        uasort($types, fn (array $a, array $b): int => (int) ! empty($a['broad']) <=> (int) ! empty($b['broad']));
 
         $attributes = [];
         foreach ((array) ($reply['attributes'] ?? []) as $entry) {

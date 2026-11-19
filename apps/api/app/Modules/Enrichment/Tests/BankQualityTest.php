@@ -10,8 +10,12 @@ use App\Modules\Enrichment\Actions\MeasureBankQuality;
 use App\Modules\Enrichment\Models\EnrichmentExpertBank;
 use App\Modules\Enrichment\Scanning\BankEvidence;
 use App\Modules\Enrichment\Scanning\BankQuality;
+use App\Modules\Enrichment\Scanning\BrandResolver;
+use App\Modules\Enrichment\Scanning\CodeReading;
+use App\Modules\Enrichment\Scanning\ExpertBankShape;
 use App\Modules\Enrichment\Scanning\TextNormalizer;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
+use App\Modules\Enrichment\Vocabulary\VocabularyDefinition;
 use App\Modules\Runs\Enums\RunStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,6 +69,56 @@ final class BankQualityTest extends TestCase
         $this->assertSame(round(10 / 12, 3), $specificity['broad_share']);
     }
 
+    /** A broad kind ("toy") is only for what no finer kind reads: a doll stays a doll, the crawler gets "toy" (expert_bank v5). */
+    public function test_a_broad_kind_reads_only_what_no_finer_kind_reads(): void
+    {
+        $texts = [];
+        foreach (['Doll Anna', 'Doll Mia', 'Crawler push and go', 'Cloud university', 'Rattle set'] as $title) {
+            $texts[] = ['id' => (string) count($texts), 'title' => $title, 'head' => TextNormalizer::forMatching($title.' ; Toys & Games'), 'full' => '', 'department' => 'Toys & Games'];
+        }
+        $bank = ['types' => [
+            ['id' => 'type:toy', 'key' => 'toy', 'label' => 'Toy', 'words' => ['toys'], 'broad' => true],
+            ['id' => 'type:doll', 'key' => 'doll', 'label' => 'Doll', 'words' => ['doll']],
+        ], 'attributes' => []];
+        $evidence = new BankEvidence($texts);
+
+        $sets = $evidence->typeSets($bank);
+        $this->assertSame([0, 1], array_keys($sets['doll']));
+        $this->assertSame([2, 3, 4], array_keys($sets['toy']), 'never the dolls, though their department says toys');
+        $typeOf = BankQuality::typeOf($bank, $sets);
+        ksort($typeOf);
+        $this->assertSame(['doll', 'doll', 'toy', 'toy', 'toy'], array_values($typeOf));
+
+        $measured = $evidence->measure($bank, [], 2);
+        $this->assertSame(5, $measured['typed']);
+        $this->assertSame(3, $measured['types']['toy']['products']);
+        $this->assertTrue($measured['types']['toy']['broad']);
+        $this->assertSame([], $measured['type_overlaps'], 'a broad kind overlaps no finer one');
+    }
+
+    /** ...and code reads products by it the same way: the store's department never beats a name that says the kind. */
+    public function test_code_gives_a_broad_kind_only_to_a_product_no_finer_kind_fits(): void
+    {
+        $this->buildShop();
+        $definition = ['schema_version' => 1, 'key' => 'store', 'name' => ['he' => 'חנות', 'en' => 'Store'], 'root_category_external_id' => '*', 'attributes' => [],
+            'product_types' => [
+                ['key' => 'doll', 'label' => ['he' => 'בובה', 'en' => 'Doll'], 'patterns' => [ExpertBankShape::pattern('doll')], 'words' => ['doll']],
+                ['key' => 'rattle', 'label' => ['he' => 'רעשן', 'en' => 'Rattle'], 'patterns' => [ExpertBankShape::pattern('rattle')], 'words' => ['rattle']],
+                ['key' => 'toy', 'label' => ['he' => 'צעצוע', 'en' => 'Toy'], 'patterns' => [ExpertBankShape::pattern('toys')], 'words' => ['toys'], 'broad' => true],
+            ]];
+        [$vocabulary, $problems] = VocabularyDefinition::parse($definition);
+        $this->assertSame([], $problems);
+        $read = function (string $title) use ($vocabulary): ?string {
+            $product = $this->product(md5($title), $title, 'x', [], ['payload' => ['product_type' => 'Toys & Games']]);
+
+            return $this->inShop(fn () => CodeReading::read($product, new BrandResolver, $vocabulary, readText: true)['type']['key'] ?? null);
+        };
+
+        $this->assertSame('doll', $read('Doll Anna'), 'its name says the kind: never "toy" for its department');
+        $this->assertSame('toy', $read('Crawler push and go'), 'its name says none: the broad kind');
+        $this->assertNull($read('Doll with rattle'), 'two finer kinds fit: no type, never the broad one in their place');
+    }
+
     public function test_how_often_a_type_is_right_is_judged_on_a_sample_by_the_other_family(): void
     {
         $this->buildShop();
@@ -90,8 +144,9 @@ final class BankQualityTest extends TestCase
                 $items = (array) (json_decode($user, true)['items'] ?? []);
                 $this->test->asked[] = ['provider' => $provider, 'items' => $items];
 
-                // the doll with a stroller is judged no doll; the rest right
-                return new ModelReply(['verdicts' => array_map(fn (array $i): array => ['id' => $i['id'], 'verdict' => str_contains($i['product']['title'], 'stroller') ? 'incorrect' : 'correct'], $items)], 900, 200);
+                // the doll with a stroller is judged no doll; the wardrobe right, though a shopper names it finer; the rest right
+                return new ModelReply(['verdicts' => array_map(fn (array $i): array => ['id' => $i['id'], 'verdict' => str_contains($i['product']['title'], 'stroller') ? 'incorrect' : 'correct',
+                    'finer' => str_contains($i['product']['title'], 'Wardrobe') ? 'ארון הזזה' : ''], $items)], 900, 200);
             }
         });
 
@@ -100,10 +155,12 @@ final class BankQualityTest extends TestCase
         $this->assertSame(RunStatus::Succeeded, $run->status, (string) $run->error);
         $this->assertCount(1, $this->asked, 'one call');
         $this->assertCount(4, $this->asked[0]['items'], 'every typed product, the sample being larger');
-        $this->assertSame(['attribute' => 'product type', 'value' => 'בובה'], collect($this->asked[0]['items'])->firstWhere('product.title', 'Doll Anna')['tag']);
+        $this->assertSame('בובה', collect($this->asked[0]['items'])->firstWhere('product.title', 'Doll Anna')['type']);
         $quality = $this->inShop(fn () => $bank->fresh()->measurement['quality']);
-        $this->assertSame(['judged' => 4, 'sure' => 4, 'correct' => 3, 'incorrect' => 1, 'share' => 0.75], array_diff_key($quality['accuracy'], ['wrong' => 1]));
+        $this->assertSame(['judged' => 4, 'sure' => 4, 'correct' => 3, 'incorrect' => 1, 'share' => 0.75], array_intersect_key($quality['accuracy'], array_flip(['judged', 'sure', 'correct', 'incorrect', 'share'])));
         $this->assertSame([['title' => 'Doll set with stroller', 'type' => 'בובה']], $quality['accuracy']['wrong']);
+        $this->assertSame(round(2 / 3, 3), $quality['accuracy']['specific'], 'of the three right, the wardrobe a shopper names finer');
+        $this->assertSame([['title' => 'Wardrobe white', 'type' => 'ארון', 'finer' => 'ארון הזזה']], $quality['accuracy']['coarse']);
         $this->assertEquals(1.0, $this->inShop(fn () => $bank->fresh()->measurement['type_share']), 'the measurement it had stays');
     }
 }

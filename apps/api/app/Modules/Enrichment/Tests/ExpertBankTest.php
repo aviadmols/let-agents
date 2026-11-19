@@ -87,7 +87,11 @@ final class ExpertBankTest extends TestCase
                 $this->test->calls[] = ['role' => $role, 'provider' => $provider->value, 'model' => $model, 'schema' => $schema, 'effort' => $effort, 'input' => $input];
 
                 if ($role === 'writer') {
-                    return new ModelReply(count($this->test->written) > 1 ? array_shift($this->test->written) : $this->test->written[0], 9000, 2000);
+                    $reply = count($this->test->written) > 1 ? array_shift($this->test->written) : $this->test->written[0];
+                    // v5 says of each type whether it is broad; a reply written for an earlier version says none is
+                    $reply['types'] = array_map(fn (array $t): array => $t + ['broad' => false], (array) ($reply['types'] ?? []));
+
+                    return new ModelReply($reply, 9000, 2000);
                 }
                 if ($this->test->checkerReply !== null) {
                     return new ModelReply($this->test->checkerReply, 7000, 1500);
@@ -433,7 +437,7 @@ final class ExpertBankTest extends TestCase
         ['run' => $run, 'bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
 
         $this->assertSame(['round_1', 'round_2', 'check_1'], array_column($stored->calls, 'step'));
-        $this->assertSame(['expert_bank.v4', 'expert_bank.v4', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
+        $this->assertSame(['expert_bank.v5', 'expert_bank.v5', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
         // the writer at $4 and $20 a million, the checker at $1 and $8
         $this->assertSame([0.076, 0.076, 0.019], array_column($stored->calls, 'usd'));
         $this->assertSame(25000, $run->input_tokens);
@@ -748,7 +752,10 @@ final class ExpertBankTest extends TestCase
         $this->assertSame(['short' => [8, 3], 'long' => [0, 7]], LongestPhrase::claims('abc def def', ['short' => ['def'], 'long' => ['abc def']]), 'a word said again outside the phrase stands');
 
         // and the expert is told so, in a new version of its prompt; the released one is not edited
-        $this->assertSame(4, BuildExpertBank::PROMPTS['expert_bank'], 'v4 since 19.11: kinds, never departments');
+        $this->assertSame(5, BuildExpertBank::PROMPTS['expert_bank'], 'v5 since 20.11: a broad kind for what names no kind');
+        // v5: a broad kind, marked, for products no finer kind reads; v4 as released
+        $this->assertStringContainsString('"broad": true', (string) file_get_contents(dirname(__DIR__).'/Prompts/expert_bank.v5.md'));
+        $this->assertStringNotContainsString('"broad"', (string) file_get_contents(dirname(__DIR__).'/Prompts/expert_bank.v4.md'));
         // v4: what names open with is given, and a department of many kinds is no type (Shilav, 19.11); v3 as released
         $this->assertStringContainsString('A department that gathers several kinds is not a type', (string) file_get_contents(dirname(__DIR__).'/Prompts/expert_bank.v4.md'));
         $this->assertStringNotContainsString('heads', (string) file_get_contents(dirname(__DIR__).'/Prompts/expert_bank.v3.md'));

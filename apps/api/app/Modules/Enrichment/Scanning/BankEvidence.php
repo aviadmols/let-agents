@@ -42,12 +42,27 @@ final class BankEvidence
     {
         $all = $this->texts === [] ? [] : array_fill_keys(range(0, count($this->texts) - 1), true);
         $sets = [];
-        foreach ($bank['types'] as $type) {
+        $finer = [];
+        foreach (self::finerFirst($bank['types']) as $type) {
             [$set] = $this->read((array) $type['words'], 'head', $all);
+            // a broad kind reads only what no finer kind read (expert_bank v5), as code reads products by it
+            $set = empty($type['broad']) ? $set : array_diff_key($set, $finer);
+            $finer += empty($type['broad']) ? $set : [];
             $sets[(string) $type['key']] = $set;
         }
 
         return $sets;
+    }
+
+    /**
+     * The finer kinds first, the broad ones after them, each group in the bank's order.
+     *
+     * @param  list<array<string, mixed>>  $types
+     * @return list<array<string, mixed>>
+     */
+    private static function finerFirst(array $types): array
+    {
+        return [...array_filter($types, fn (array $t): bool => empty($t['broad'])), ...array_filter($types, fn (array $t): bool => ! empty($t['broad']))];
     }
 
     /**
@@ -64,11 +79,13 @@ final class BankEvidence
         $types = [];
         $typeSets = [];
         $typed = [];
-        foreach ($bank['types'] as $type) {
+        foreach (self::finerFirst($bank['types']) as $type) {
             [$set, $words] = $this->read($type['words'], 'head', $all);
+            // a broad kind is measured on what no finer kind read: it never overlaps one, nor counts its products
+            $set = empty($type['broad']) ? $set : array_diff_key($set, $typed);
             $typeSets[$type['key']] = $set;
             $typed += $set;
-            $types[$type['key']] = ['id' => $type['id'], 'products' => count($set), 'words' => $words];
+            $types[$type['key']] = ['id' => $type['id'], 'products' => count($set), 'words' => $words] + (empty($type['broad']) ? [] : ['broad' => true]);
         }
 
         $attributes = [];

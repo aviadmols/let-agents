@@ -101,7 +101,7 @@ final class ActivateExpertBank
             'label' => $label((string) $item['label']),
             'patterns' => array_values(array_map('strval', (array) ($item['patterns'] ?? array_map(ExpertBankShape::pattern(...), (array) $item['words'])))),
             'words' => array_values(array_map('strval', (array) $item['words'])),
-        ];
+        ] + (empty($item['broad']) ? [] : ['broad' => true]);
 
         $attributes = [];
         foreach ((array) ($bank->bank['attributes'] ?? []) as $attribute) {

@@ -75,17 +75,28 @@ final class CodeReading
         // "Kimono" and "dress" fitted two types together, and 27 of Me369's dresses had none (18.11).
         if ($text !== null && $type === null && ! self::categoryNamesAnotherType($vocabulary, $categories)) {
             $text['store_type'] = trim((string) ($product->payload['product_type'] ?? ''));
-            foreach (['store_type', 'field', 'title'] as $source) {
-                if ($text[$source] === '') {
+            // the finer kinds first, in every source; a broad kind ("toy", read from a department) only for a product no
+            // finer kind fits at all, never one two finer kinds fit (expert_bank v5: a doll is no "toy" because its
+            // department says so)
+            $ambiguous = false;
+            foreach ([false, true] as $broad) {
+                $kinds = array_values(array_filter($vocabulary->productTypes(), fn (array $t): bool => ! empty($t['broad']) === $broad));
+                if ($kinds === [] || $ambiguous || $type !== null) {
                     continue;
                 }
-                $fits = array_values(array_filter($vocabulary->productTypes(), fn (array $t): bool => self::find($text[$source], (array) ($t['patterns'] ?? [])) !== null));
-                if (count($fits) === 1) {
-                    [$type, $typeSource] = [$fits[0]['key'], $source];
-                    break;
-                }
-                if (count($fits) > 1) {
-                    break;
+                foreach (['store_type', 'field', 'title'] as $source) {
+                    if ($text[$source] === '') {
+                        continue;
+                    }
+                    $fits = array_values(array_filter($kinds, fn (array $t): bool => self::find($text[$source], (array) ($t['patterns'] ?? [])) !== null));
+                    if (count($fits) === 1) {
+                        [$type, $typeSource] = [$fits[0]['key'], $source];
+                        break;
+                    }
+                    if (count($fits) > 1) {
+                        $ambiguous = true;
+                        break;
+                    }
                 }
             }
         }
