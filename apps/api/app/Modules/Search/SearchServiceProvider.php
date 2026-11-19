@@ -18,6 +18,7 @@ use App\Modules\Admin\Contracts\TodayImprovements;
 use App\Modules\Admin\Contracts\TodaySearches;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
+use App\Modules\Assistant\Contracts\ProductsGoingWith;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Contracts\ProductsNear;
 use App\Modules\Assistant\Contracts\ProductsPopular;
@@ -35,6 +36,7 @@ use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
 use App\Modules\Search\Support\DescribedProductsSaying;
+use App\Modules\Search\Support\GoingWith;
 use App\Modules\Search\Support\HebrewPriceRange;
 use App\Modules\Search\Support\PopularProducts;
 use App\Modules\Search\Support\SearchAutoFixes;
@@ -93,6 +95,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->bind(ProductsNamed::class, SpellingProductsNamed::class);
         $this->app->bind(ProductsNear::class, SearchProductsNear::class);
         $this->app->bind(ProductsDescribed::class, DescribedProductsSaying::class);
+        // the products of another kind that go with the one on the screen ("a ring to match the bracelet"), off the index
+        $this->app->bind(ProductsGoingWith::class, GoingWith::class);
         $this->app->bind(ProductsPopular::class, PopularProducts::class);
         Event::listen([CatalogUpdated::class, CatalogProductsChanged::class, FactsDecided::class], RebuildSearchIndex::class);
 

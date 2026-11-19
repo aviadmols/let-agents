@@ -424,6 +424,10 @@ return [
         'label' => 'Popular products for a recommendation question',
         'description' => 'How many of the store\'s most popular products join an answer to "what do you recommend most" or "what sells best".',
     ],
+    'goes_with_products' => [
+        'label' => 'Matching products to choose from',
+        'description' => 'When a shopper asks for a product of another kind to go with the one they are looking at ("is there a ring to match this bracelet?"): at most this many products of that kind are offered to the assistant to choose from, the most alike first.',
+    ],
     'prepared_per_sync' => [
         'label' => 'Ready questions per sync',
         'description' => 'At most this many questions about the store are answered ahead on each sync. One already answered whose pages did not change is not asked again.',

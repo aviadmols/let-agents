@@ -64,6 +64,10 @@
         {
             "name": "team_drafts",
             "default": true
+        },
+        {
+            "name": "goes_with",
+            "default": true
         }
     ],
     "settings": [
@@ -74,6 +78,15 @@
             "min": 1,
             "max": 20,
             "scope": "shop"
+        },
+        {
+            "name": "goes_with_products",
+            "type": "int",
+            "default": 8,
+            "min": 1,
+            "max": 12,
+            "scope": "shop",
+            "unit": "products"
         },
         {
             "name": "prepared_per_sync",

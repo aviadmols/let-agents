@@ -41,6 +41,10 @@ return [
         'label' => 'Check that a search box question is about the store',
         'description' => 'Before an answer is written, a small model decides whether the question is about the store, its products, services, policies or pages, and whether it asks for something harmful. A sensitive subject the store sells is still the store\'s. About $0.0002 a new question.',
     ],
+    'goes_with' => [
+        'label' => 'Products that go with a product',
+        'description' => 'A shopper on a product page who asks for a product of another kind to go with it ("is there a ring to match this bracelet?", "matching earrings?"), or names a product by its SKU: the assistant is given the store\'s products of that kind in stock, those sharing most with it (metal, colour, style, collection, motif) first, and chooses among them. If the store has none in stock, it says none was found, never offering another kind instead.',
+    ],
     'team_drafts' => [
         'label' => 'AI help writing answers to shopper questions',
         'description' => 'On the shopper questions screen: a button that drafts an answer from the product information and the store pages, or from a few words the team typed. Nothing is published without the team.',
