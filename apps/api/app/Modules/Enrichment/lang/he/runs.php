@@ -72,6 +72,7 @@ return [
     'expert_bank_step_check' => 'בדיקה (:model): :scored פריטים לציון, :dropped ירדו, :ignored תוספות או שינויי שם שלא התקבלו. עלות: $:usd.',
     'expert_bank_step_gate' => 'שער הקוד: ירדו עוד :removed (מעט מדי מוצרים, ערך שכמעט כל המוצרים מחזיקים, ערך יחיד או כיסוי דל). נשארו :types סוגים ו־:attributes מאפיינים עם :values ערכים.',
     'expert_bank_passed' => 'הבנק הניסיוני עבר: :types סוגים, :attributes מאפיינים, :values ערכים. ל־:type_share% מהמוצרים יש סוג ול־:filterable_share% מספיק ערכים לסינון. הוסרו :removed. עלות: $:usd. לא הופעל דבר.',
+    'bank_quality' => 'איכות הסוגים: ל־:typed% מהמוצרים יש סוג; :accuracy% מהם נכונים במדגם של :judged; :broad% בסוגים כלליים; מחלקות חלשות: :weak.',
     'expert_bank_held' => 'הבנק הניסיוני לא עבר את הסף: :types סוגים, :attributes מאפיינים, :values ערכים. ל־:type_share% מהמוצרים יש סוג ול־:filterable_share% מספיק ערכים לסינון. הוסרו :removed. עלות: $:usd. לא הופעל דבר.',
     'expert_bank_show_type' => 'סוג מוצר',
     'expert_bank_show_products' => 'מוצרים',

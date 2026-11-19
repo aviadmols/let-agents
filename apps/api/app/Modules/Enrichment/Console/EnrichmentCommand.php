@@ -21,6 +21,7 @@ use App\Modules\Enrichment\Actions\DiscoverSchema;
 use App\Modules\Enrichment\Actions\ImportRelationRules;
 use App\Modules\Enrichment\Actions\ImportTaskResults;
 use App\Modules\Enrichment\Actions\ImportVocabulary;
+use App\Modules\Enrichment\Actions\MeasureBankQuality;
 use App\Modules\Enrichment\Actions\ProposeSchema;
 use App\Modules\Enrichment\Actions\ReadContentInCode;
 use App\Modules\Enrichment\Actions\ReadProductsInCode;
@@ -62,7 +63,7 @@ use Illuminate\Console\Command;
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, type-audit, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, bank-quality, type-audit, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show or --activate}
         {--template= : vocabulary template name}
@@ -108,6 +109,10 @@ final class EnrichmentCommand extends Command
             'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
             // An experiment: a bank written for this store alone, measured and checked, kept as a report. Activates nothing.
             'expert-bank' => $this->expertBank(),
+            // How good a stored bank's types are: by department, how specific, and how often right on a sample (the last
+            // bank when no id is given). Activates nothing.
+            'bank-quality' => $this->shopStep(fn (Shop $shop): Run => app(MeasureBankQuality::class)->handle($shop->id, (string) ($this->argument('argument')
+                ?: $tenant->run($shop->id, fn () => (string) EnrichmentExpertBank::query()->where('status', '!=', EnrichmentExpertBank::FAILED)->latest()->value('id'))))),
             // The types code read from the filing alone and cannot vouch for, put to the other family (AuditProductTypes).
             'type-audit' => $this->typeAudit(),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),

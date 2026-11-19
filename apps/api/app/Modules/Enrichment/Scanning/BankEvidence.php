@@ -33,6 +33,24 @@ final class BankEvidence
     }
 
     /**
+     * The products each type reads, by type key, as measure() reads them (by place in the texts).
+     *
+     * @param  array{types: list<array<string, mixed>>}  $bank
+     * @return array<string, array<int, true>>
+     */
+    public function typeSets(array $bank): array
+    {
+        $all = $this->texts === [] ? [] : array_fill_keys(range(0, count($this->texts) - 1), true);
+        $sets = [];
+        foreach ($bank['types'] as $type) {
+            [$set] = $this->read((array) $type['words'], 'head', $all);
+            $sets[(string) $type['key']] = $set;
+        }
+
+        return $sets;
+    }
+
+    /**
      * @param  array{types: list<array<string, mixed>>, attributes: list<array<string, mixed>>}  $bank
      * @param  array<string, int>  $frequent  the catalogue's words and phrases, with how many products say each
      * @param  int  $enough  the attributes a product must have a value of to count as one a shopper can filter

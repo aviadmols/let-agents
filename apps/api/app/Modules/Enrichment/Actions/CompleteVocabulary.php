@@ -773,7 +773,7 @@ final class CompleteVocabulary
     }
 
     /** What a product says of itself, for the auditor: title, the store's fields, the start of its description, its picture. */
-    private static function described(CatalogProduct $product, ?array $picture): array
+    public static function described(CatalogProduct $product, ?array $picture): array
     {
         $fields = [trim((string) ($product->payload['product_type'] ?? ''))];
         foreach (array_filter($product->categoryPaths()) as $path) {

@@ -92,7 +92,10 @@ final class CatalogueFacts
                 $head = TextNormalizer::forMatching($fields);
                 $full = TextNormalizer::forMatching($fields.self::BETWEEN.$own.self::BETWEEN.mb_substr($description, 0, self::HEAD));
 
-                $texts[] = ['id' => $id, 'title' => mb_substr($title, 0, 160), 'head' => $head, 'full' => $full];
+                // the department the store files it under (its type field, else its top category), for what is measured by
+                // department (BankQuality)
+                $roots = array_values(array_filter(array_map(fn (array $path): string => self::tidy((string) ($path[0] ?? '')), array_filter($product->categoryPaths()))));
+                $texts[] = ['id' => $id, 'title' => mb_substr($title, 0, 160), 'head' => $head, 'full' => $full, 'department' => $type !== '' ? $type : ($roots[0] ?? '')];
                 $rows[$id] = [
                     'id' => (string) $product->external_id,
                     'title' => mb_substr($title, 0, 160),

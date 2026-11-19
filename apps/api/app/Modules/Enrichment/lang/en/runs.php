@@ -72,6 +72,7 @@ return [
     'expert_bank_step_check' => 'Check (:model): :scored items to score, :dropped removed, :ignored additions or renames not taken. Cost: $:usd.',
     'expert_bank_step_gate' => 'Code gate: :removed more removed (too few products, a value nearly every product holds, a single value or thin coverage). Left: :types types and :attributes attributes with :values values.',
     'expert_bank_passed' => 'The experimental bank passed: :types types, :attributes attributes, :values values. :type_share% of the products have a type and :filterable_share% enough values to filter by. Removed: :removed. Cost: $:usd. Nothing was activated.',
+    'bank_quality' => 'Type quality: :typed% of the products have a type; :accuracy% of them right in a sample of :judged; :broad% under broad types; weak departments: :weak.',
     'expert_bank_held' => 'The experimental bank did not reach the threshold: :types types, :attributes attributes, :values values. :type_share% of the products have a type and :filterable_share% enough values to filter by. Removed: :removed. Cost: $:usd. Nothing was activated.',
     'expert_bank_show_type' => 'Product type',
     'expert_bank_show_products' => 'products',
