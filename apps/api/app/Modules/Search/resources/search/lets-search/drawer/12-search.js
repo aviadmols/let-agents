@@ -470,6 +470,7 @@
     // where it is, so it can be taken off; the order is the results', so nothing moves, a value only leaves or comes back
     // (a new one never comes in under the finger: Jean Rachel QA, 16.11). The row over the results offers only what narrows.
     var codes = Object.keys(counts).map(Number).filter(function (code) {
+      if (twinOfLength(Math.floor(code / 1000))) { return false; }
       var g = Math.floor(code / 1000), facet = S.facets[g], value = facet && facet.v[code % 1000];
       if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
       if (onCode(c, code)) { return true; }
@@ -570,10 +571,20 @@
   }
   // a size filter: by its values' own order (35, 36, 37), never by count
   function sizeFacet(f) { return !!f && /size|מידה|מידות/i.test(String(f.k || '') + ' ' + String(f.l || '')); }
+  // a filter whose values each open with a number ("1–3 days", "12+ days", "2 to 5 days"): in the order of that number, as sizes
+  // are (Gil Travel, 19.11: 4–5 days before 1–3)
+  function numberedFacet(f) { return sizeFacet(f) || (!!f && (f.v || []).length > 1 && f.v.every(function (v) { return /^\s*\d/.test(String(v.l)); })); }
+  // a filter of day ranges the tag bank made, where the store's own length filter is there: the same thing twice (Gil Travel,
+  // 19.11: "Trip length" and "Length"); the length filter stays
+  function twinOfLength(g) {
+    var f = S.facets[g];
+    return !!f && /^tag:/.test(String(f.k)) && (f.v || []).length > 0 && f.v.every(function (v) { return /^\s*\d+\s*(?:[–-]\s*\d+|\+|to\s+\d+|עד\s+\d+)?\s*(?:days?|nights?|ימים|לילות)\s*$/i.test(String(v.l)); })
+      && S.facets.some(function (o) { return o && o.k === 'length'; });
+  }
   // Two sizes in order: by the number they are (21, 21.5, 22), never by the order the store added them (21.5 after 47:
   // Vans QA, 16.11); a size that is no number ("M (38.5-42)", socks) after every number, in the store's own order.
   function sizeNumber(code) {
-    var f = S.facets[Math.floor(code / 1000)], v = f && f.v[code % 1000], m = v && /^\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(v.l));
+    var f = S.facets[Math.floor(code / 1000)], v = f && f.v[code % 1000], m = v && (sizeFacet(f) ? /^\s*(\d+(?:[.,]\d+)?)\s*$/ : /^\s*(\d+(?:[.,]\d+)?)/).exec(String(v.l));
     return m ? parseFloat(m[1].replace(',', '.')) : null;
   }
   function bySize(a, b) {
@@ -584,7 +595,7 @@
   // the chips of a size filter in its own order, in the places they hold among the others
   function sizesInOrder(codes) {
     var places = {}, out = codes.slice();
-    codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (sizeFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
+    codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (numberedFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
     Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(bySize); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
     return out;
   }

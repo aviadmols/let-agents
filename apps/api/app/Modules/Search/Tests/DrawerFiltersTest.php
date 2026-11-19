@@ -82,6 +82,25 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([false, 0, true, true], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001], fc.codes.indexOf(2000) >= 0, fc.codes.indexOf(2003) >= 0]; })()"));
     }
 
+    public function test_day_ranges_go_in_order_and_a_tag_twin_of_the_length_filter_is_not_shown(): void
+    {
+        // Gil Travel, 19.11: "Trip length" (the tag bank) beside "Length" (the store's own), and 4–5 days before 1–3
+        $tours = <<<'JS'
+            S.facets = [
+              { k: 'tag:trip_length', l: 'Trip length', v: [{ k: 'a', l: '4–5 days' }, { k: 'b', l: '12+ days' }, { k: 'c', l: '1–3 days' }] },
+              { k: 'length', l: 'Length', v: [{ k: 'd1', l: '6 to 9 days' }, { k: 'd2', l: '2 to 5 days' }, { k: 'd3', l: '10 to 14 days' }] }
+            ];
+            S.records = {};
+            [[1, [0, 1001]], [2, [0, 1001]], [3, [1, 1002]], [4, [2, 1000]], [5, [0, 1000]], [6, [2, 1001]]].forEach(function (p) {
+              S.records['p:' + p[0]] = { id: 'p:' + p[0], t: 'product', title: 'Tour ' + p[0], s: 1, kw: '', f: p[1] };
+            });
+            JS;
+        $out = self::drawer('(function () { '.$tours."var fc = T.facetChips(turn('tour', [1, 2, 3, 4, 5, 6], {}), 0); return [fc.codes.filter(function (c) { return c < 1000; }).length, fc.codes.filter(function (c) { return c >= 1000; })]; })()");
+
+        $this->assertSame(0, $out[0], 'the tag twin of the length filter is not shown');
+        $this->assertSame([1001, 1000, 1002], $out[1], 'the length filter in the order of its days');
+    }
+
     public function test_values_a_product_holds_several_of_go_together_and_the_counts_are_what_pressing_shows(): void
     {
         // Rocks, 19.11: "פנינה (3)" beside a chosen "יהלום" showed 42, most with no pearl. Stones: a ring holds several, so two
