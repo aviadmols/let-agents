@@ -22,6 +22,9 @@ final class CatalogueFacts
 
     public const TOP_PHRASES = 150;
 
+    /** The words and two-word openings of products' names listed, the most said first. */
+    public const TOP_HEADS = 120;
+
     /** A word or a phrase is listed when at least this many products say it. */
     public const MIN_PRODUCTS = 2;
 
@@ -58,7 +61,8 @@ final class CatalogueFacts
         $stop = array_flip(self::STOP);
 
         // One pass: SchemaStats counts the store's own fields from the same products as they go by.
-        $seen = function () use ($products, &$texts, &$rows, &$marks, &$order, &$words, &$phrases, &$letters, $stop) {
+        $heads = [];
+        $seen = function () use ($products, &$texts, &$rows, &$marks, &$order, &$words, &$phrases, &$heads, &$letters, $stop) {
             foreach ($products as $product) {
                 $id = (string) $product->id;
                 $title = TextNormalizer::clean((string) $product->title);
@@ -124,6 +128,12 @@ final class CatalogueFacts
                 foreach (array_keys($said) as $phrase) {
                     $phrases[(string) $phrase] = ($phrases[(string) $phrase] ?? 0) + 1;
                 }
+                // what the name opens with, one word and two: most names say first what the product is ("ארון תום לבן",
+                // "עגלת תינוק פוקס"), where a store's type field may be a department of many kinds (Shilav, 19.11)
+                $opening = array_values(array_filter(self::tokens(TextNormalizer::forMatching($title), $stop), fn (string $t): bool => preg_match('/^\d/u', $t) !== 1));
+                foreach (array_unique(array_filter([$opening[0] ?? '', isset($opening[1]) ? $opening[0].' '.$opening[1] : ''])) as $head) {
+                    $heads[$head] = ($heads[$head] ?? 0) + 1;
+                }
 
                 yield $product;
             }
@@ -146,6 +156,7 @@ final class CatalogueFacts
                 'key_values' => $stats['key_values'],
                 'words' => self::top($words, self::TOP_WORDS),
                 'phrases' => self::top($phrases, self::TOP_PHRASES),
+                'heads' => self::top($heads, self::TOP_HEADS),
                 'sample' => array_map(fn (string $id): array => $rows[$id], self::sample($marks, $order, $sample)),
             ],
             'texts' => $texts,
