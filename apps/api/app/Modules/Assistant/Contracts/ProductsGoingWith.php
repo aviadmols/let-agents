@@ -30,4 +30,11 @@ interface ProductsGoingWith
      * @return array{kind: string, ids: list<string>, shares: array<string, list<string>>, complement: bool}|null
      */
     public function goingWith(string $shopId, string $viewed, string $question, int $limit, array $sources = []): ?array;
+
+    /**
+     * Whether the question names a kind of product the store files, other than the viewed product's own, in any words and
+     * any language the store's index knows: "איזה שרשראות יכולים להיות באותו הסגנון?" on a ring's page does, "is it 14K?"
+     * does not. Read off the index alone, nothing scored: for routing a question to goingWith().
+     */
+    public function asksAnotherKind(string $shopId, string $viewed, string $question): bool;
 }

@@ -2168,9 +2168,26 @@ final class AnswerSiteQuestion implements TriesQuestions
     }
 
     /** Whether a question asks, in so many words, for something to go with a product, in a store that has it on. */
-    public static function asksToGoWith(string $shopId, string $question): bool
+    public static function asksToGoWith(string $shopId, string $question, ?string $viewing = null): bool
     {
-        return Features::enabled('assistant.goes_with', $shopId) && preg_match(self::GOES_WITH, $question) === 1;
+        if (! Features::enabled('assistant.goes_with', $shopId)) {
+            return false;
+        }
+        if (preg_match(self::GOES_WITH, $question) === 1) {
+            return true;
+        }
+        // ...or, on a product's page, names another kind of what the store sells, in whatever words and language (Aviad,
+        // 19.11: "a list of phrases will always miss one"): read off the store's own index, no model, any store
+        if ($viewing === null || $viewing === '' || ! app()->bound(ProductsGoingWith::class)) {
+            return false;
+        }
+        try {
+            return (bool) app(TenantContext::class)->run($shopId, fn (): bool => app(ProductsGoingWith::class)->asksAnotherKind($shopId, $viewing, $question));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     /**

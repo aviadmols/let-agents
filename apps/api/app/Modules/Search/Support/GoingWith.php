@@ -95,6 +95,17 @@ final class GoingWith implements ProductsGoingWith
 
     public function __construct(private readonly ProductKinds $kinds, private readonly GoesWithPartners $partners) {}
 
+    public function asksAnotherKind(string $shopId, string $viewed, string $question): bool
+    {
+        $index = LoadedIndex::for($shopId);
+        $own = $index['records']['p:'.$viewed] ?? null;
+        if ($index === null || $own === null || trim($question) === '') {
+            return false;
+        }
+
+        return self::askedKind($index, array_values((array) ($index['facets'] ?? [])), $question, $own) !== null;
+    }
+
     public function goingWith(string $shopId, string $viewed, string $question, int $limit, array $sources = []): ?array
     {
         $index = LoadedIndex::for($shopId);

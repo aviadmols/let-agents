@@ -301,6 +301,26 @@ final class GoesWithTest extends TestCase
     }
 
     /**
+     * The product page's own field hands a question to the match by what it asks, not by its words (Aviad, 19.11: "a list
+     * of phrases will always miss one"): another kind of what the store sells, named in any words, goes to the match; a
+     * question about the product itself stays this page's.
+     */
+    public function test_the_product_pages_field_hands_another_kind_to_the_match_in_any_words(): void
+    {
+        $this->rocks();
+        Features::override('assistant.on_search', true, $this->shop->id);
+        $ask = fn (string $question) => $this->call('POST', '/api/v1/widget/'.SiteKeys::site(self::TOKEN).'/ask', server: ['HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain'],
+            content: json_encode(['id' => '17156', 'question' => $question, 'vid' => 'anon-visitor1234567890goes', 'locale' => 'he', 'type' => 'product'], JSON_UNESCAPED_UNICODE));
+
+        $ask('ואם אני רוצה גם טבעת?')->assertOk();
+        $this->assertSame('טבעת', json_decode($this->calls[0]['user'], true)['analysis']['goes_with']['kind'] ?? null, 'no phrase of a match: the kind named is');
+
+        $this->calls = [];
+        $ask('האם הצמיד עשוי זהב אמיתי?')->assertOk();
+        $this->assertNotSame(file_get_contents(dirname(__DIR__, 2).'/Assistant/Prompts/goes_with_answer.v1.md'), $this->calls[0]['system'] ?? '', 'about the bracelet itself: this page\'s');
+    }
+
+    /**
      * "מאוד אהבתי את הטבעת הזאת איזה שרשראות יכולים להיות באותו הסגנון?" (Rocks, 19.11) was answered in general words: a
      * kind asked in the product's style is a match, and so is "…בסגנון הזה" naming another kind. More of the product's own
      * kind in its style is still the similar products, as before.
