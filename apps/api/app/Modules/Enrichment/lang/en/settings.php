@@ -358,6 +358,30 @@ return [
         'label' => 'Share of products that must get enough values to filter by',
         'description' => 'The bank as a whole passes only when at least this share of the products got a value in the set number of attributes.',
     ],
+    'type_auditor_provider' => [
+        'label' => 'Provider that audits doubtful product types',
+        'description' => 'Another family than the one that wrote the store\'s bank. When the two families are the same the run fails before any model call.',
+    ],
+    'type_auditor_model' => [
+        'label' => 'Model that audits doubtful product types',
+        'description' => 'A small model: it sees the title, the picture\'s description, the store\'s filing and the list of types, and says which type the product is, or none. In a batch.',
+    ],
+    'type_auditor_input_usd_per_million' => [
+        'label' => 'Input price for the type auditor (per million tokens)',
+        'description' => 'For the cost account of every run.',
+    ],
+    'type_auditor_output_usd_per_million' => [
+        'label' => 'Output price for the type auditor (per million tokens)',
+        'description' => 'For the cost account of every run.',
+    ],
+    'type_audit_min_confidence' => [
+        'label' => 'Confidence from which a type auditor\'s verdict is applied',
+        'description' => 'Below it nothing changes: the verdict is kept for the operator and the type code read stays.',
+    ],
+    'type_audit_max_products' => [
+        'label' => 'At most how many products are asked about in one run',
+        'description' => 'The rest are asked in the next run. A product answered already for the same question is not asked again.',
+    ],
     'expert_bank_values_per_product' => [
         'label' => 'Attributes a product needs a value in to count as filterable',
         'description' => 'Counted for each product, without the product type.',

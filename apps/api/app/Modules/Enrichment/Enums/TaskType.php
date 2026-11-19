@@ -26,6 +26,9 @@ enum TaskType: string
     /** Writes the questions a shopper might ask that one section of a page or post answers, for search only. */
     case SectionQuestions = 'section_questions';
 
+    /** Audits the type code gave a product from the store's filing alone: which type of the bank it is, or none. */
+    case TypeAudit = 'type_audit';
+
     public function label(): string
     {
         return __("enrichment::enrichment.tasks.{$this->value}");
@@ -38,6 +41,7 @@ enum TaskType: string
             self::FactReview => 'enrichment.reviewer',
             self::ContentMapping => 'enrichment.content_mapper',
             self::ProductHighlights, self::ProductSummary, self::SectionQuestions => 'enrichment.writer',
+            self::TypeAudit => 'enrichment.type_auditor',
         };
     }
 

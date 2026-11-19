@@ -69,6 +69,10 @@ final class FirstScan
         // family and by code (BuildExpertBank): made the vocabulary only once its checks pass, the products read by it.
         // Only where enrichment.expert_bank is on (a demo store); elsewhere the step says so and changes nothing.
         'bank' => ['enrichment', ['step' => 'expert-bank', 'target' => '{shop}', '--activate-passed' => true]],
+        // The types code read from the store's filing alone and cannot vouch for, put to a model of the other family
+        // (AuditProductTypes): a type of the bank or none, applied in code, and the search follows. Only where
+        // enrichment.type_audit is on (a demo store); elsewhere the step says so and changes nothing.
+        'type_audit' => ['enrichment', ['step' => 'type-audit', 'target' => '{shop}']],
         'pages' => ['retrieval', ['step' => 'nightly', 'target' => '{shop}']],
         'search' => ['search', ['step' => 'index', 'target' => '{shop}']],
         // The filter screen arranged (ArrangeFilters): an order, value orders, a duplicate gone, a heap tucked away, the
@@ -109,6 +113,7 @@ final class FirstScan
         'products' => ['enrichment.nightly', 'enrichment.nightly_model', 'enrichment.nightly_review', 'enrichment.read_in_code', 'enrichment.build_cards', 'enrichment.collect_batches'],
         'complete' => ['enrichment.complete_vocabulary'],
         'bank' => ['enrichment.build_expert_bank', 'enrichment.activate_expert_bank', 'enrichment.read_in_code'],
+        'type_audit' => ['enrichment.audit_types', 'enrichment.collect_batches'],
         'pages' => ['retrieval.build_index', 'retrieval.match_products'],
         'search' => ['search.build_index'],
         'layout' => ['search.arrange_filters'],

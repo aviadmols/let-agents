@@ -15,6 +15,7 @@ use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Models\CatalogSibling;
 use App\Modules\Catalog\Models\CatalogVariant;
 use App\Modules\Enrichment\Contracts\ExpertBankNames;
+use App\Modules\Enrichment\Contracts\ProductTypes;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
@@ -99,6 +100,12 @@ final class BuildSearchIndex
 
     /** The category filter was left out because the store's expert bank already sorts its categories (categoryFacet). */
     private bool $categoriesSorted = false;
+
+    /** @var array<string, string|null> each product's settled type (Enrichment\Contracts\ProductTypes), null for "none of the bank" */
+    private array $settledTypes = [];
+
+    /** The store's types, by the names that say exactly one of them, or null where no module answers for them. */
+    private ?ProductTypes $productTypes = null;
 
     /** @var array<string, list<int>> the tag filters each post or page holds (tagFacets), by catalog content id */
     private array $contentTags = [];
@@ -381,6 +388,10 @@ final class BuildSearchIndex
         }
         // What the scan learned each product is and is for, in words: found by them, before the long lists.
         $learned = $this->learnedWords($this->locale($shopId));
+        // what each product is, as its approved type says (the type audit's verdict among them): a category or a tag that
+        // names another of the store's types is none of the product's words (productWords)
+        $this->productTypes = app()->bound(ProductTypes::class) ? app(ProductTypes::class) : null;
+        $this->settledTypes = $this->productTypes?->settled() ?? [];
         // What each product is about by meaning, from its tags, where the shop has tags in search: found by
         // them as by its own words, never instead of them ("ספרי חטופים" finds a book whose text says "נחטף")
         $tagged = app()->bound(ProductTags::class) ? app(ProductTags::class)->tagsByProduct($shopId) : [];
@@ -1858,7 +1869,9 @@ final class BuildSearchIndex
 
         // a category or a tag that says the opposite of the product's own title is none of its words: "חולצה ארוכה Core
         // Thermal" tagged "חולצות טי קצרות" was found for "חולצה קצרה" (Vans, 12.11). Its title is what it is.
-        $fits = fn (string $name): bool => ! self::contradicts((string) $product->title, $name);
+        // Nor one that names another of the store's types than the product's own settled type (the type audit, 19.11: a
+        // mesh top tagged "חולצות טי" and "חולצות מכופתרות" is neither, and was found for "חולצה מכופתרת").
+        $fits = fn (string $name): bool => ! self::contradicts((string) $product->title, $name) && ! $this->namesAnotherType($product, $name);
 
         // a name that joins two kinds ("חולצות טי ומכופתרות", "Tees & Shirts") holds products of either: each is one of them,
         // so only what its own title says of the name is its word. Every tee filed there was found for "חולצה מכופתרת"
@@ -1884,6 +1897,21 @@ final class BuildSearchIndex
         }
 
         return $words;
+    }
+
+    /**
+     * Whether a name the store files the product under says exactly one of the store's types, and that type is not the
+     * product's own: its type is settled (an approved type fact, or the audit's "none of the bank") and differs. A product
+     * whose type is not settled, and a name that says no type or two ("Tees & Shirts": the joined-name rule), change nothing.
+     */
+    private function namesAnotherType(CatalogProduct $product, string $name): bool
+    {
+        if ($this->productTypes === null || ! array_key_exists((string) $product->id, $this->settledTypes)) {
+            return false;
+        }
+        $named = $this->productTypes->namedBy([$name])[$name] ?? null;
+
+        return $named !== null && $named !== $this->settledTypes[(string) $product->id];
     }
 
     /**

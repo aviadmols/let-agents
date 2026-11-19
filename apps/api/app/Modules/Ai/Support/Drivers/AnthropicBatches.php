@@ -36,15 +36,24 @@ final class AnthropicBatches implements BatchDriver
 
     public function submit(string $apiKey, string $model, array $requests): string
     {
-        $rows = array_map(fn (BatchRequest $request): array => ['custom_id' => $request->customId, 'params' => [
-            'model' => $model,
-            'max_tokens' => $request->maxOutputTokens,
-            'system' => $request->system.self::JSON_ONLY,
-            'messages' => [['role' => 'user', 'content' => $request->image === null ? $request->user : [
-                ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $request->image['mime'], 'data' => base64_encode($request->image['bytes'])]],
-                ['type' => 'text', 'text' => $request->user],
-            ]]],
-        ]], $requests);
+        $rows = array_map(function (BatchRequest $request) use ($model): array {
+            // as AnthropicChat sends one call: the reply held to a schema when the request has one, adaptive thinking at
+            // the effort asked on a model that takes it, nothing added otherwise
+            $tune = AnthropicChat::tuning($model, $request->effort);
+            $output = array_filter(['format' => $request->schema === null ? null : ['type' => 'json_schema', 'schema' => $request->schema], 'effort' => $tune['effort'] ?? null]);
+
+            return ['custom_id' => $request->customId, 'params' => array_filter([
+                'model' => $model,
+                'max_tokens' => $request->maxOutputTokens,
+                'system' => $request->system.self::JSON_ONLY,
+                'messages' => [['role' => 'user', 'content' => $request->image === null ? $request->user : [
+                    ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $request->image['mime'], 'data' => base64_encode($request->image['bytes'])]],
+                    ['type' => 'text', 'text' => $request->user],
+                ]]],
+                'output_config' => $output === [] ? null : $output,
+                'thinking' => $tune['thinking'] ?? null,
+            ], fn ($value): bool => $value !== null)];
+        }, $requests);
 
         try {
             $batch = $this->client($apiKey)->messages->batches->create(requests: $rows);

@@ -79,6 +79,10 @@
         {
             "name": "section_questions",
             "default": true
+        },
+        {
+            "name": "type_audit",
+            "default": false
         }
     ],
     "settings": [
@@ -922,9 +926,91 @@
             "max": 30,
             "scope": "global",
             "unit": "products"
+        },
+        {
+            "name": "type_auditor_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "type_auditor_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "type_auditor_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "type_auditor_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "type_audit_min_confidence",
+            "type": "int",
+            "default": 85,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "type_audit_max_products",
+            "type": "int",
+            "default": 500,
+            "min": 10,
+            "max": 5000,
+            "scope": "shop",
+            "unit": "products"
         }
     ],
     "agents": [
+        {
+            "name": "type_auditor",
+            "action": "audit_types",
+            "when": "on_request",
+            "features": [
+                "type_audit"
+            ],
+            "roles": [
+                {
+                    "role": "checker",
+                    "provider": "type_auditor_provider",
+                    "model": "type_auditor_model",
+                    "prices": [
+                        "type_auditor_input_usd_per_million",
+                        "type_auditor_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "type_audit"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "type-audit",
+                "shop_argument": "target"
+            }
+        },
         {
             "name": "nightly_model",
             "action": "nightly_model",

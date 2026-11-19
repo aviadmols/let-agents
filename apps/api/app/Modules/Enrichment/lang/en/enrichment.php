@@ -8,6 +8,7 @@ return [
         'product_highlights' => 'Product highlights',
         'product_summary' => 'Short description for search',
         'section_questions' => 'Questions each page section answers',
+        'type_audit' => 'Product type audit',
     ],
     'batch_statuses' => [
         'awaiting_results' => 'Waiting for answers',
