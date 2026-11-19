@@ -22,6 +22,9 @@ final class SearchesBesideAnswer implements AnswerSearches
     /** The readings of the question's words a search is built from: never a guess from a sound or a slip. */
     private const SURE = ['exact', 'form', 'family'];
 
+    /** The values a goes-with button joins beside the kind, the most shared first. */
+    private const MAX_TOGETHER = 3;
+
     public function __construct(private readonly ProductKinds $kinds) {}
 
     public function searches(string $shopId, string $question, array $picks, ?array $goesWith, int $max, int $min, bool $beyond = true): array
@@ -142,7 +145,8 @@ final class SearchesBesideAnswer implements AnswerSearches
             uksort($shares, fn (int $a, int $b): int => $shares[$b] <=> $shares[$a] ?: $a <=> $b);
             $together = [];
             foreach (array_keys($shares) as $code) {
-                if ($count([...$base, ...$together, $code]) >= $min) {
+                // three values at most beside the kind: a button of seven read as a sentence (Rocks, 19.11)
+                if (count($together) < self::MAX_TOGETHER && $count([...$base, ...$together, $code]) >= $min) {
                     $together[] = $code;
                 }
             }

@@ -403,7 +403,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * Asks for something to go with a product: "מתאים/ה ל", "שמתאים", "ללכת עם", "סט", "תואם", "להשלים", "משלים", "match",
      * "goes with", "set", "complete the look". A sign only: what is asked for is the kind the question names (goesWith()).
      */
-    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
+    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים|יתאים|יתאימו|תתאים|תתאימו|להתאים|ישתלב|ישתלבו|תשתלב|תשתלבו|משתלב|משתלבת|משתלבים|משתלבות)|לשלב\s+(?:עם|איתו|איתה|איתם)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
 
     /**
      * What the code found to go with the product asked about (goesWith()): the kind asked, the product, and by id what each

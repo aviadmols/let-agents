@@ -11,7 +11,7 @@
   var POINTS_AT_IT = /(^|[^֐-׿a-z])(המוצר|הפריט|הטבעת|התכשיט|[וש]?אותה|[וש]?אותו|הזו|הזה|הזאת|it|this(\s+one)?)([^֐-׿a-z]|$)/i;
   // ...and so does one that asks for something to go with it ("יש טבעת שמתאימה לצמיד?" on the bracelet's page went with no
   // product, and the answer asked which bracelet: Rocks 19.11). Narrow on purpose: "מה מתאים לעור יבש?" is not one.
-  var GOES_WITH_IT = /שמתאימ(?:ה|ים|ות)?\s*ל|(^|[^֐-׿])תואמ(?:ת|ים|ות)?([^֐-׿]|$)|(^|[^֐-׿])סט([^֐-׿]|$)|להשלים|משלימ|(?:שילך|שתלך|ללכת|הולך|הולכת|לשלב)\s+(?:עם|איתו|איתה)|\bmatch(?:es|ing)?\b|\bgoes?\s+with\b|\bcomplete\s+the\s+look\b/i;
+  var GOES_WITH_IT = /שמתאימ(?:ה|ים|ות)?\s*ל|(^|[^֐-׿])תואמ(?:ת|ים|ות)?([^֐-׿]|$)|(^|[^֐-׿])סט([^֐-׿]|$)|להשלים|משלימ|(?:שילך|שתלך|ללכת|הולך|הולכת|לשלב)\s+(?:עם|איתו|איתה)|(^|[^֐-׿])[והכלמש]{0,2}(?:יתאימו?|תתאימו?|להתאים|ישתלבו?|תשתלבו?|משתלב(?:ת|ים|ות)?)([^֐-׿]|$)|\bmatch(?:es|ing)?\b|\bgoes?\s+with\b|\bcomplete\s+the\s+look\b/i;
   // making it bigger or smaller ("אפשר להגדיל למידה 59?"): on a product's page, that product; how far depends on it (Rocks
   // 15.11: asked in the search box it went as the store's question, without the ring, and a general answer came back)
   var RESIZES_IT = /(^|[^֐-׿a-z])[ול]?(להגדיל|להגדל|להקטין|להקטנ|הגדלה|הגדלת|הקטנה|הקטנת|התאמת\s+מידה|שינוי\s+מידה|resiz)/i;
@@ -88,8 +88,12 @@
           // shown as cards here too, never this product itself: the answer named three bracelets and showed none (Rocks, 19.11)
           var own0 = String(pid(turn.ctx));
           var picks0 = (d.picks || []).filter(function (p) { return String(pid(p.external_id || p.id)) !== own0; }).map(function (p) { return { id: pid(p.external_id || p.id), why: p.why, title: p.title, url: p.url, image: p.image }; });
-          update(turn, { loading: false, answer: d.answer, picks: picks0, sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead, team: !!d.team, noAnswer: d.no_answer || null });
-          if (picks0.length) { products(picks0.map(function (p) { return p.id; })).then(function () { render(); }, function () { /* the cards stand on what the answer sent */ }); }
+          // ...and the store's searches it leads into (assistant.answer_searches), counted on the index once it is in
+          var searches0 = d.searches && d.searches.length ? d.searches : null;
+          update(turn, { loading: false, answer: d.answer, picks: picks0, searches: searches0, sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead, team: !!d.team, noAnswer: d.no_answer || null });
+          if (picks0.length || searches0) {
+            Promise.all([picks0.length ? products(picks0.map(function (p) { return p.id; })) : null, searches0 ? loadIndex() : null]).then(function () { render(); }, function () { /* the answer stands on what it sent */ });
+          }
           announce(t('announceReady') + ': ' + plainAnswer(d.answer));
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
