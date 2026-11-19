@@ -13,6 +13,7 @@ use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\SearchSubscriptions\Actions\ForgetRemovedStores;
 use App\Modules\SearchSubscriptions\Actions\RemindEnding;
 use App\Modules\SearchSubscriptions\Actions\SendWeekly;
+use App\Modules\SearchSubscriptions\Jobs\DeliverWeeklyEmails;
 use App\Modules\SearchSubscriptions\Mail\ConfirmSubscriptionMail;
 use App\Modules\SearchSubscriptions\Mail\StillInterestedMail;
 use App\Modules\SearchSubscriptions\Mail\WeeklyNewArrivalsMail;
@@ -20,11 +21,18 @@ use App\Modules\SearchSubscriptions\Models\SearchSubscription;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionProduct;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionSend;
 use App\Modules\SearchSubscriptions\Support\Subscribers;
+use App\Modules\SearchSubscriptions\Support\WeeklyEmails;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -64,14 +72,19 @@ final class SearchSubscriptionsTest extends TestCase
 
             public function find(string $shopId, string $query, int $limit): array
             {
-                return $this->test->found();
+                return $this->test->found($query);
             }
         });
     }
 
+    /** @var list<string> the words the store's search was asked, in order */
+    private array $asked = [];
+
     /** @return list<string> */
-    public function found(): array
+    public function found(string $query = ''): array
     {
+        $this->asked[] = $query;
+
         return $this->found;
     }
 
@@ -172,6 +185,129 @@ final class SearchSubscriptionsTest extends TestCase
         $this->assertTrue(SendWeekly::due($this->shop, Carbon::parse('2026-11-19 08:30', 'UTC')), 'Thursday 10:30 in Israel');
         $this->assertFalse(SendWeekly::due($this->shop, Carbon::parse('2026-11-19 10:30', 'UTC')));
         $this->assertFalse(SendWeekly::due($this->shop, Carbon::parse('2026-11-18 08:30', 'UTC')));
+    }
+
+    public function test_a_store_whose_owner_chose_another_day_and_hour_gets_its_email_then_and_only_then(): void
+    {
+        Settings::set('search_subscriptions.send_day', 'monday', $this->shop->id);
+        Settings::set('search_subscriptions.send_hour', 18, $this->shop->id);
+        $this->confirmed('dana@example.com', 'jeans jacket', Carbon::parse('2026-11-10 09:00', 'UTC'));
+        $this->product('n', 'Jeans jacket new', Carbon::parse('2026-11-15 09:00', 'UTC'));
+        $this->found = ['n'];
+
+        // Monday 23.11 in Israel (UTC+2): 10:00 there is 08:00 UTC, 18:00 there is 16:00 UTC
+        $this->travelTo(Carbon::parse('2026-11-23 08:02', 'UTC'));
+        $this->assertSame(0, app(SendWeekly::class)->dispatchDue(), 'not at the default hour');
+        $this->travelTo(Carbon::parse('2026-11-19 16:02', 'UTC'));
+        $this->assertSame(0, app(SendWeekly::class)->dispatchDue(), 'not on the default day at its hour');
+        Mail::assertNothingSent();
+
+        $this->travelTo(Carbon::parse('2026-11-23 16:02', 'UTC'));
+        $this->assertSame(1, app(SendWeekly::class)->dispatchDue());
+        Mail::assertSent(WeeklyNewArrivalsMail::class, fn (WeeklyNewArrivalsMail $m): bool => $m->hasTo('dana@example.com'));
+        $this->assertSame('2026-W48', $this->inShop(fn () => SearchSubscriptionSend::query()->sole()->period));
+
+        $this->travelTo(Carbon::parse('2026-11-23 17:02', 'UTC'));
+        $this->assertSame(0, app(SendWeekly::class)->dispatchDue(), 'its hour has passed');
+        Mail::assertSent(WeeklyNewArrivalsMail::class, 1);
+    }
+
+    public function test_thousands_of_subscriptions_take_bounded_queries_each_search_once_and_one_email_an_address(): void
+    {
+        // 2,000 subscriptions over 50 searches: 1,500 addresses, 500 of them following a second search
+        $this->manySubscriptions(2000, 50, 1500, now()->subDays(10));
+        foreach (range(1, 20) as $i) {
+            $this->product('p'.$i, 'Product '.$i, now()->subDays(2));
+        }
+        $this->found = array_map(fn (int $i): string => 'p'.$i, range(1, 20));
+
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+        $memory = memory_get_usage();
+        $this->assertSame(1500, app(SendWeekly::class)->handle(onlyShop: $this->shop->id));
+        $this->assertLessThan(64 * 1024 * 1024, memory_get_peak_usage() - $memory);
+
+        $this->assertLessThan(200, $queries, 'queries by slices of addresses, never by subscriber or product: '.$queries);
+        $this->assertCount(50, $this->asked, 'each distinct search once');
+        $to = collect(Mail::sent(WeeklyNewArrivalsMail::class))->map(fn (WeeklyNewArrivalsMail $m): string => $m->to[0]['address']);
+        $this->assertCount(1500, $to);
+        $this->assertCount(1500, $to->unique(), 'one email an address');
+        $this->assertSame(1500, $this->inShop(fn () => SearchSubscriptionSend::query()->whereNotNull('mailed_at')->count()));
+        Mail::assertSent(WeeklyNewArrivalsMail::class, fn (WeeklyNewArrivalsMail $m): bool => $m->total() === 6 && count($m->searches) <= 2);
+
+        // the hour again, or a job retried: nothing twice
+        Mail::fake();
+        $this->asked = [];
+        $this->assertSame(0, app(SendWeekly::class)->handle(onlyShop: $this->shop->id));
+        Mail::assertNothingSent();
+    }
+
+    public function test_nothing_new_in_the_store_runs_no_search_at_all(): void
+    {
+        $this->manySubscriptions(300, 30, 300, now()->subDays(3));
+        $this->product('old', 'Product old', now()->subDays(5));
+        $this->found = ['old'];
+
+        $this->assertSame(0, app(SendWeekly::class)->handle(onlyShop: $this->shop->id));
+        $this->assertSame([], $this->asked);
+        Mail::assertNothingSent();
+    }
+
+    public function test_the_database_holds_one_weekly_email_an_address_a_week_even_when_a_run_repeats(): void
+    {
+        $s = $this->confirmed('dana@example.com', 'jeans jacket', now()->subDays(20));
+        $this->product('n', 'Jeans jacket new', now()->subDay());
+        $this->found = ['n'];
+        // this week's email of the address already written, though its time reads as long ago (as a race would leave it)
+        $this->inShop(fn () => SearchSubscriptionSend::query()->create(['shop_id' => $this->shop->id, 'email_hash' => $s->email_hash, 'kind' => 'weekly',
+            'period' => SendWeekly::period($this->shop, now()), 'queries' => ['jeans jacket'], 'products' => 1, 'sent_at' => now()->subDays(8), 'mailed_at' => now()->subDays(8), 'opened_at' => now()->subDays(8)]));
+
+        $this->assertSame(0, app(SendWeekly::class)->handle(onlyShop: $this->shop->id));
+        Mail::assertNothingSent();
+        $this->assertSame(0, $this->inShop(fn () => SearchSubscriptionProduct::query()->count()), 'its products wait for an email that goes');
+    }
+
+    public function test_through_resend_the_emails_go_a_hundred_a_request_once_and_a_refused_one_is_taken_back(): void
+    {
+        config(['mail.default' => 'resend', 'services.resend.key' => 're_test_key']);
+        Mail::swap(new MailManager($this->app));
+        Settings::set('search_subscriptions.mail_requests_per_second', 10);
+        $requests = 0;
+        Http::fake(['api.resend.com/*' => function (Request $request) use (&$requests) {
+            $requests++;
+
+            return Http::response(['data' => array_map(fn (int $i): array => ['id' => 'em_'.$i], range(1, count($request->data())))]
+                + ($requests === 2 ? ['errors' => [['index' => 0, 'message' => 'Invalid `to` field.']]] : []));
+        }]);
+        $this->assertTrue(WeeklyEmails::batched());
+        $this->manySubscriptions(150, 5, 150, now()->subDays(4));
+        $this->product('n', 'Jeans jacket new', now()->subDay());
+        $this->found = ['n'];
+
+        $this->assertSame(150, app(SendWeekly::class)->handle(onlyShop: $this->shop->id));
+        Http::assertSentCount(2);
+        $sizes = [];
+        Http::assertSent(function (Request $r) use (&$sizes): bool {
+            $sizes[] = count($r->data());
+            $first = $r->data()[0] ?? [];
+
+            return $r->url() === 'https://api.resend.com/emails/batch' && $r->hasHeader('Authorization', 'Bearer re_test_key')
+                && str_starts_with($r->header('Idempotency-Key')[0] ?? '', 'search-subscriptions-weekly-') && $r->hasHeader('x-batch-validation', 'permissive')
+                && $first['from'] === '"Gueta Avigdor" <'.config('mail.from.address').'>' && str_contains($first['html'], 'Jeans jacket new')
+                && ($first['headers']['List-Unsubscribe-Post'] ?? '') === 'List-Unsubscribe=One-Click' && str_starts_with($first['subject'], '1 new for “search ');
+        });
+        sort($sizes);
+        $this->assertSame([50, 100], $sizes);
+        $this->assertSame(149, $this->inShop(fn () => SearchSubscriptionSend::query()->whereNotNull('mailed_at')->count()));
+        $this->assertSame(149, $this->inShop(fn () => SearchSubscriptionSend::query()->count()), 'the refused one is taken back');
+        $this->assertSame(149, $this->inShop(fn () => SearchSubscriptionProduct::query()->count()), 'with its product, for next time');
+
+        // a delivery run again after the fact mails nothing more
+        $ids = $this->inShop(fn () => SearchSubscriptionSend::query()->pluck('id')->all());
+        DeliverWeeklyEmails::dispatchSync($this->shop->id, array_slice($ids, 0, 100));
+        Http::assertSentCount(2);
     }
 
     public function test_one_tap_stops_one_search_or_all_of_them_and_a_mail_clients_button_does_too(): void
@@ -281,6 +417,26 @@ final class SearchSubscriptionsTest extends TestCase
             'query_key' => Subscribers::queryKey($query), 'consent_text' => 'yes', 'consent_at' => $at, 'status' => SearchSubscription::ACTIVE,
             'confirmed_at' => $at, 'expires_at' => $at->copy()->addDays(90),
         ]));
+    }
+
+    /**
+     * $count active subscriptions to $searches searches ("search 0", …) from $addresses addresses: each address its first
+     * search, and the first ones a second, written in bulk so the test stays fast.
+     */
+    private function manySubscriptions(int $count, int $searches, int $addresses, Carbon $confirmed): void
+    {
+        $rows = [];
+        for ($i = 0; $i < $count; $i++) {
+            $address = $i < $addresses ? $i : $i - $addresses;
+            $search = $i < $addresses ? $i % $searches : ($i + 7) % $searches;
+            $email = "shopper{$address}@example.com";
+            $rows[] = ['id' => strtolower((string) Str::ulid()), 'shop_id' => $this->shop->id, 'email' => Crypt::encryptString($email), 'email_hash' => Subscribers::hash($email),
+                'query' => "search {$search}", 'query_key' => "search {$search}", 'locale' => 'he', 'status' => SearchSubscription::ACTIVE, 'consent_text' => 'yes',
+                'consent_at' => $confirmed, 'confirmed_at' => $confirmed, 'expires_at' => $confirmed->copy()->addDays(90), 'created_at' => $confirmed, 'updated_at' => $confirmed];
+        }
+        foreach (array_chunk($rows, 250) as $chunk) {
+            DB::table('search_subscriptions')->insert($chunk);
+        }
     }
 
     private function product(string $id, string $title, Carbon $created, bool $inStock = true): void

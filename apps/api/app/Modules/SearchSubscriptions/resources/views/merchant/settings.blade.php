@@ -9,8 +9,16 @@
             <x-lp::row :title="$t('placement')" :sub="$t('placement_sub')">
                 <x-lp::chips model="data.placement" :options="$t('placements')" :sm="true" :label="$t('placement')" />
             </x-lp::row>
-            <x-lp::row :title="$t('send_day')" :sub="$t('send_day_sub', ['hour' => $this->sendHour()])">
-                <x-lp::chips model="data.send_day" :options="$t('days')" :sm="true" :label="$t('send_day')" />
+            <x-lp::row :title="$t('send_day')" :sub="$t('send_day_sub')">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                    <x-lp::chips model="data.send_day" :options="$t('days')" :sm="true" :label="$t('send_day')" />
+                    <select wire:model="data.send_hour" class="lp-d-pick" dir="ltr" aria-label="{{ $t('send_hour') }}" data-send-hour>
+                        @foreach ($this->hours() as $value => $clock)
+                            <option value="{{ $value }}">{{ $clock }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @if ($this->problem('send_hour'))<span class="lp-set-error" role="alert">{{ $t('errors.send_hour') }}</span>@endif
             </x-lp::row>
             <x-lp::row :title="$t('logo')" :sub="$t('logo_sub')">
                 <x-lp::field model="data.logo_url" :ltr="true" :width="320" type="url" placeholder="https://…/logo.png" :aria-label="$t('logo')" />
@@ -54,13 +62,22 @@
             @if ($people === [])
                 <p class="lp-note" style="margin: 16px 0 0">{{ $t('people.none') }}</p>
             @else
+                @php($upcoming = $this->upcoming($people))
                 <div style="margin-top: 8px" data-signed-up-list>
                     @foreach ($people as $p)
-                        <div class="lp-row" style="gap: 12px; flex-wrap: wrap">
+                        <div class="lp-row" style="gap: 4px 12px; flex-wrap: wrap">
                             <bdi dir="ltr" style="flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere">{{ $p['email'] }}</bdi>
                             <bdi dir="auto" style="flex: 1 1 160px; min-width: 0; font-weight: 600">{{ $p['query'] }}</bdi>
                             <span style="flex: 0 0 auto; color: var(--lp-muted, #6b6b70)">{{ $p['at']?->timezone(config('app.timezone'))->format('d.m.Y') }}</span>
                             <span style="flex: 0 0 auto">{{ $t('people.status.'.$p['status']) }}</span>
+                            @if ($p['status'] === 'active')
+                                @php($new = $upcoming['next'][$p['id']] ?? 0)
+                                @php($last = $upcoming['last'][$p['hash']] ?? null)
+                                <span style="flex: 1 1 100%; font-size: 13px; color: var(--lp-muted, #6b6b70)" data-next-email="{{ $new }}">
+                                    <span @if ($new > 0) style="font-weight: 600; color: var(--la-ink, inherit)" @endif>{{ trans_choice('search_subscriptions::merchant.people.next', $new, ['count' => number_format($new)]) }}</span>
+                                    · {{ $last !== null ? $t('people.last', ['date' => \Illuminate\Support\Carbon::parse($last)->timezone(config('app.timezone'))->format('d.m.Y')]) : $t('people.never') }}
+                                </span>
+                            @endif
                         </div>
                     @endforeach
                 </div>

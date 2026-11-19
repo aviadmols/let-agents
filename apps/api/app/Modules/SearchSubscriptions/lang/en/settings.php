@@ -8,6 +8,7 @@ return [
     'reply_to' => ['label' => 'Reply-to address', 'description' => 'Where a shopper\'s reply to the weekly email goes. Empty: no reply-to address.'],
     'products_per_email' => ['label' => 'Products per email', 'description' => 'The most products in one email, best matches first.'],
     'searches_per_email' => ['label' => 'Searches per address', 'description' => 'The most active searches for one email address in a store.'],
+    'mail_requests_per_second' => ['label' => 'Weekly email pace', 'description' => 'Requests a second to the mail service for the weekly emails, each up to 100 emails. Within the mail account\'s own limit, with room left for the other emails.'],
     'keep_days' => ['label' => 'Subscription length', 'description' => 'After how many days a subscription stops, unless the shopper keeps it.'],
     'remind_days_before' => ['label' => 'Reminder before the end', 'description' => 'How many days before the end the "Still interested?" email goes out.'],
     'unopened_stop' => ['label' => 'Stop after unopened emails', 'description' => 'After how many unopened emails in a row a subscription stops.'],
