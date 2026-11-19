@@ -20,6 +20,7 @@ use App\Modules\Enrichment\Contracts\GoesWithPartners;
 use App\Modules\Enrichment\Contracts\ProductTypes;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
+use App\Modules\Enrichment\Jobs\ReadNewProductsJob;
 use App\Modules\Enrichment\Listeners\ReadNewProducts;
 use App\Modules\Enrichment\Listeners\RebuildCards;
 use App\Modules\Enrichment\Support\EnrichmentHome;
@@ -36,6 +37,7 @@ use App\Modules\Enrichment\Support\StoredProductTypes;
 use App\Modules\Enrichment\Support\WrittenSectionQuestions;
 use App\Modules\Retrieval\Contracts\DocumentNotes;
 use App\Modules\Retrieval\Contracts\SectionQuestions;
+use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 
@@ -88,6 +90,19 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
                 ->withoutOverlapping()
                 ->onOneServer()
                 ->runInBackground();
+
+            // The products code never read, looked for every ten minutes too: a sync that finds no change says nothing, and the
+            // products published before it waited for the night (Rocks, 19.11: 56 waiting at 22:50). One query a shop when
+            // there are none (ReadNewProductsJob, one waiting per shop).
+            $schedule->call(function (): void {
+                foreach (Shop::query()->pluck('id') as $shopId) {
+                    ReadNewProductsJob::dispatch((string) $shopId);
+                }
+            })
+                ->everyTenMinutes()
+                ->name('enrichment:read-new')
+                ->withoutOverlapping()
+                ->onOneServer();
 
             // Answers of batches handed to a provider: read as they end, through the day.
             $schedule->command('enrichment collect --scheduled')
