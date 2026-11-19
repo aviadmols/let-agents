@@ -354,6 +354,10 @@ final class SearchCatalog
             if (isset($kindWords[self::wordForm($plain)])) {
                 continue;
             }
+            // nor a side ("קצר", "ארוכה"): left out, the search finds its opposite (BuildSearchIndex::saysSide)
+            if (BuildSearchIndex::saysSide($plain)) {
+                continue;
+            }
             $describing[] = ['at' => $at, 'word' => $word, 'colour' => Colours::mentions($word) !== []];
         }
         // a colour first, then the others from the last typed
@@ -389,7 +393,7 @@ final class SearchCatalog
         // many products say ("נגד") is no such word; the last typed that finds is taken, and what was left out is said.
         // ...never leaving out a price, whom it is for, or the kind of product it names: "צמיד זול" with no bracelet that cheap is
         // nothing, not the studs; "מכונת פוליש" is never every machine
-        $bound = array_filter($words, fn (string $w): bool => HebrewSearch::pricePart($w) || isset($kindWords[self::wordForm(HebrewSearch::normalize($w))])
+        $bound = array_filter($words, fn (string $w): bool => HebrewSearch::pricePart($w) || isset($kindWords[self::wordForm(HebrewSearch::normalize($w))]) || BuildSearchIndex::saysSide($w)
             || array_filter($whomSaid, fn (string $said): bool => $said !== '' && str_contains(HebrewSearch::normalize($w), $said)) !== []);
         if ($found === [] && ($result['price'] ?? null) === null) {
             // ...nor a word a product's title opens with: that is a kind the store sells ("צמיד יהלומים" with no bracelet of diamonds

@@ -1769,7 +1769,20 @@ final class BuildSearchIndex
      * Opposites a product's title and the names it is filed under may say of it: its length, height, width, thickness,
      * weight. Stems as HebrewSearch reads them (finals as letters), and in English.
      */
-    private const OPPOSITES = [['קצר', 'ארוכ'], ['גבוה', 'נמוכ'], ['רחב', 'צר'], ['דק', 'עבה'], ['short', 'long'], ['high', 'low'], ['wide', 'narrow'], ['thin', 'thick']];
+    // ...and two kinds of one garment no product is both of: a T-shirt is never button-down (Vans filed tees under "חולצות
+    // מכופתרות" too: "חולצת טי קצרה Left Chest" was found for "חולצה מכופתרת", 19.11)
+    private const OPPOSITES = [['קצר', 'ארוכ'], ['גבוה', 'נמוכ'], ['רחב', 'צר'], ['דק', 'עבה'], ['טי', 'מכופתר'], ['short', 'long'], ['high', 'low'], ['wide', 'narrow'], ['thin', 'thick']];
+
+    /**
+     * Whether a word says one side of such a pair ("קצר", "ארוכה", "short"): a search never leaves it out to find more, as
+     * what it would find instead is its opposite ("חולצה מכופתרת עם שרוול קצר" showed the long ones: Vans, 19.11).
+     */
+    public static function saysSide(string $word): bool
+    {
+        $w = HebrewSearch::normalize($word);
+
+        return $w !== '' && array_any(array_merge(...self::OPPOSITES), fn (string $side): bool => $w === $side || (mb_strlen($side) >= 3 && str_starts_with($w, $side)));
+    }
 
     /**
      * Whether a name the store files a product under says the opposite of what its own title says ("חולצות טי קצרות"

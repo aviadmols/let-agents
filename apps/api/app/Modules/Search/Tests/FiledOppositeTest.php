@@ -19,6 +19,20 @@ final class FiledOppositeTest extends TestCase
         $this->assertTrue(BuildSearchIndex::contradicts('מכנס ג\'ינס קצר', 'מכנסיים ארוכים'));
         $this->assertTrue(BuildSearchIndex::contradicts('Long Sleeve Tee', 'Short sleeve'));
         $this->assertTrue(BuildSearchIndex::contradicts('נעל גבוהה Sk8-Hi', 'נעליים נמוכות'));
+        // a tee filed under the button-down shirts too (Vans, 19.11)
+        $this->assertTrue(BuildSearchIndex::contradicts('חולצת טי קצרה Left Chest II Loose', 'חולצות מכופתרות'));
+        $this->assertFalse(BuildSearchIndex::contradicts('חולצה מכופתרת ארוכה Martinez Cord', 'חולצות מכופתרות'));
+    }
+
+    public function test_a_word_that_says_a_side_is_never_left_out_of_a_search(): void
+    {
+        // "חולצה מכופתרת עם שרוול קצר" with "קצר" left out showed the long ones (Vans, 19.11)
+        foreach (['קצר', 'קצרה', 'ארוך', 'ארוכות', 'גבוהה', 'short', 'Long'] as $side) {
+            $this->assertTrue(BuildSearchIndex::saysSide($side), $side);
+        }
+        foreach (['שרוול', 'חולצה', 'כחול', 'sleeve'] as $other) {
+            $this->assertFalse(BuildSearchIndex::saysSide($other), $other);
+        }
     }
 
     public function test_similar_items_put_the_opposite_last_and_read_the_colour_the_store_files(): void
