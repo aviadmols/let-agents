@@ -73,6 +73,14 @@ final class WhatShoppersSeeTest extends TestCase
         $page->call('choose', 'look', 'nope')->call('turn', 'nope');
     }
 
+    public function test_a_switch_turned_is_drawn_anew_in_its_new_state(): void
+    {
+        // 19.11: the toast said saved and the switch stayed until the page was loaded again (a prevented click leaves the
+        // box deaf to its checked attribute): its key changes with its state, so the page draws a new one
+        $page = Livewire::test(WhatShoppersSee::class)->assertSeeHtml('wire:key="see-start_popular-on"');
+        $page->call('turn', 'start_popular')->assertSeeHtml('wire:key="see-start_popular-off"')->assertDontSeeHtml('wire:key="see-start_popular-on"');
+    }
+
     public function test_hand_over_to_whatsapp_needs_a_number_kept_international(): void
     {
         $id = $this->shop->id;

@@ -26,8 +26,12 @@
     })
     @php($toggle = function (string $name) use ($on, $held, $t, $withUpgrade): string {
         $label = e($t('held'));
+        // keyed by its state, so a turn draws it anew: a box whose click was prevented no longer follows its checked
+        // attribute and stayed as it was until the page was loaded again (19.11). The name is joined here, as Livewire
+        // reads every literal key attribute of a template and would rewrite this string.
+        $key = 'wire'.':key';
 
-        return $withUpgrade($name, '<label class="lp-d-toggle lp-d-toggle-lg"'.(in_array($name, $held, true) ? ' title="'.$label.'"' : '').'><input type="checkbox" wire:click.prevent="turn(\''.$name.'\')" wire:loading.attr="disabled"'.($on[$name] ? ' checked' : '').(in_array($name, $held, true) ? ' disabled' : '').'><span class="sr-only">'.e($on[$name] ? 'On' : 'Off').'</span></label>');
+        return $withUpgrade($name, '<label class="lp-d-toggle lp-d-toggle-lg" '.$key.'="see-'.$name.'-'.($on[$name] ? 'on' : 'off').'"'.(in_array($name, $held, true) ? ' title="'.$label.'"' : '').'><input type="checkbox" wire:click.prevent="turn(\''.$name.'\')" wire:loading.attr="disabled"'.($on[$name] ? ' checked' : '').(in_array($name, $held, true) ? ' disabled' : '').'><span class="sr-only">'.e($on[$name] ? 'On' : 'Off').'</span></label>');
     })
     @php($seg = function (string $name, array $options) use ($pick, $held, $t, $withUpgrade): string {
         $out = '<div class="lp-d-seg" role="group">';
