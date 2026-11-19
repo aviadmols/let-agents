@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\BuildCards;
+use App\Modules\Enrichment\Actions\BuildExpertBank;
 use App\Modules\Enrichment\Actions\BuildStructure;
 use App\Modules\Enrichment\Actions\CollectProviderBatches;
 use App\Modules\Enrichment\Actions\CompleteVocabulary;
@@ -25,9 +26,11 @@ use App\Modules\Enrichment\Actions\ReadPromisesInCode;
 use App\Modules\Enrichment\Actions\RunNightlyReading;
 use App\Modules\Enrichment\Enums\TaskType;
 use App\Modules\Enrichment\Models\EnrichmentBatch;
+use App\Modules\Enrichment\Models\EnrichmentExpertBank;
 use App\Modules\Enrichment\Models\EnrichmentSchemaProposal;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Scanning\BranchPlan;
+use App\Modules\Enrichment\Scanning\ExpertBankGate;
 use App\Modules\Enrichment\Scanning\WordAudit;
 use App\Modules\Enrichment\Support\TaskFile;
 use App\Modules\Enrichment\Support\VocabularyBranch;
@@ -48,13 +51,15 @@ use Illuminate\Console\Command;
  *   enrichment rankings gueta-avigdor
  *   enrichment rules gueta-avigdor --template=hardware-store
  *   enrichment relations gueta-avigdor
+ *   enrichment expert-bank gueta-avigdor            (a dry run: writes a report, activates nothing)
+ *   enrichment expert-bank gueta-avigdor --show     (the last report, as the filters a shopper would get)
  */
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, complete, collect, vocabulary, schema, structure, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
-        {argument? : task type for tasks, results file for results}
+        {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show}
         {--template= : vocabulary template name}
         {--file= : vocabulary JSON file}
         {--author= : who wrote the vocabulary}
@@ -65,7 +70,8 @@ final class EnrichmentCommand extends Command
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
         {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only)}
-        {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off}
+        {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off; expert-bank: ask again though the same facts were answered}
+        {--show : expert-bank: print a stored report as the filters a shopper would get, asking no model}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
         {--include-done : ask again about products already read with the same input}
         {--all-products : nightly: every product a model has not read, not only a night of them (the first scan)}
@@ -93,6 +99,8 @@ final class EnrichmentCommand extends Command
             'schema' => $this->schema(),
             // The first scan's structure: branches, a vocabulary for each, a score, and the gate.
             'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
+            // An experiment: a bank written for this store alone, measured and checked, kept as a report. Activates nothing.
+            'expert-bank' => $this->expertBank(),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),
@@ -189,6 +197,79 @@ final class EnrichmentCommand extends Command
         $this->line((string) json_encode($report, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The expert bank, a dry run for one named shop: the run's lines step by step and where the report is kept; with
+     * --show, a stored report as filters. Never for every shop, and nothing the store is read with changes.
+     */
+    private function expertBank(): int
+    {
+        $shop = $this->option('scheduled') ? null : $this->shop();
+        if (! $shop) {
+            return $this->failWith('Shop not found. The expert bank runs for one named shop only.');
+        }
+        $he = fn (string $key, array $params = []): string => (string) trans('enrichment::runs.'.$key, $params, 'he');
+
+        if ($this->option('show')) {
+            $stored = app(TenantContext::class)->run($shop->id, fn (): ?EnrichmentExpertBank => EnrichmentExpertBank::query()
+                ->when($this->argument('argument'), fn ($q, $id) => $q->whereKey($id), fn ($q) => $q->where('status', '!=', EnrichmentExpertBank::FAILED))
+                ->latest()->first());
+            if ($stored === null) {
+                return $this->failWith($he('expert_bank_show_none'));
+            }
+
+            return $this->showExpertBank($stored, $he);
+        }
+
+        if (! Features::enabled(BuildExpertBank::FEATURE, $shop->id)) {
+            $this->line($he('expert_bank_off'));
+
+            return self::SUCCESS;
+        }
+
+        ['run' => $run, 'bank' => $stored] = app(BuildExpertBank::class)->handle($shop->id, (bool) $this->option('force'));
+        foreach ((array) ($run->output['steps'] ?? []) as $step) {
+            $this->line((string) $step);
+        }
+        if (! in_array((string) $run->summary(), (array) ($run->output['steps'] ?? []), true)) {
+            $this->line((string) $run->summary());
+        }
+        if ($stored !== null) {
+            $this->showExpertBank($stored, $he);
+        }
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /** @param  callable(string, array<string, scalar>=): string  $he */
+    private function showExpertBank(EnrichmentExpertBank $stored, callable $he): int
+    {
+        $this->info($he('expert_bank_show_stored', ['id' => $stored->id, 'status' => $stored->status]));
+        foreach ((array) $stored->problems as $problem) {
+            $this->line('  '.$problem);
+        }
+        if ($stored->bank === null || $stored->measurement === null) {
+            return self::SUCCESS;
+        }
+
+        foreach (ExpertBankGate::filters($stored->bank, $stored->measurement, $he('expert_bank_show_type')) as $filter) {
+            $this->line('');
+            $this->line($filter['label'].' ('.$filter['products'].' '.$he('expert_bank_show_products').')');
+            foreach ($filter['values'] as $value) {
+                $this->line('  '.$value['label'].': '.$value['products']);
+            }
+        }
+
+        $why = array_count_values(array_column((array) $stored->removed, 'why'));
+        ksort($why, SORT_STRING);
+        $this->line('');
+        $this->line($he('expert_bank_show_removed', ['count' => count((array) $stored->removed)]));
+        foreach ($why as $reason => $count) {
+            $this->line('  '.$reason.': '.$count);
+        }
+
+        return self::SUCCESS;
     }
 
     private function vocabulary(): int

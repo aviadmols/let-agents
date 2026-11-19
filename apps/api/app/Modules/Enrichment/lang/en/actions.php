@@ -17,4 +17,5 @@ return [
     'suggest_from_picture' => 'Detail suggested from the picture',
     'compare_readers' => 'Two reading models compared',
     'collect_batches' => 'Collecting batch answers from the provider',
+    'build_expert_bank' => 'Writing an attribute bank for the store itself (experiment)',
 ];

@@ -17,4 +17,5 @@ return [
     'suggest_from_picture' => 'הצעת פרט מהתמונה',
     'compare_readers' => 'השוואת שני מודלים שקוראים מוצרים',
     'collect_batches' => 'איסוף תשובות של קבוצות מהספק',
+    'build_expert_bank' => 'כתיבת בנק מאפיינים לחנות עצמה (ניסוי)',
 ];

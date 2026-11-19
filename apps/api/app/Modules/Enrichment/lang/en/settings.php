@@ -298,4 +298,68 @@ return [
         'label' => 'Longest answer about colour names',
         'description' => 'How many tokens each model may write in its answer about the night\'s colour names.',
     ],
+    'expert_bank_writer_provider' => [
+        'label' => 'Provider that writes the store\'s bank (experiment)',
+        'description' => 'A family other than the checker\'s. When the two families are the same the run fails before any model is asked.',
+    ],
+    'expert_bank_writer_model' => [
+        'label' => 'Model that writes the store\'s bank (experiment)',
+        'description' => 'An advanced model that knows the trade. Writes product types, attributes and values from the store\'s own words only.',
+    ],
+    'expert_bank_writer_input_usd_per_million' => [
+        'label' => 'Input price for the bank writer (per million tokens)',
+        'description' => 'For the cost of each run.',
+    ],
+    'expert_bank_writer_output_usd_per_million' => [
+        'label' => 'Output price for the bank writer (per million tokens)',
+        'description' => 'For the cost of each run.',
+    ],
+    'expert_bank_checker_provider' => [
+        'label' => 'Provider that checks the bank (experiment)',
+        'description' => 'A family other than the writer\'s.',
+    ],
+    'expert_bank_checker_model' => [
+        'label' => 'Model that checks the bank (experiment)',
+        'description' => 'Gives every type, attribute and value a score and a reason. It can only remove.',
+    ],
+    'expert_bank_checker_input_usd_per_million' => [
+        'label' => 'Input price for the bank checker (per million tokens)',
+        'description' => 'For the cost of each run.',
+    ],
+    'expert_bank_checker_output_usd_per_million' => [
+        'label' => 'Output price for the bank checker (per million tokens)',
+        'description' => 'For the cost of each run.',
+    ],
+    'expert_bank_sample' => [
+        'label' => 'Products shown whole to the bank writer',
+        'description' => 'A sample spread over everything the store sells: title, the store\'s own fields and the start of the description.',
+    ],
+    'expert_bank_max_products' => [
+        'label' => 'Most products the bank is measured on',
+        'description' => 'A larger catalogue is measured in part, the same products every run.',
+    ],
+    'expert_bank_min_score' => [
+        'label' => 'Score from which an item stays in the bank',
+        'description' => 'An item the checker scored lower is removed, and so is an item it left without a score.',
+    ],
+    'expert_bank_min_products' => [
+        'label' => 'Fewest products that must hold a value',
+        'description' => 'A value or a product type fewer products say is no filter.',
+    ],
+    'expert_bank_min_attribute_share' => [
+        'label' => 'Smallest share of products an attribute must cover',
+        'description' => 'Of the products of the types the attribute belongs to. An attribute covering less, or left with fewer than two values, is removed.',
+    ],
+    'expert_bank_min_type_share' => [
+        'label' => 'Share of products that must get a product type',
+        'description' => 'The bank as a whole passes only when at least this share of the store\'s products were read with a type.',
+    ],
+    'expert_bank_min_filterable_share' => [
+        'label' => 'Share of products that must get enough values to filter by',
+        'description' => 'The bank as a whole passes only when at least this share of the products got a value in the set number of attributes.',
+    ],
+    'expert_bank_values_per_product' => [
+        'label' => 'Attributes a product needs a value in to count as filterable',
+        'description' => 'Counted for each product, without the product type.',
+    ],
 ];

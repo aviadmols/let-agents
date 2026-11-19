@@ -26,4 +26,11 @@ final class AnthropicTuningTest extends TestCase
         $this->assertSame([], AnthropicChat::tuning('claude-haiku-4-5', 'low'), 'Haiku 4.5 takes budget_tokens, never effort');
         $this->assertSame([], AnthropicChat::tuning('claude-sonnet-4-5', 'low'));
     }
+
+    public function test_only_a_reply_allowed_a_long_piece_of_writing_is_waited_for_longer(): void
+    {
+        $this->assertSame(60.0, AnthropicChat::timeoutFor(4000));
+        $this->assertSame(60.0, AnthropicChat::timeoutFor(16000), 'every call there was waits as before');
+        $this->assertSame(300.0, AnthropicChat::timeoutFor(20000), 'a store\'s whole attribute bank');
+    }
 }

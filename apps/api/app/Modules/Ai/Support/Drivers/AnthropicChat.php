@@ -31,6 +31,14 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
 {
     private const TIMEOUT_SECONDS = 60.0;
 
+    /**
+     * A reply allowed more tokens than this is a long piece of writing (a store's whole attribute bank, by a model that
+     * thinks first): it is given LONG_REPLY_TIMEOUT_SECONDS. Every other call waits as before.
+     */
+    private const LONG_REPLY_TOKENS = 16000;
+
+    private const LONG_REPLY_TIMEOUT_SECONDS = 300.0;
+
     /** A model that searches waits for its pages. */
     private const SEARCH_TIMEOUT_SECONDS = 180.0;
 
@@ -129,6 +137,12 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
         );
     }
 
+    /** How long a reply is waited for: longer only for one allowed more than LONG_REPLY_TOKENS. */
+    public static function timeoutFor(int $maxOutputTokens): float
+    {
+        return $maxOutputTokens > self::LONG_REPLY_TOKENS ? self::LONG_REPLY_TIMEOUT_SECONDS : self::TIMEOUT_SECONDS;
+    }
+
     /**
      * @param  string|list<array<string, mixed>>  $content
      * @param  array<string, mixed>|null  $schema  held to it by the API (output_config.format), so it always parses
@@ -139,7 +153,7 @@ final class AnthropicChat implements StructuredChatDriver, VisionDriver, WebSear
         $output = array_filter(['format' => $schema === null ? null : ['type' => 'json_schema', 'schema' => $schema], 'effort' => $tune['effort'] ?? null]);
 
         try {
-            $message = (new Client(apiKey: $apiKey, requestOptions: RequestOptions::with(timeout: self::TIMEOUT_SECONDS, maxRetries: 1)))
+            $message = (new Client(apiKey: $apiKey, requestOptions: RequestOptions::with(timeout: self::timeoutFor($maxOutputTokens), maxRetries: 1)))
                 ->messages
                 ->create(
                     maxTokens: $maxOutputTokens,

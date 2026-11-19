@@ -1,0 +1,21 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["items"],
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "score", "verdict", "reason"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "score": {"type": "integer"},
+                    "verdict": {"type": "string", "enum": ["keep", "drop"]},
+                    "reason": {"type": "string"}
+                }
+            }
+        }
+    }
+}
