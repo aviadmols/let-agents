@@ -67,7 +67,8 @@
   var GOLD_KARAT = /(^|[^\p{L}\p{N}])([בהול]?זהב|gold)\s+(8|9|10|14|18|20|21|22|24)(?![\p{L}\p{N}.,])(?!\s*(?:סמ|ממ|מ|גרמ|גר|אינצ|cm|mm|m|g|gr|in)(?![\p{L}\p{N}]))/gu;
   var MAY_BE_GOLD = /(זהב|gold)\s+\d/;
   function karats(text) {
-    if (MAY_BE_KARAT.test(text)) { text = text.replace(KARAT, '$1$2k'); }
+    // ...never the fraction of a weight read once already ("0 21 קראט"; no lookbehind: an older Safari would not load)
+    if (MAY_BE_KARAT.test(text)) { text = text.replace(KARAT, function (all, before, n, at, whole) { return /\d\s$/.test(whole.slice(Math.max(0, at - 1), at + before.length)) ? all : before + n + 'k'; }); }
     return MAY_BE_GOLD.test(text) ? text.replace(GOLD_KARAT, '$1$2 $3k') : text;
   }
 

@@ -1259,7 +1259,9 @@ final class HebrewSearch
      */
     public static function karats(string $text): string
     {
-        $text = (string) preg_replace('~(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])~u', '$1$2k', $text);
+        // ...nor the fraction of a weight read once already ("0 21 קראט": keywords are stored normalized, and read again
+        // into the index, so every "1.21 קראט" became 21k: "טבעת זהב 21 קראט" found 95 diamond rings, Rocks 18.11)
+        $text = (string) preg_replace('~(^|[^\p{L}\p{N}.,])(?<!\d\s)(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])~u', '$1$2k', $text);
 
         // "זהב 21", "gold 18": a gold's karat without its word, as a jeweller says it; never a measure ("זהב 21 סמ")
         return (string) preg_replace(self::GOLD_KARAT, '$1$2 $3k', $text);

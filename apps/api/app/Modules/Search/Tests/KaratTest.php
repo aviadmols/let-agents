@@ -34,6 +34,8 @@ final class KaratTest extends TestCase
             'a space before K' => ['זהב 21 K', 'זהב 21k'],
             'as titles write it' => ['זהב 14K', 'זהב 14k'],
             'a weight stays a weight' => ['יהלום 0.21 קראט', 'יהלומ 0 21 קראט'],
+            'a weight read twice stays a weight' => ['יהלומ 0 21 קראט', 'יהלומ 0 21 קראט'],
+            'a karat after a word and a number of pieces' => ['39 יהלומים 21 קראט', '39 יהלומימ 21k'],
             'a weight with a comma' => ['2,21 קרט', '2 21 קרט'],
             'the word alone' => ['קראט', 'קראט'],
             'gold and its number' => ['יש לכם זהב 21?', 'יש לכמ זהב 21k'],
