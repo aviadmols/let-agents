@@ -91,6 +91,17 @@ final class BankEvidence
             ];
         }
 
+        // how many of a type's products no other type reads: taken out, they would be left with none (ExpertBankGate::checked)
+        foreach ($typeSets as $key => $set) {
+            $others = [];
+            foreach ($typeSets as $other => $otherSet) {
+                if ($other !== $key) {
+                    $others += $otherSet;
+                }
+            }
+            $types[$key]['alone'] = count(array_diff_key($set, $others));
+        }
+
         [, $typePairs] = $this->overlaps($typeSets);
         $filterable = count(array_filter($perProduct, fn (int $count): bool => $count >= $enough));
 
@@ -203,8 +214,10 @@ final class BankEvidence
     {
         return $this->memo[$where.'|'.$word] ??= (function () use ($word, $where): array {
             $pattern = ExpertBankShape::pattern($word);
-            // The word's first letters, to pass quickly over the products that cannot hold it.
-            $start = mb_substr((string) (preg_split('/[\s\-]+/u', $word, -1, PREG_SPLIT_NO_EMPTY)[0] ?? ''), 0, -1);
+            // The word's first letters, to pass quickly over the products that cannot hold it (three at most: a plural reads
+            // its singular too, "כפכפים" also "כפכף", ExpertBankShape::pattern).
+            $head = (string) (preg_split('/[\s\-]+/u', $word, -1, PREG_SPLIT_NO_EMPTY)[0] ?? '');
+            $start = mb_substr($head, 0, min(3, max(0, mb_strlen($head) - 1)));
             $found = [];
             foreach ($this->texts as $index => $text) {
                 if (($start === '' || str_contains($text[$where], $start)) && ($all = PatternMatch::all($text[$where], $pattern)) !== []) {

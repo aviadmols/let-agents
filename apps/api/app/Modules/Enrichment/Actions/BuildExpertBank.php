@@ -211,7 +211,7 @@ final class BuildExpertBank
                 $items = [...$items, ...array_values((array) ($reply['items'] ?? []))];
             }
             [$verdicts, $ignored] = ExpertBankGate::verdicts($ids, $items, $limits['min_score']);
-            [$bank, $dropped] = ExpertBankGate::checked($bank, $verdicts);
+            [$bank, $dropped] = ExpertBankGate::checked($bank, $verdicts, 'check', (array) $measured);
             $removed = [...$removed, ...$dropped];
             $say('expert_bank_step_check', ['model' => $checker->model, 'scored' => count($ids), 'dropped' => count($dropped), 'ignored' => count($ignored), 'usd' => self::usd(array_slice($calls, $before))]);
         } catch (ReplySchemaBroken $e) {

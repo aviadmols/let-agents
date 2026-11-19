@@ -310,8 +310,10 @@ final class ExpertBankTest extends TestCase
 
         ['bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
 
-        $this->assertSame([], $stored->bank['types'], 'every item was scored 92');
-        $this->assertSame(['no_types', 'no_attributes'], $stored->gate['hard_failures']);
+        // every item was scored 92: the attributes go; the types stay, each the only one its products have (19.11)
+        $this->assertSame([], $stored->bank['attributes']);
+        $this->assertSame(['ring', 'necklace', 'earrings'], array_column($stored->bank['types'], 'key'));
+        $this->assertSame(['no_attributes'], $stored->gate['hard_failures']);
         $this->assertSame(EnrichmentExpertBank::HELD, $stored->status);
     }
 

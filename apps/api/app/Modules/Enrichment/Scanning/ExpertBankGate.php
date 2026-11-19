@@ -23,6 +23,12 @@ final class ExpertBankGate
     /** The attribute of who a product is for (expert_bank v3), as the search's audience filter reads it. */
     public const AUDIENCE = 'audience';
 
+    /** A type the checker kept but scored under its threshold, this or more (doubtful, not wrong), stays while products only it reads would have none (checked). */
+    public const ALONE_MIN = 50;
+
+    /** ...and that many products at least are read by it alone. */
+    public const ALONE_PRODUCTS = 2;
+
     /** An attribute a shopper can filter by offers a choice: at least this many values. */
     public const MIN_VALUES = 2;
 
@@ -270,15 +276,24 @@ final class ExpertBankGate
      * The checker's verdicts applied: it can take out, and nothing else. An attribute goes with its values; a type
      * taken out is taken off the attributes that named it, and an attribute left naming none goes too.
      *
+     * A type is what a product is, not a filter to be worth its room: one the checker kept but scored doubtful (ALONE_MIN
+     * or more, under its threshold) stays while products only it reads would be left with none; one it dropped goes. The
+     * checker scored "כפכפים וסנדלים" (5 sandals) 60 for being few, and its products had no type (Vans, 19.11).
+     *
      * @param  array<string, array{score: ?int, verdict: ?string, reason: string, kept: bool, why: ?string}>  $verdicts
+     * @param  array<string, mixed>  $measured  the bank measured on the products (BankEvidence::measure): each type's `alone`
      * @return array{0: array{types: list<array<string, mixed>>, attributes: list<array<string, mixed>>}, 1: list<array<string, mixed>>}
      */
-    public static function checked(array $bank, array $verdicts, string $step = 'check'): array
+    public static function checked(array $bank, array $verdicts, string $step = 'check', array $measured = []): array
     {
         $removed = [];
-        $gone = function (array $item, string $kind) use ($verdicts, &$removed, $step): bool {
+        $gone = function (array $item, string $kind) use ($verdicts, &$removed, $step, $measured): bool {
             $verdict = $verdicts[$item['id']] ?? ['kept' => false, 'why' => 'unscored', 'score' => null, 'reason' => ''];
             if ($verdict['kept']) {
+                return false;
+            }
+            if ($kind === 'type' && $verdict['why'] === 'low_score' && $verdict['score'] !== null
+                && $verdict['score'] >= self::ALONE_MIN && (int) ($measured['types'][$item['key'] ?? '']['alone'] ?? 0) >= self::ALONE_PRODUCTS) {
                 return false;
             }
             $removed[] = self::removed($item, $kind, $verdict['why'] === 'unscored' ? 'code' : 'checker', $step, (string) $verdict['why'], ($verdict['score'] === null ? '' : $verdict['score'].': ').$verdict['reason']);
