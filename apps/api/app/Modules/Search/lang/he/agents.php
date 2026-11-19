@@ -9,4 +9,5 @@ return [
     'family_writer' => 'כותב משפחות מילים',
     'family_judge' => 'שופט משפחות מילים',
     'word_reader' => 'קורא מילים במשמעות',
+    'filter_layout' => 'מסדר את מסך המסננים',
 ];

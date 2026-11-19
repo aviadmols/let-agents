@@ -1,6 +1,6 @@
 // Runs the drawer's filter, search and answer parts in Node, with the few page objects they touch stubbed, and prints
 // the JSON value of an expression over them (DrawerFiltersTest). Usage: node drawer-harness.js <resources/search> '<expr>'
-// The expression sees T: { S, C, filtered, wouldCounts, facetChips, niceLabel, plainlySays, sized, handsOver, t }.
+// The expression sees T: { S, C, filtered, wouldCounts, facetChips, sheetGroups, niceLabel, plainlySays, sized, handsOver, t }.
 'use strict';
 const fs = require('fs');
 const vm = require('vm');
@@ -32,7 +32,7 @@ ctx.window = { document: ctx.document, navigator: ctx.navigator, location: ctx.l
 ctx.window.window = ctx.window;
 vm.createContext(ctx);
 vm.runInContext(engine, ctx);
-vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, resultsHtml: resultsHtml, toldOnScreen: toldOnScreen, conversationGoingOn: conversationGoingOn, money: money, priceLike: priceLike, capital: capital, similarLink: similarLink, activeRow: activeRow, peopleAsk: peopleAsk, miniRow: miniRow, unsaid: unsaid, liveStock: liveStock, buyBtn: buyBtn, privacyLink: privacyLink, asWhole: asWhole, t: t };\n})();', ctx);
+vm.runInContext('(function () {' + stub + parts + '\n;window.T = { S: S, C: C, filtered: filtered, wouldCounts: wouldCounts, facetChips: facetChips, sheetGroups: sheetGroups, niceLabel: niceLabel, plainlySays: plainlySays, sized: sized, handsOver: handsOver, noteHtml: noteHtml, setCounted: setCounted, resultsHtml: resultsHtml, toldOnScreen: toldOnScreen, conversationGoingOn: conversationGoingOn, money: money, priceLike: priceLike, capital: capital, similarLink: similarLink, activeRow: activeRow, peopleAsk: peopleAsk, miniRow: miniRow, unsaid: unsaid, liveStock: liveStock, buyBtn: buyBtn, privacyLink: privacyLink, asWhole: asWhole, t: t };\n})();', ctx);
 ctx.T = ctx.window.T;
 ctx.LANG_SET = ctx.window.LANG_SET;
 process.stdout.write(JSON.stringify(vm.runInContext(expression, ctx)));

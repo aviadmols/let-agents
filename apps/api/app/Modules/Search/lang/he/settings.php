@@ -569,4 +569,60 @@ return [
         'label' => 'אורך תשובה מרבי: חיפושי גולשים',
         'description' => 'מספיק לחיפושים ולשאלות של פעם אחת.',
     ],
+    'filter_layout_writer_provider' => [
+        'label' => 'הספק שמסדר את המסננים',
+        'description' => 'משפחה אחרת מזו של הבודק. כששתי המשפחות זהות הריצה נכשלת לפני כל פנייה למודל.',
+    ],
+    'filter_layout_writer_model' => [
+        'label' => 'המודל שמסדר את המסננים',
+        'description' => 'מודל מתקדם: הוא מציע את הסדר ואת מה שמוסתר.',
+    ],
+    'filter_layout_writer_input_usd_per_million' => [
+        'label' => 'מחיר קלט למיליון טוקנים: סידור המסננים',
+        'description' => 'לחישוב העלות בלבד.',
+    ],
+    'filter_layout_writer_output_usd_per_million' => [
+        'label' => 'מחיר פלט למיליון טוקנים: סידור המסננים',
+        'description' => 'לחישוב העלות בלבד.',
+    ],
+    'filter_layout_checker_provider' => [
+        'label' => 'הספק שבודק את סידור המסננים',
+        'description' => 'משפחה אחרת מזו של המודל שמסדר.',
+    ],
+    'filter_layout_checker_model' => [
+        'label' => 'המודל שבודק את סידור המסננים',
+        'description' => 'נותן ציון לכל שינוי ויכול רק לדחות.',
+    ],
+    'filter_layout_checker_input_usd_per_million' => [
+        'label' => 'מחיר קלט למיליון טוקנים: בדיקת הסידור',
+        'description' => 'לחישוב העלות בלבד.',
+    ],
+    'filter_layout_checker_output_usd_per_million' => [
+        'label' => 'מחיר פלט למיליון טוקנים: בדיקת הסידור',
+        'description' => 'לחישוב העלות בלבד.',
+    ],
+    'filter_layout_min_score' => [
+        'label' => 'הציון שממנו שינוי במסננים מוחל',
+        'description' => 'שינוי שהבודק נתן לו ציון נמוך מזה, דחה או לא נתן ציון, לא מוחל.',
+    ],
+    'filter_layout_min_filters' => [
+        'label' => 'הכי מעט מסננים שנשארים גלויים',
+        'description' => 'הסתרה שהייתה משאירה פחות מזה נדחית בקוד.',
+    ],
+    'filter_layout_max_values' => [
+        'label' => 'ערכים לכל מסנן שהמודלים רואים',
+        'description' => 'הנפוצים ביותר; השאר נשארים אחריהם בסדר של היום.',
+    ],
+    'filter_layout_duplicate_min_shared' => [
+        'label' => 'החפיפה שמסנן כפול צריך',
+        'description' => 'מסנן מוסתר ככפול רק כשלפחות אחוז כזה ממוצרי הקטן מביניהם נמצא גם בשני.',
+    ],
+    'filter_layout_duplicate_min_same_split' => [
+        'label' => 'כמה מסנן כפול צריך לחלק כמו השני',
+        'description' => 'מסנן מוסתר ככפול רק כשהוא מחלק את המוצרים המשותפים כמעט כמו המסנן שנשאר: כל ערך שלו בתוך ערך אחד של השני.',
+    ],
+    'filter_layout_move_min_cover' => [
+        'label' => 'החפיפה שערך שמועבר צריך',
+        'description' => 'ערך יוצא ממסנן מעורבב רק כשהערך שמחזיק אותו במסנן אחר מחזיק לפחות אחוז כזה מהמוצרים שלו.',
+    ],
 ];

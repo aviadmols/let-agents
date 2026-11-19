@@ -9,4 +9,5 @@ return [
     'family_writer' => 'Word family writer',
     'family_judge' => 'Word family judge',
     'word_reader' => 'Words by meaning reader',
+    'filter_layout' => 'Filter screen arranger',
 ];

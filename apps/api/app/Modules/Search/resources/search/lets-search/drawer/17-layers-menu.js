@@ -1,18 +1,16 @@
   // ---------------------------------------------------------------- filters + sort layers
   function filtersLayer(turn) {
     function draw() {
-      var fc = facetChips(turn, 0), c = C(turn), groups = {}, so = sortOf(c);
-      fc.codes.forEach(function (code) { var g = Math.floor(code / 1000); (groups[g] = groups[g] || []).push(code); });
-      // sizes in the order sizes go (35 to 48, S to L), as the filter holds them, never by how many carry each (Naot QA, 16.11)
-      Object.keys(groups).forEach(function (g) { if (numberedFacet(S.facets[g])) { groups[g].sort(bySize); } });
+      // the filters and their values in the order the sheet shows them (sheetGroups: the store's layout, sizes by size)
+      var sheet = sheetGroups(turn), fc = sheet.fc, c = C(turn), so = sortOf(c);
       var html = activeRow(turn) ? '<div class="ls-fgroup ls-fgroup--active"><div class="ls-fgroup__t">' + esc(t('activeFilters')) + '</div>' + activeRow(turn) + '</div>' : '';
       html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(t('sort')) + '</div><div class="ls-chips">' + ['', 'asc', 'desc', 'new'].map(function (s) { return '<button class="ls-chip" aria-pressed="' + (so === s) + '" data-fsort="' + s + '"><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + esc(sortLabel(s)) + '</button>'; }).join('') + '</div></div>';
       if (fc.stock || fc.sale || onStock(c) || onSale(c)) {
         html += '<div class="ls-fgroup"><div class="ls-fgroup__t">' + esc(LANG === 'he' ? 'זמינות' : 'Availability') + '</div><div class="ls-chips">' + ((fc.stock || onStock(c)) ? chip(t('inStock'), onStock(c), 'stock', turn.id, c.autoStock && !c.stock && !!c.saidStock) : '') + ((fc.sale || onSale(c)) ? chip(t('onSale'), onSale(c), 'sale', turn.id, c.autoSale && !c.sale) : '') + '</div></div>';
       }
-      Object.keys(groups).forEach(function (g) {
-        var facet = S.facets[g], colours = groups[g].some(function (code) { return swatch(facet, facet.v[code % 1000]); });
-        html += '<div class="ls-fgroup' + (colours ? ' ls-fgroup--colour' : '') + '"><div class="ls-fgroup__t">' + esc(facet.l) + '</div><div class="ls-chips">' + groups[g].map(function (code) {
+      sheet.groups.forEach(function (group) {
+        var facet = S.facets[group[0]], codes = group[1], colours = codes.some(function (code) { return swatch(facet, facet.v[code % 1000]); });
+        html += '<div class="ls-fgroup' + (colours ? ' ls-fgroup--colour' : '') + '"><div class="ls-fgroup__t">' + esc(facet.l) + '</div><div class="ls-chips">' + codes.map(function (code) {
           var v = facet.v[code % 1000];
           return chip(asWhole(facet, v, niceLabel(facet, v.l)), onCode(c, code), 'f:' + code, turn.id, c.auto[code] && !c.f[code], swatch(facet, v), fc.counts[code]);
         }).join('') + '</div></div>';

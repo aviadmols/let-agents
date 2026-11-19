@@ -121,4 +121,8 @@ return [
         'label' => 'Search check after a scan',
         'description' => 'At the end of every scan the search is tried on searches made from the products and on searches like a shopper\'s; what fails is mended for this store alone, and a report is sent.',
     ],
+    'filter_layout' => [
+        'label' => 'Filter layout',
+        'description' => 'An advanced model arranges the store\'s filter screen: the order of the filters and of their values, and hides duplicate or messy filters. A model of the other family checks every change, and code applies only order and hiding, never renaming or adding. On request only.',
+    ],
 ];

@@ -30,6 +30,7 @@ use App\Modules\Search\Console\RecountSearchesCommand;
 use App\Modules\Search\Console\ResumePictureScansCommand;
 use App\Modules\Search\Console\SearchCommand;
 use App\Modules\Search\Console\WordAuditCommand;
+use App\Modules\Search\Contracts\FilterLayouts;
 use App\Modules\Search\Contracts\PageTags;
 use App\Modules\Search\Contracts\ProductsForQuery;
 use App\Modules\Search\Listeners\RebuildSearchIndex;
@@ -50,6 +51,7 @@ use App\Modules\Search\Support\SearchShopFacts;
 use App\Modules\Search\Support\SearchToday;
 use App\Modules\Search\Support\SpellingProductsForQuery;
 use App\Modules\Search\Support\SpellingProductsNamed;
+use App\Modules\Search\Support\StoredFilterLayouts;
 use App\Modules\Search\Support\StoredPageTags;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
@@ -84,6 +86,8 @@ final class SearchServiceProvider extends ModuleServiceProvider
     protected function bootModule(): void
     {
         $this->app->bind(PageTags::class, StoredPageTags::class);
+        // how a store's filter screen is arranged, as the index applies it (ArrangeFilters)
+        $this->app->bind(FilterLayouts::class, StoredFilterLayouts::class);
         $this->app->bind(ProductsForQuery::class, SpellingProductsForQuery::class);
         $this->app->bind(PriceRange::class, HebrewPriceRange::class);
         $this->app->bind(ProductsNamed::class, SpellingProductsNamed::class);

@@ -135,6 +135,10 @@
         {
             "name": "scan_check",
             "default": true
+        },
+        {
+            "name": "filter_layout",
+            "default": false
         }
     ],
     "settings": [
@@ -1432,6 +1436,134 @@
             "max": 8000,
             "scope": "global",
             "unit": "tokens"
+        },
+        {
+            "name": "filter_layout_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "filter_layout_writer_model",
+            "type": "string",
+            "default": "claude-opus-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "filter_layout_writer_input_usd_per_million",
+            "type": "float",
+            "default": 4,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "filter_layout_writer_output_usd_per_million",
+            "type": "float",
+            "default": 20,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "filter_layout_checker_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "filter_layout_checker_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "filter_layout_checker_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "filter_layout_checker_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "filter_layout_min_score",
+            "type": "int",
+            "default": 70,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "points"
+        },
+        {
+            "name": "filter_layout_min_filters",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 10,
+            "scope": "shop",
+            "unit": "filters"
+        },
+        {
+            "name": "filter_layout_max_values",
+            "type": "int",
+            "default": 60,
+            "min": 10,
+            "max": 300,
+            "scope": "shop",
+            "unit": "values"
+        },
+        {
+            "name": "filter_layout_duplicate_min_shared",
+            "type": "int",
+            "default": 50,
+            "min": 10,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "filter_layout_duplicate_min_same_split",
+            "type": "int",
+            "default": 70,
+            "min": 30,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "filter_layout_move_min_cover",
+            "type": "int",
+            "default": 80,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
         }
     ],
     "agents": [
@@ -1662,6 +1794,45 @@
             "run": {
                 "command": "search",
                 "step": "check",
+                "shop_argument": "target"
+            }
+        },
+        {
+            "name": "filter_layout",
+            "action": "arrange_filters",
+            "when": "on_request",
+            "features": [
+                "filter_layout"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "filter_layout_writer_provider",
+                    "model": "filter_layout_writer_model",
+                    "prices": [
+                        "filter_layout_writer_input_usd_per_million",
+                        "filter_layout_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "filter_layout"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "filter_layout_checker_provider",
+                    "model": "filter_layout_checker_model",
+                    "prices": [
+                        "filter_layout_checker_input_usd_per_million",
+                        "filter_layout_checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "filter_layout_check"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "search",
+                "step": "layout",
                 "shop_argument": "target"
             }
         }
