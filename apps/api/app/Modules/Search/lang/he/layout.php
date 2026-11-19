@@ -1,0 +1,66 @@
+<?php
+
+// What `search layout {shop}` prints for the team (SearchCommand::layout): the filter screen before and after, and
+// every change with the checker's score.
+return [
+    'one_shop' => 'סידור המסננים רץ לחנות אחת בשם, אף פעם לא לכל החנויות.',
+    'off' => 'סידור המסננים כבוי לחנות הזאת.',
+    'none' => 'אין לחנות הזאת סידור מסננים שמור.',
+    'cleared' => 'סידור המסננים נמחק (:count רשומות). המסננים חוזרים לסדר שהקוד בונה.',
+    'reindexed' => 'אינדקס החיפוש נבנה מחדש, והמגירה מקבלת את המסך הזה.',
+    'stored' => 'נשמר: search_filter_layouts :id (:status), $:usd',
+    'status' => [
+        'applied' => 'הוחל',
+        'kept' => 'בלי שינוי',
+        'failed' => 'נכשל',
+    ],
+    'before' => 'לפני:',
+    'after' => 'אחרי:',
+    'filter' => ':n. :label (:products מוצרים)',
+    'more' => 'ועוד :count',
+    'hidden' => 'מוסתר: :label (:reason)',
+    'changes' => 'השינויים שהוצעו:',
+    'item' => '  [:kind] :what',
+    'score' => 'ציון :score, :state. :reason',
+    'why' => 'הכותב: :why',
+    'ignored' => 'הקוד התעלם מ־:count דברים בהצעה:',
+    'note' => 'הערה של הכותב: :note',
+    'kind' => [
+        'order' => 'סדר המסננים',
+        'values' => 'סדר ערכים',
+        'hide' => 'הסתרה',
+        'move' => 'העברת ערך',
+    ],
+    'reason' => [
+        'duplicate' => 'כפול של :of',
+        'mixed_heap' => 'ערבוב של סוגים',
+        'too_few_products' => 'מעט מדי מוצרים',
+        'says_nothing' => 'לא אומר לגולש כלום',
+        'unreadable_values' => 'ערכים שלא נקראים',
+    ],
+    'state' => [
+        'applied' => 'הוחל',
+        'unscored' => 'לא קיבל ציון, לא הוחל',
+        'vetoed' => 'הבודק דחה',
+        'low_score' => 'ציון נמוך מהסף, לא הוחל',
+        'refused' => 'עבר את הבודק והקוד דחה: :why',
+    ],
+    'refusal' => [
+        'kept_for_duplicate' => 'הוא המסנן שנשאר במקום כפול שהוסתר',
+        'twin_hidden' => 'המסנן שהיה אמור להישאר הוסתר בעצמו',
+        'too_few_filters' => 'היו נשארים פחות מסננים מהמינימום',
+        'filter_hidden' => 'המסנן הוסתר',
+        'target_hidden' => 'המסנן שהערך עובר אליו הוסתר',
+        'too_few_values' => 'במסנן היה נשאר ערך אחד',
+    ],
+    'ignore' => [
+        'unknown_filter' => 'מסנן שאין במסך',
+        'unknown_value' => 'ערך שאין במסנן',
+        'unknown_reason' => 'סיבה שאינה ברשימה',
+        'unknown_duplicate' => 'כפול של מסנן שאין במסך',
+        'no_overlap' => 'המוצרים לא מראים את זה (חפיפה או חלוקה)',
+        'twice' => 'הופיע פעמיים',
+        'too_few_values' => 'פחות משני ערכים',
+        'same_as_now' => 'זה הסדר של היום',
+    ],
+];

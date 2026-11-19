@@ -470,7 +470,7 @@
     // where it is, so it can be taken off; the order is the results', so nothing moves, a value only leaves or comes back
     // (a new one never comes in under the finger: Jean Rachel QA, 16.11). The row over the results offers only what narrows.
     var codes = Object.keys(counts).map(Number).filter(function (code) {
-      if (twinOfLength(Math.floor(code / 1000))) { return false; }
+      if (twinOfLength(Math.floor(code / 1000)) || laidAside(code)) { return false; }
       var g = Math.floor(code / 1000), facet = S.facets[g], value = facet && facet.v[code % 1000];
       if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
       if (onCode(c, code)) { return true; }
@@ -592,11 +592,39 @@
     if (x !== null && y !== null) { return x - y || a - b; }
     return x !== null ? -1 : y !== null ? 1 : a - b;
   }
-  // the chips of a size filter in its own order, in the places they hold among the others
+  // The store's filter screen as arranged (the index's layout, ArrangeFilters): a filter hidden (hide) or a value taken
+  // out of a filter that another already offers (vh) is not offered, its codes kept as they are; a filter's place (o)
+  // and its values' order (vo) are what the sheet shows them in. With no layout, nothing here changes a thing.
+  function laidAside(code) {
+    var f = S.facets[Math.floor(code / 1000)];
+    return !!f && (!!f.hide || (!!f.vh && f.vh.indexOf(code % 1000) >= 0));
+  }
+  function laidOut(f) { return !!f && !!f.vo && f.vo.length > 1; }
+  function facetRank(g) { var f = S.facets[g]; return f && typeof f.o === 'number' ? f.o : 1e6; }
+  // two values of one filter in the layout's order, those it does not name after it; with none, a numbered filter's by
+  // number, any other as they came (the results' order)
+  function byLayout(a, b) {
+    var f = S.facets[Math.floor(a / 1000)], x = laidOut(f) ? f.vo.indexOf(a % 1000) : -1, y = laidOut(f) ? f.vo.indexOf(b % 1000) : -1;
+    if (x >= 0 && y >= 0) { return x - y; }
+    if (x >= 0 || y >= 0) { return x >= 0 ? -1 : 1; }
+    return numberedFacet(f) ? bySize(a, b) : 0;
+  }
+  // The filter sheet's groups: each filter offered with its values, the filters in the layout's order (the index's
+  // without one), each one's values in its own order where it has one. A press changes neither: the order is the
+  // layout's and the results', never what is chosen, so a value chosen stays where it is.
+  function sheetGroups(turn) {
+    var fc = facetChips(turn, 0), groups = {};
+    fc.codes.forEach(function (code) { var g = Math.floor(code / 1000); (groups[g] = groups[g] || []).push(code); });
+    // sizes in the order sizes go (35 to 48, S to L), as the filter holds them, never by how many carry each (Naot QA, 16.11)
+    Object.keys(groups).forEach(function (g) { if (laidOut(S.facets[g]) || numberedFacet(S.facets[g])) { groups[g].sort(byLayout); } });
+    var order = Object.keys(groups).map(Number).sort(function (a, b) { return facetRank(a) - facetRank(b) || a - b; });
+    return { fc: fc, groups: order.map(function (g) { return [g, groups[g]]; }) };
+  }
+  // the chips of a size filter (or of a filter the layout orders) in its own order, in the places they hold among the others
   function sizesInOrder(codes) {
     var places = {}, out = codes.slice();
-    codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (numberedFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
-    Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(bySize); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
+    codes.forEach(function (code, i) { var g = Math.floor(code / 1000); if (laidOut(S.facets[g]) || numberedFacet(S.facets[g])) { (places[g] = places[g] || []).push(i); } });
+    Object.keys(places).forEach(function (g) { var sorted = places[g].map(function (i) { return codes[i]; }).sort(byLayout); places[g].forEach(function (i, k) { out[i] = sorted[k]; }); });
     return out;
   }
   // A version named by what tells it from its siblings, never the whole product name: "Buzz - WEK White Floral Rose Gold"

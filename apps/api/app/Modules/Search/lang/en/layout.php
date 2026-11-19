@@ -1,0 +1,66 @@
+<?php
+
+// What `search layout {shop}` prints for the team (SearchCommand::layout): the filter screen before and after, and
+// every change with the checker's score.
+return [
+    'one_shop' => 'The filter layout runs for one named shop, never for every shop.',
+    'off' => 'The filter layout is off for this store.',
+    'none' => 'This store has no stored filter layout.',
+    'cleared' => 'The filter layout is removed (:count rows). The filters go back to the order code builds.',
+    'reindexed' => 'The search index was built again, and the drawer gets this screen.',
+    'stored' => 'Stored: search_filter_layouts :id (:status), $:usd',
+    'status' => [
+        'applied' => 'applied',
+        'kept' => 'no change',
+        'failed' => 'failed',
+    ],
+    'before' => 'Before:',
+    'after' => 'After:',
+    'filter' => ':n. :label (:products products)',
+    'more' => 'and :count more',
+    'hidden' => 'Hidden: :label (:reason)',
+    'changes' => 'The changes proposed:',
+    'item' => '  [:kind] :what',
+    'score' => 'Score :score, :state. :reason',
+    'why' => 'Proposer: :why',
+    'ignored' => 'Code ignored :count things in the proposal:',
+    'note' => 'Proposer\'s note: :note',
+    'kind' => [
+        'order' => 'filter order',
+        'values' => 'value order',
+        'hide' => 'hide',
+        'move' => 'value moved',
+    ],
+    'reason' => [
+        'duplicate' => 'duplicate of :of',
+        'mixed_heap' => 'a heap of kinds',
+        'too_few_products' => 'too few products',
+        'says_nothing' => 'tells a shopper nothing',
+        'unreadable_values' => 'unreadable values',
+    ],
+    'state' => [
+        'applied' => 'applied',
+        'unscored' => 'not scored, not applied',
+        'vetoed' => 'vetoed by the checker',
+        'low_score' => 'under the threshold, not applied',
+        'refused' => 'passed the checker and code refused: :why',
+    ],
+    'refusal' => [
+        'kept_for_duplicate' => 'it is the filter kept in place of a hidden duplicate',
+        'twin_hidden' => 'the filter meant to stay was hidden itself',
+        'too_few_filters' => 'fewer filters than the minimum would be left',
+        'filter_hidden' => 'the filter was hidden',
+        'target_hidden' => 'the filter the value moves to was hidden',
+        'too_few_values' => 'the filter would be left with one value',
+    ],
+    'ignore' => [
+        'unknown_filter' => 'a filter not on the screen',
+        'unknown_value' => 'a value not in the filter',
+        'unknown_reason' => 'a reason not on the list',
+        'unknown_duplicate' => 'a duplicate of a filter not on the screen',
+        'no_overlap' => 'the products do not show it (overlap or split)',
+        'twice' => 'given twice',
+        'too_few_values' => 'fewer than two values',
+        'same_as_now' => 'it is today\'s order',
+    ],
+];

@@ -1,0 +1,68 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["filter_order", "filter_order_why", "value_orders", "hides", "splits", "notes"],
+    "properties": {
+        "filter_order": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "filter_order_why": {"type": "string"},
+        "value_orders": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["filter", "values", "why"],
+                "properties": {
+                    "filter": {"type": "string"},
+                    "values": {"type": "array", "items": {"type": "string"}},
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "hides": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["filter", "reason", "duplicate_of", "why"],
+                "properties": {
+                    "filter": {"type": "string"},
+                    "reason": {"type": "string", "enum": ["duplicate", "mixed_heap", "too_few_products", "says_nothing", "unreadable_values"]},
+                    "duplicate_of": {"type": "string"},
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "splits": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["filter", "moves", "why"],
+                "properties": {
+                    "filter": {"type": "string"},
+                    "moves": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["value", "into", "as"],
+                            "properties": {
+                                "value": {"type": "string"},
+                                "into": {"type": "string"},
+                                "as": {"type": "string"}
+                            }
+                        }
+                    },
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "notes": {
+            "type": "array",
+            "items": {"type": "string"}
+        }
+    }
+}

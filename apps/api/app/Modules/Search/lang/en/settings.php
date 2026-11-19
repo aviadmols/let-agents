@@ -569,4 +569,60 @@ return [
         'label' => 'Longest answer: shoppers\' searches',
         'description' => 'Enough for one set of searches and questions.',
     ],
+    'filter_layout_writer_provider' => [
+        'label' => 'Provider that arranges the filters',
+        'description' => 'A family other than the checker\'s. When both are one family the run fails before any model is asked.',
+    ],
+    'filter_layout_writer_model' => [
+        'label' => 'Model that arranges the filters',
+        'description' => 'An advanced model: it proposes the order and what is hidden.',
+    ],
+    'filter_layout_writer_input_usd_per_million' => [
+        'label' => 'Input price per million tokens: filter layout',
+        'description' => 'For the cost only.',
+    ],
+    'filter_layout_writer_output_usd_per_million' => [
+        'label' => 'Output price per million tokens: filter layout',
+        'description' => 'For the cost only.',
+    ],
+    'filter_layout_checker_provider' => [
+        'label' => 'Provider that checks the filter layout',
+        'description' => 'A family other than the one that arranges.',
+    ],
+    'filter_layout_checker_model' => [
+        'label' => 'Model that checks the filter layout',
+        'description' => 'Scores every change and can only veto.',
+    ],
+    'filter_layout_checker_input_usd_per_million' => [
+        'label' => 'Input price per million tokens: layout check',
+        'description' => 'For the cost only.',
+    ],
+    'filter_layout_checker_output_usd_per_million' => [
+        'label' => 'Output price per million tokens: layout check',
+        'description' => 'For the cost only.',
+    ],
+    'filter_layout_min_score' => [
+        'label' => 'Score from which a filter change is applied',
+        'description' => 'A change the checker scored lower, vetoed or left unscored is not applied.',
+    ],
+    'filter_layout_min_filters' => [
+        'label' => 'Fewest filters left visible',
+        'description' => 'A hide that would leave fewer is refused by code.',
+    ],
+    'filter_layout_max_values' => [
+        'label' => 'Values per filter the models see',
+        'description' => 'The most common; the rest stay after them in today\'s order.',
+    ],
+    'filter_layout_duplicate_min_shared' => [
+        'label' => 'Overlap a duplicate filter needs',
+        'description' => 'A filter is hidden as a duplicate only when at least this share of the smaller one\'s products is in the other too.',
+    ],
+    'filter_layout_duplicate_min_same_split' => [
+        'label' => 'How alike a duplicate filter must split',
+        'description' => 'A filter is hidden as a duplicate only when it splits the shared products nearly as the filter kept does: each of its values inside one of the other\'s.',
+    ],
+    'filter_layout_move_min_cover' => [
+        'label' => 'Overlap a moved value needs',
+        'description' => 'A value leaves a mixed filter only when the value holding it in another filter holds at least this share of its products.',
+    ],
 ];

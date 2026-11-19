@@ -24,12 +24,14 @@ use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Enums\RunTrigger;
 use App\Modules\Runs\Models\Run;
+use App\Modules\Search\Contracts\FilterLayouts;
 use App\Modules\Search\Contracts\ProductTags;
 use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchLearned;
 use App\Modules\Search\Models\SearchSynonym;
 use App\Modules\Search\Support\Colours;
 use App\Modules\Search\Support\Evidence;
+use App\Modules\Search\Support\FilterLayoutGate;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\Looks;
 use App\Modules\Search\Support\ShownQuestion;
@@ -528,6 +530,13 @@ final class BuildSearchIndex
             $items[] = $this->record('a:'.$answer['id'], 'answer', $answer['question'], [], $synonyms, ['ans' => $answer['answer'], 'src' => $answer['sources'], 'w' => $answer['store'] ? 1 : null,
                 'ak' => $answer['kind'], 'an' => $answer['asked']] + ($answer['picks'] === [] ? [] : ['pk' => $answer['picks']]));
             $counts['answer']++;
+        }
+
+        // The store's filter screen as arranged (ArrangeFilters), while its flag is on: only an order and hiding, on the
+        // facets as built. No code moves: a hidden filter is marked, its codes kept, so every product's f stays as it is.
+        $layout = app()->bound(FilterLayouts::class) ? app(FilterLayouts::class)->applied($shopId) : null;
+        if ($layout !== null) {
+            $facets['facets'] = FilterLayoutGate::onFacets($facets['facets'], $layout);
         }
 
         $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'],

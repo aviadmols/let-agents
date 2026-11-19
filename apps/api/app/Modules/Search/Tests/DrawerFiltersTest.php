@@ -101,6 +101,36 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([1001, 1000, 1002], $out[1], 'the length filter in the order of its days');
     }
 
+    public function test_the_stores_layout_orders_the_sheet_hides_what_it_hides_and_a_chosen_value_stays_in_place(): void
+    {
+        // the filter layout (ArrangeFilters, 19.11): a filter's place (o), its values' order (vo), a filter hidden (hide)
+        // and a value taken out of a mixed filter (vh), every code as it was
+        $store = <<<'JS'
+            S.facets = [
+              { k: 'store_tags', l: 'Tags', v: [{ k: 't1', l: 'Gift' }, { k: 't2', l: 'New' }] },
+              { k: 'category', l: 'Kind', v: [{ k: 'a', l: 'Hiking' }, { k: 'b', l: 'Cycling' }, { k: 'c', l: 'Sailing' }] },
+              { k: 'tag:dup', l: 'Duplicate', v: [{ k: 'x', l: 'One' }, { k: 'y', l: 'Two' }] },
+              { k: 'variant_size', l: 'Size', v: [{ k: 'L', l: 'L' }, { k: 'S', l: 'S' }, { k: 'M', l: 'M' }] },
+              { k: 'mixed', l: 'Mixed', v: [{ k: 'm1', l: 'Beach' }, { k: 'm2', l: 'Italy' }, { k: 'm3', l: 'Family' }] }
+            ];
+            S.records = {};
+            [[1, [0, 1000, 2000, 3000, 4000, 4001]], [2, [1, 1000, 2001, 3001, 4001, 4002]], [3, [0, 1001, 2000, 3002, 4000]], [4, [1, 1000, 2001, 3001, 4002]], [5, [0, 1002, 2000, 3000, 4001]]].forEach(function (p) {
+              S.records['p:' + p[0]] = { id: 'p:' + p[0], t: 'product', title: 'Trip ' + p[0], s: 1, kw: '', f: p[1] };
+            });
+            var laid = function () { S.facets[1].o = 0; S.facets[1].vo = [2, 0, 1]; S.facets[2].hide = 1; S.facets[3].o = 1; S.facets[3].vo = [1, 2, 0]; S.facets[4].vh = [1]; };
+            var groups = function (c) { return T.sheetGroups(turn('trip', [1, 2, 3, 4, 5], c || {})).groups; };
+            JS;
+
+        // with no layout the sheet is as it always was: the filters in the index's order, values the most held first, sizes by size
+        $this->assertSame([[0, [0, 1]], [1, [1000, 1001, 1002]], [2, [2000, 2001]], [3, [3000, 3001, 3002]], [4, [4001, 4000, 4002]]], self::drawer('(function () { '.$store.' return groups(); })()'));
+
+        $out = self::drawer('(function () { '.$store.' laid(); var row = T.facetChips(turn(\'trip\', [1, 2, 3, 4, 5], {}), 99).codes; return [groups(), groups({ f: { 1001: true } })[0], row.filter(function (c) { return c === 2000 || c === 2001 || c === 4001; })]; })()');
+
+        $this->assertSame([[1, [1002, 1000, 1001]], [3, [3001, 3002, 3000]], [0, [0, 1]], [4, [4000, 4002]]], $out[0], 'the layout\'s filters first in its order, their values in its order; the hidden filter and the moved value are not offered');
+        $this->assertSame([1, [1002, 1000, 1001]], $out[1], 'a value chosen stays where it is');
+        $this->assertSame([], $out[2], 'nor in the row over the results');
+    }
+
     public function test_values_a_product_holds_several_of_go_together_and_the_counts_are_what_pressing_shows(): void
     {
         // Rocks, 19.11: "פנינה (3)" beside a chosen "יהלום" showed 42, most with no pearl. Stones: a ring holds several, so two

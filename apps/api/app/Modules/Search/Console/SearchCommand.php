@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Runs\Enums\RunTrigger;
+use App\Modules\Search\Actions\ArrangeFilters;
 use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Search\Actions\CheckStoreSearch;
 use App\Modules\Search\Actions\LearnFromSearches;
@@ -15,9 +16,12 @@ use App\Modules\Search\Actions\SettleWordFamilies;
 use App\Modules\Search\Actions\WritePageTags;
 use App\Modules\Search\Actions\WriteWordFamilies;
 use App\Modules\Search\Models\SearchClick;
+use App\Modules\Search\Models\SearchFilterLayout;
+use App\Modules\Search\Models\SearchIndex;
 use App\Modules\Search\Models\SearchPhotoAsk;
 use App\Modules\Search\Models\SearchShare;
 use App\Modules\Search\Models\SearchTerm;
+use App\Modules\Search\Support\FilterLayoutGate;
 use App\Modules\Search\Support\StoredPageTags;
 use App\Modules\Tenancy\Enums\ShopStatus;
 use App\Modules\Tenancy\Models\Shop;
@@ -34,17 +38,22 @@ use Illuminate\Console\Command;
  *   search tags gueta-avigdor             write and check the tags the pages offer
  *   search tags --all                     what the schedule runs, for shops with the flag on
  *   search check gueta-avigdor            try the search as shoppers will, mend what fails, report (a scan's last step)
+ *   search layout gueta-avigdor           arrange the filter screen (two models, code applies only order and hiding)
+ *   search layout gueta-avigdor --show    the stored arrangement; --clear removes it (the screen as code builds it)
  *   search prune                          drop counts older than search.keep_days
  */
 final class SearchCommand extends Command
 {
     protected $signature = 'search
-        {step : index, resolve, tags, check, try or prune}
+        {step : index, resolve, tags, check, layout, try or prune}
         {target? : shop slug or ID}
         {query? : what to search, for try}
-        {--all : every active shop}';
+        {--all : every active shop}
+        {--show : layout: print the stored arrangement, ask no model}
+        {--clear : layout: remove the shop arrangement}
+        {--force : layout: ask again though the screen is unchanged}';
 
-    protected $description = 'Build a shop\'s search index, try a query, or prune old counts.';
+    protected $description = 'Build a shop\'s search index, arrange its filters, try a query, or prune old counts.';
 
     public function handle(TenantContext $tenant): int
     {
@@ -54,6 +63,7 @@ final class SearchCommand extends Command
             'resolve' => $this->resolve(),
             'tags' => $this->tags(),
             'check' => $this->check(),
+            'layout' => $this->layout(),
             'try' => $this->try(),
             'prune' => $this->prune(),
             default => $this->failWith('Unknown step.'),
@@ -192,6 +202,150 @@ final class SearchCommand extends Command
         $this->line("{$shop->slug}: ".$run->summary());
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The filter screen arranged for one named shop, never for every shop and never on a schedule (ArrangeFilters): the
+     * screen before and after, in Hebrew, and every change with the checker's score and reason. Applied, the index is
+     * built again so the drawer gets it.
+     */
+    private function layout(): int
+    {
+        $he = fn (string $key, array $params = []): string => (string) trans('search::layout.'.$key, $params, 'he');
+        if ($this->option('all')) {
+            return $this->failWith($he('one_shop'));
+        }
+        $shop = $this->shop();
+        if ($shop === null) {
+            return $this->failWith('Shop not found.');
+        }
+        $tenant = app(TenantContext::class);
+
+        if ($this->option('clear')) {
+            $removed = (int) $tenant->run($shop->id, fn (): int => SearchFilterLayout::query()->delete());
+            $this->line($he('cleared', ['count' => $removed]));
+            if ($tenant->run($shop->id, fn (): bool => SearchIndex::query()->exists())) {
+                app(BuildSearchIndex::class)->handle($shop->id);
+                $this->line($he('reindexed'));
+            }
+
+            return self::SUCCESS;
+        }
+
+        if ($this->option('show')) {
+            $stored = $tenant->run($shop->id, fn (): ?SearchFilterLayout => SearchFilterLayout::query()->orderByDesc('created_at')->orderByDesc('id')->first());
+            if ($stored === null) {
+                return $this->failWith($he('none'));
+            }
+            $this->showLayout($stored, $he);
+
+            return self::SUCCESS;
+        }
+
+        if (! Features::enabled(ArrangeFilters::FEATURE, $shop->id)) {
+            $this->line($he('off'));
+
+            return self::SUCCESS;
+        }
+
+        ['run' => $run, 'layout' => $stored] = app(ArrangeFilters::class)->handle($shop->id, (bool) $this->option('force'));
+        foreach ((array) ($run->output['steps'] ?? []) as $step) {
+            $this->line((string) $step);
+        }
+        $this->line("{$shop->slug}: ".$run->summary());
+        if ($stored !== null) {
+            $this->showLayout($stored, $he);
+        }
+        if ($run->status->value === 'succeeded' && $stored !== null && $stored->status === SearchFilterLayout::APPLIED && empty($run->output['unchanged'])) {
+            app(BuildSearchIndex::class)->handle($shop->id);
+            $this->line($he('reindexed'));
+        }
+
+        return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /** @param  callable(string, array<string, mixed>=): string  $he */
+    private function showLayout(SearchFilterLayout $stored, callable $he): void
+    {
+        $this->info($he('stored', ['id' => $stored->id, 'status' => $he('status.'.$stored->status), 'usd' => number_format((float) $stored->cost_usd, 2, '.', '')]));
+        foreach ((array) $stored->problems as $problem) {
+            $this->line('  '.$problem);
+        }
+        if (! is_array($stored->screen)) {
+            return;
+        }
+        $labels = array_column((array) ($stored->screen['filters'] ?? []), 'label', 'key');
+        $print = function (string $title, array $screen) use ($he, $labels): void {
+            $this->line('');
+            $this->line($title);
+            foreach ($screen['shown'] as $n => $filter) {
+                $this->line($he('filter', ['n' => $n + 1, 'label' => $filter['label'], 'products' => $filter['products']]));
+                $values = array_map(fn (array $v): string => $v['label'].' ('.$v['products'].')', $filter['values']);
+                $this->line('     '.implode(', ', $values).($filter['more'] > 0 ? ' '.$he('more', ['count' => $filter['more']]) : ''));
+            }
+            foreach ($screen['hidden'] as $filter) {
+                $this->line($he('hidden', ['label' => $filter['label'], 'reason' => self::layoutReason($filter['reason'], $he, $labels)]));
+            }
+        };
+        $print($he('before'), FilterLayoutGate::screen($stored->screen));
+        if ($stored->status !== SearchFilterLayout::FAILED) {
+            $print($he('after'), FilterLayoutGate::screen($stored->screen, (array) $stored->applied));
+        }
+
+        $items = (array) $stored->items;
+        if ($items !== []) {
+            $this->line('');
+            $this->line($he('changes'));
+        }
+        $verdicts = (array) ($stored->review['verdicts'] ?? []);
+        $refused = array_column((array) ($stored->refused['refused'] ?? []), 'why', 'id');
+        foreach ($items as $item) {
+            $what = match ($item['kind']) {
+                'order' => implode(' › ', (array) $item['labels']),
+                'values' => $item['label'].': '.implode(' › ', (array) $item['labels']),
+                'hide' => $item['label'].' ('.self::layoutReason((string) $item['reason'], $he, $labels).')',
+                'move' => $item['label'].' › '.$item['value_label'].' → '.$item['into_label'].' › '.$item['as_label'].' ('.(int) round(100 * (float) $item['cover']).'%)',
+                default => '',
+            };
+            $verdict = $verdicts[$item['id']] ?? null;
+            $state = match (true) {
+                $verdict === null => $he('state.unscored'),
+                isset($refused[$item['id']]) => $he('state.refused', ['why' => $he('refusal.'.$refused[$item['id']])]),
+                (bool) $verdict['applied'] => $he('state.applied'),
+                default => $he('state.'.$verdict['why']),
+            };
+            $this->line($he('item', ['kind' => $he('kind.'.$item['kind']), 'what' => $what]));
+            $this->line('      '.$he('score', ['score' => $verdict['score'] ?? '-', 'state' => $state, 'reason' => (string) ($verdict['reason'] ?? '')]));
+            if ((string) ($item['why'] ?? '') !== '') {
+                $this->line('      '.$he('why', ['why' => (string) $item['why']]));
+            }
+        }
+        $ignored = (array) ($stored->refused['ignored'] ?? []);
+        if ($ignored !== []) {
+            $this->line('');
+            $this->line($he('ignored', ['count' => count($ignored)]));
+            foreach ($ignored as $entry) {
+                $this->line('  '.trim($entry['filter'].' '.$entry['key']).': '.$he('ignore.'.$entry['why']));
+            }
+        }
+        foreach ((array) ($stored->proposal['notes'] ?? []) as $note) {
+            $this->line($he('note', ['note' => (string) $note]));
+        }
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>=): string  $he
+     * @param  array<string, string>  $labels  the screen's filter labels, by key
+     */
+    private static function layoutReason(string $reason, callable $he, array $labels): string
+    {
+        if (str_starts_with($reason, 'duplicate_of:')) {
+            $of = substr($reason, strlen('duplicate_of:'));
+
+            return $he('reason.duplicate', ['of' => $labels[$of] ?? $of]);
+        }
+
+        return $he('reason.'.$reason);
     }
 
     private function try(): int
