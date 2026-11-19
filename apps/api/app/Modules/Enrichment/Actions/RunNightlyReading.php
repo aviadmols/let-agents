@@ -42,8 +42,6 @@ final class RunNightlyReading
         'articles' => MatchProductsToArticles::class,
         'rankings' => ComputeRankings::class,
         'relations' => ComputeProductRelations::class,
-        // Which kinds go together, where the shop has it on: asked once, and again only when the kinds change (its fingerprint).
-        'goes_with' => BuildGoesWithMap::class,
         // Last, and the only ones that cost anything: what code could not work out on its own.
         'model' => RunNightlyModelReading::class,
         // What the reading left waiting, checked by the other family.
@@ -69,9 +67,6 @@ final class RunNightlyReading
                 foreach (self::STEPS as $name => $action) {
                     // Relations only where the shop still has them; elsewhere the indexes fill those sections.
                     if ($name === 'relations' && ! Features::enabled('enrichment.relations', $shopId)) {
-                        continue;
-                    }
-                    if ($name === 'goes_with' && ! Features::enabled(BuildGoesWithMap::FEATURE, $shopId)) {
                         continue;
                     }
                     try {
