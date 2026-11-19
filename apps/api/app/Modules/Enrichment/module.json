@@ -888,6 +888,15 @@
             "unit": "values"
         },
         {
+            "name": "expert_bank_max_value_share",
+            "type": "int",
+            "default": 85,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
             "name": "card_text_chars",
             "type": "int",
             "default": 4000,

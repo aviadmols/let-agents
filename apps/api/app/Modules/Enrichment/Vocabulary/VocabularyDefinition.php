@@ -17,6 +17,9 @@ final class VocabularyDefinition
 {
     public const SCHEMA_VERSION = 1;
 
+    /** The key a vocabulary made from an expert bank names the bank by (its id): the stored report it came from. */
+    public const EXPERT_BANK = 'expert_bank';
+
     public const RANK_DIRECTIONS = ['min', 'max'];
 
     /** How much a shopper needs an attribute known before buying. docs/strict-scan.md */
@@ -80,6 +83,10 @@ final class VocabularyDefinition
             $problems[] = 'name needs he and en';
         }
 
+        if (isset($data[self::EXPERT_BANK]) && (! is_string($data[self::EXPERT_BANK]) || $data[self::EXPERT_BANK] === '')) {
+            $problems[] = self::EXPERT_BANK.' is the id of the stored bank it was made from';
+        }
+
         $keys = [];
         foreach ((array) ($data['product_types'] ?? []) as $i => $type) {
             $problems = [...$problems, ...self::checkEntry("product_types[{$i}]", $type, $keys)];
@@ -121,6 +128,10 @@ final class VocabularyDefinition
 
             if (isset($attribute['multiple']) && ($type !== 'enum' || ! is_bool($attribute['multiple']))) {
                 $problems[] = "{$at}.multiple is true or false, on a choice only";
+            }
+
+            if (isset($attribute['longest_phrase']) && ($type !== 'enum' || ! is_bool($attribute['longest_phrase']))) {
+                $problems[] = "{$at}.longest_phrase is true or false, on a choice only";
             }
 
             if (isset($attribute['read_by']) && ($type !== 'enum' || $attribute['read_by'] !== self::READ_BY_MODEL)) {
@@ -236,6 +247,24 @@ final class VocabularyDefinition
     public function coversWholeCatalog(): bool
     {
         return $this->rootCategoryExternalId() === self::WHOLE_CATALOG;
+    }
+
+    /** The id of the stored expert bank this vocabulary was made from (ActivateExpertBank), or null for any other. */
+    public function expertBankId(): ?string
+    {
+        $id = $this->data[self::EXPERT_BANK] ?? null;
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /**
+     * Whether a choice's values are read the longest phrase first (LongestPhrase): a span a longer phrase of one value
+     * took is not read again by a shorter word of another, so "sterling silver" inside "gold over sterling silver" is
+     * the longer value's only. An expert bank's vocabulary asks it on every choice, as its measurement read them.
+     */
+    public function longestPhrase(string $attributeKey): bool
+    {
+        return ($this->attribute($attributeKey)['longest_phrase'] ?? false) === true;
     }
 
     /** Whether a choice holds several values at once: a ring set with diamonds and a ruby has both stones. */

@@ -4,6 +4,7 @@ namespace App\Modules\Enrichment\Tests;
 
 use App\Core\Facades\Features;
 use App\Core\Facades\Settings;
+use App\Core\Settings\InvalidSettingValue;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Contracts\SpendCapReached;
@@ -18,6 +19,7 @@ use App\Modules\Enrichment\Scanning\BankEvidence;
 use App\Modules\Enrichment\Scanning\CatalogueFacts;
 use App\Modules\Enrichment\Scanning\ExpertBankGate;
 use App\Modules\Enrichment\Scanning\ExpertBankShape;
+use App\Modules\Enrichment\Scanning\LongestPhrase;
 use App\Modules\Enrichment\Scanning\PatternMatch;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Runs\Enums\RunStatus;
@@ -429,7 +431,7 @@ final class ExpertBankTest extends TestCase
         ['run' => $run, 'bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
 
         $this->assertSame(['round_1', 'round_2', 'check_1'], array_column($stored->calls, 'step'));
-        $this->assertSame(['expert_bank.v1', 'expert_bank.v1', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
+        $this->assertSame(['expert_bank.v2', 'expert_bank.v2', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
         // the writer at $4 and $20 a million, the checker at $1 and $8
         $this->assertSame([0.076, 0.076, 0.019], array_column($stored->calls, 'usd'));
         $this->assertSame(25000, $run->input_tokens);
@@ -598,8 +600,10 @@ final class ExpertBankTest extends TestCase
         $this->jewellery();
         $this->product('11', 'Ruby Rose Gold Ring', '', [], ['payload' => ['title' => 'Ruby Rose Gold Ring', 'description' => 'A rose shaped ring in 14k gold with sterling silver band.', 'tags' => [], 'attributes' => [], 'meta' => []]]);
         $bank = $this->bank();
-        // "gold" alone reads the 14k gold too, and both metals are written on the new ring
+        // "gold" alone is no second reading of "14k gold" (the longer phrase takes it), and both metals are written on the new ring
         $bank['attributes'][0]['values'][] = ['key' => 'gold', 'label' => 'Gold', 'words' => ['gold']];
+        // a word every description says reads the same products as each metal
+        $bank['attributes'][0]['values'][] = ['key' => 'studio_made', 'label' => 'Studio', 'words' => ['studio']];
         $bank['attributes'][] = ['key' => 'clasp', 'label' => 'Clasp', 'multiple' => false, 'types' => ['necklace'], 'values' => [['key' => 'silver_clasp', 'label' => 'Silver', 'words' => ['sterling silver']], ['key' => 'cz', 'label' => 'CZ', 'words' => ['cz']]]];
 
         ['facts' => $facts, 'texts' => $texts] = $this->inShop(fn () => CatalogueFacts::of(CatalogProduct::query()->orderBy('external_id')->get(), 20, 'en'));
@@ -614,13 +618,113 @@ final class ExpertBankTest extends TestCase
         $this->assertContains(['value:stone.cz', 'value:clasp.cz'], array_column($looks('two_meanings'), 'ids'), 'one word, two items');
         $this->assertContains(['value:clasp.silver_clasp'], array_column($looks('two_meanings'), 'ids'), 'said mostly by products of other types');
         $this->assertContains(['value:stone.moonstone'], array_column($looks('rare'), 'ids'));
-        $this->assertSame(6, $measured['attributes']['metal']['values']['gold']['products']);
-        $this->assertSame(6, $measured['attributes']['metal']['overlapping'], 'the six products of 14k gold are read as gold too');
+        $this->assertSame(1, $measured['attributes']['metal']['values']['gold']['products'], 'only the rose gold ring: inside "14k gold" the word is the longer phrase\'s');
+        $this->assertSame(11, $measured['attributes']['metal']['overlapping'], 'every metal of the ten is read beside the studio, and the new ring has three');
 
         // a one-value attribute whose values read the same products fails the bank whatever its shares
         $gate = ExpertBankGate::bank($shaped, $measured, 0.1, 0.1);
         $this->assertContains('overlap:metal', $gate['hard_failures']);
         $this->assertFalse($gate['passed']);
+    }
+
+    public function test_a_value_nearly_every_product_of_its_attribute_holds_separates_nothing_and_code_takes_it_out_though_the_checker_kept_it(): void
+    {
+        $this->jewellery();
+        $bank = $this->bank();
+        // every product says "handmade"; two say "pearl"
+        $bank['attributes'][] = ['key' => 'craft', 'label' => 'Craft', 'multiple' => true, 'types' => [], 'values' => [
+            ['key' => 'handmade', 'label' => 'Handmade', 'words' => ['handmade']], ['key' => 'pearl_set', 'label' => 'Pearl set', 'words' => ['pearl']],
+        ]];
+        $this->written = [$bank];
+
+        ['bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
+
+        $this->assertTrue($stored->review['items']['value:craft.handmade']['kept'], 'the checker kept it');
+        $this->assertContains(['look' => 'nearly_universal', 'ids' => ['attribute:craft', 'value:craft.handmade'], 'detail' => '10 of the 10 products with a value have this one'], $stored->review['checklist']);
+        $removed = array_column($stored->removed, null, 'id');
+        $this->assertSame(['by' => 'code', 'step' => 'gate', 'why' => 'separates_nothing', 'detail' => '10 of 10'], array_intersect_key($removed['value:craft.handmade'], array_flip(['by', 'step', 'why', 'detail'])));
+        $this->assertSame('too_few_values', $removed['attribute:craft']['why'], 'left with one value, the attribute is no filter');
+        $this->assertNotContains('craft', array_column($stored->bank['attributes'], 'key'));
+        $this->assertSame(['metal', 'stone'], array_column($stored->bank['attributes'], 'key'), 'values of ordinary shares stay');
+    }
+
+    public function test_the_share_a_value_may_hold_is_a_bounded_setting(): void
+    {
+        $this->jewellery();
+        $bank = $this->bank();
+        $bank['attributes'][] = ['key' => 'craft', 'label' => 'Craft', 'multiple' => true, 'types' => [], 'values' => [
+            ['key' => 'handmade', 'label' => 'Handmade', 'words' => ['handmade']], ['key' => 'pearl_set', 'label' => 'Pearl set', 'words' => ['pearl']],
+        ]];
+        $this->written = [$bank];
+        // 100%: only a value every product of its attribute holds; 10 of 10 still goes
+        Settings::set('enrichment.expert_bank_max_value_share', 100, $this->shop->id);
+        ['bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
+        $this->assertContains('value:craft.handmade', array_column(array_filter($stored->removed, fn (array $r): bool => $r['why'] === 'separates_nothing'), 'id'));
+        $this->assertEquals(1, $stored->gate['limits']['max_value_share']);
+
+        $this->expectException(InvalidSettingValue::class);
+        Settings::set('enrichment.expert_bank_max_value_share', 30, $this->shop->id);
+    }
+
+    public function test_a_value_that_says_it_is_not_known_is_no_choice(): void
+    {
+        $this->jewellery();
+        $bank = $this->bank();
+        $bank['attributes'][1]['values'][] = ['key' => 'unconfirmed', 'label' => 'Stone not confirmed', 'words' => ['moonstone']];
+        $bank['attributes'][1]['values'][] = ['key' => 'na', 'label' => 'N/A', 'words' => ['pearl']];
+        $bank['attributes'][1]['values'][] = ['key' => 'he_unknown', 'label' => 'אבן לא ידועה', 'words' => ['cz']];
+        $this->written = [$bank];
+
+        ['bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
+
+        $removed = array_values(array_filter($stored->removed, fn (array $r): bool => $r['why'] === 'not_a_choice'));
+        $this->assertSame(['value:stone.unconfirmed', 'value:stone.na', 'value:stone.he_unknown'], array_values(array_unique(array_column($removed, 'id'))));
+        $this->assertSame(['round_1', 'round_2'], array_values(array_unique(array_column($removed, 'step'))), 'taken out in each round, before any checker');
+        $this->assertSame(['cz', 'pearl'], array_column($stored->bank['attributes'][1]['values'], 'key'));
+        $this->assertNotContains('value:stone.unconfirmed', $this->calls[2]['input']['score']);
+        // the list is of uncertainty only: a value that merely sounds negative is not taken
+        $this->assertSame([], ExpertBankGate::notChoices(['types' => [], 'attributes' => [['id' => 'attribute:a', 'key' => 'a', 'label' => 'A', 'multiple' => false, 'types' => [], 'values' => [
+            ['id' => 'value:a.known', 'key' => 'known', 'label' => 'Well known', 'words' => ['known']], ['id' => 'value:a.no', 'key' => 'no', 'label' => 'No stone', 'words' => ['no stone']],
+        ]]]], 'round_1')[1]);
+    }
+
+    public function test_within_one_attribute_the_longest_phrase_wins_and_another_attribute_reads_its_own_words(): void
+    {
+        $texts = [];
+        foreach (['Aurora Sterling Silver Ring', '14K Gold Over Sterling Silver Ring', 'Sterling silver chain with a 14K gold over sterling silver charm', 'Sterling Silvery Ring', 'Silver Grey Ring'] as $i => $title) {
+            $texts[] = ['id' => (string) $i, 'title' => $title, 'head' => mb_strtolower($title), 'full' => mb_strtolower($title)];
+        }
+        $item = fn (string $attribute, string $key, array $words): array => ['id' => "value:{$attribute}.{$key}", 'key' => $key, 'label' => $key, 'words' => $words];
+        $bank = ['types' => [['id' => 'type:ring', 'key' => 'ring', 'label' => 'Ring', 'words' => ['ring']]], 'attributes' => [
+            ['id' => 'attribute:metal', 'key' => 'metal', 'label' => 'Metal', 'multiple' => false, 'types' => [], 'values' => [
+                $item('metal', 'sterling_silver', ['sterling silver']), $item('metal', 'gold_over_silver', ['14k gold over sterling silver', 'gold over sterling silver']),
+            ]],
+            ['id' => 'attribute:colour', 'key' => 'colour', 'label' => 'Colour', 'multiple' => true, 'types' => [], 'values' => [
+                $item('colour', 'silver', ['silver']), $item('colour', 'grey', ['grey']),
+            ]],
+        ]];
+
+        $measured = (new BankEvidence($texts))->measure($bank, [], 1);
+        $metal = $measured['attributes']['metal'];
+
+        $this->assertSame(2, $metal['values']['sterling_silver']['products'], 'the plain one and the chain: inside the longer phrase it is not read again');
+        $this->assertSame(2, $metal['values']['gold_over_silver']['products']);
+        $this->assertSame(['14k gold over sterling silver' => 2, 'gold over sterling silver' => 2], $metal['values']['gold_over_silver']['words'], 'a shorter word of the same value inside its own longer phrase is no conflict');
+        $this->assertSame(1, $metal['overlapping'], 'the chain says both, each in its own words');
+        $this->assertSame(4, $measured['attributes']['colour']['values']['silver']['products'], 'another attribute reads its own words: "silver" is no metal\'s there');
+        $this->assertSame(3, $metal['products'], '"silvery" is no whole word of it');
+
+        // the same rule, alone: equal lengths both stand; only a strictly longer phrase of another value takes a span
+        $this->assertSame(['a' => [0, 3], 'b' => [0, 3]], LongestPhrase::claims('abc def', ['a' => ['abc'], 'b' => ['abc']]));
+        $this->assertSame(['long' => [0, 7]], LongestPhrase::claims('abc def', ['short' => ['def'], 'long' => ['abc def']]));
+        $this->assertSame(['short' => [8, 3], 'long' => [0, 7]], LongestPhrase::claims('abc def def', ['short' => ['def'], 'long' => ['abc def']]), 'a word said again outside the phrase stands');
+
+        // and the expert is told so, in a new version of its prompt; the released one is not edited
+        $this->assertSame(2, BuildExpertBank::PROMPTS['expert_bank']);
+        $prompts = dirname(__DIR__).'/Prompts/';
+        $this->assertStringContainsString('code reads the longest phrase first', (string) file_get_contents($prompts.'expert_bank.v2.md'));
+        $this->assertStringNotContainsString('longest phrase', (string) file_get_contents($prompts.'expert_bank.v1.md'));
+        $this->assertSame(file_get_contents($prompts.'expert_bank.v1.schema.json'), file_get_contents($prompts.'expert_bank.v2.schema.json'));
     }
 
     /** Ten products of a jewellery store that writes in English: rings, necklaces, earrings, one bracelet. */

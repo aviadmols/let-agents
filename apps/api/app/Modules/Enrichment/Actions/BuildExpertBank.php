@@ -39,8 +39,12 @@ use Generator;
  * 5. The checker (another family, checked in code before any call) scores every type, attribute and value. It can
  *    take out and nothing else: what it adds or renames is ignored, what it leaves unscored is dropped.
  * 6. The gate, in code (ExpertBankGate): an item stays only with evidence and a score at the threshold; a value on too
- *    few products and an attribute with too few values or products are no filters; the bank as a whole passes on the
- *    shares measured on this store.
+ *    few products, a value nearly every product of its attribute holds, a value that says it is not known, and an
+ *    attribute with too few values or products are no filters; the bank as a whole passes on the shares measured on
+ *    this store.
+ *
+ * Within one attribute, the longest phrase wins (LongestPhrase), here and in the code reading of an activated bank.
+ * A bank that passed becomes the store's vocabulary only when a person activates it (ActivateExpertBank).
  *
  * A reply that breaks its schema fails the run: nothing is mended and nothing is asked again. Every call asks
  * SpendGuard first and is recorded on the run with its tokens and cost, and each step says one line.
@@ -54,10 +58,10 @@ final class BuildExpertBank
     public const FEATURE = 'enrichment.expert_bank';
 
     /** The code's own version, part of the fingerprint: a change in how facts are counted or the bank measured asks again. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** The released version each prompt is sent at; a released one is never edited. */
-    public const PROMPTS = ['expert_bank' => 1, 'expert_bank_check' => 1];
+    public const PROMPTS = ['expert_bank' => 2, 'expert_bank_check' => 1];
 
     private const WRITER_TOKENS = 20000;
 
@@ -118,6 +122,7 @@ final class BuildExpertBank
             'min_type_share' => (int) Settings::get('enrichment.expert_bank_min_type_share', $shopId) / 100,
             'min_filterable_share' => (int) Settings::get('enrichment.expert_bank_min_filterable_share', $shopId) / 100,
             'values_per_product' => (int) Settings::get('enrichment.expert_bank_values_per_product', $shopId),
+            'max_value_share' => (int) Settings::get('enrichment.expert_bank_max_value_share', $shopId) / 100,
         ];
 
         // 1. Facts, in code. No ready vocabulary is read.
@@ -182,6 +187,9 @@ final class BuildExpertBank
                 [$bank, $unformed] = ExpertBankShape::fromReply($reply, 'round_'.$round);
                 // What no product says is taken out, always: a word, then the value or the type left with none.
                 [$bank, $unseen] = ExpertBankGate::unseen($bank, $measure($bank), 'round_'.$round);
+                // A value that says it is not known ("not confirmed", "N/A") is no choice, however many products say it.
+                [$bank, $unchosen] = ExpertBankGate::notChoices($bank, 'round_'.$round);
+                $unseen = [...$unseen, ...$unchosen];
                 $measured = $measure($bank);
                 $removed = [...$removed, ...$unformed, ...$unseen];
                 $drafts[] = ['round' => $round, 'bank' => $bank, 'type_share' => $measured['type_share'], 'filterable_share' => $measured['filterable_share'], 'notes' => array_slice(array_map('strval', (array) ($reply['notes'] ?? [])), 0, 5)];
@@ -217,7 +225,7 @@ final class BuildExpertBank
         // 6. The gate, in code: the least evidence a filter needs, until nothing more goes.
         $thinned = 0;
         for ($pass = 0; $pass < self::SETTLE; $pass++) {
-            [$bank, $thin] = ExpertBankGate::thin($bank, $measure($bank), $limits['min_products'], $limits['min_attribute_share']);
+            [$bank, $thin] = ExpertBankGate::thin($bank, $measure($bank), $limits['min_products'], $limits['min_attribute_share'], $limits['max_value_share']);
             if ($thin === []) {
                 break;
             }

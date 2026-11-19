@@ -6,6 +6,7 @@ use App\Core\Facades\Features;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Actions\ActivateExpertBank;
 use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\BuildCards;
 use App\Modules\Enrichment\Actions\BuildExpertBank;
@@ -53,13 +54,15 @@ use Illuminate\Console\Command;
  *   enrichment relations gueta-avigdor
  *   enrichment expert-bank gueta-avigdor            (a dry run: writes a report, activates nothing)
  *   enrichment expert-bank gueta-avigdor --show     (the last report, as the filters a shopper would get)
+ *   enrichment expert-bank gueta-avigdor <id> --activate   (a bank that passed becomes the store's vocabulary)
+ *   enrichment expert-bank gueta-avigdor --deactivate      (and back: the vocabularies it replaced return)
  */
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
         {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
-        {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show}
+        {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show or --activate}
         {--template= : vocabulary template name}
         {--file= : vocabulary JSON file}
         {--author= : who wrote the vocabulary}
@@ -69,7 +72,8 @@ final class EnrichmentCommand extends Command
         {--limit= : maximum requests}
         {--out= : where to write the task file}
         {--model= : the model that produced the results}
-        {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only)}
+        {--activate : complete: make the completed bank the active one once its checks passed (without it, a report only); expert-bank: make the stored bank named by its id the vocabulary of the shop}
+        {--deactivate : expert-bank: undo the activated bank and restore the vocabularies it replaced}
         {--force : structure: also when a vocabulary already covers the whole catalog; complete: also when the shop has it off; expert-bank: ask again though the same facts were answered}
         {--show : expert-bank: print a stored report as the filters a shopper would get, asking no model}
         {--branch= : schema: one branch of the catalog by its key (BranchPlan), also one that already has a vocabulary}
@@ -222,6 +226,13 @@ final class EnrichmentCommand extends Command
             return $this->showExpertBank($stored, $he);
         }
 
+        if ($this->option('deactivate')) {
+            return $this->deactivateExpertBank($shop, $he);
+        }
+        if ($this->option('activate')) {
+            return $this->activateExpertBank($shop, $he);
+        }
+
         if (! Features::enabled(BuildExpertBank::FEATURE, $shop->id)) {
             $this->line($he('expert_bank_off'));
 
@@ -240,6 +251,53 @@ final class EnrichmentCommand extends Command
         }
 
         return $run->status->value === 'succeeded' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * A stored bank that passed becomes the store's vocabulary; nothing is read with it here. The commands that turn it
+     * into facts and filters are printed, in order, for the person to run: code reading, then the search index.
+     *
+     * @param  callable(string, array<string, scalar>=): string  $he
+     */
+    private function activateExpertBank(Shop $shop, callable $he): int
+    {
+        $id = (string) $this->argument('argument');
+        if ($id === '') {
+            return $this->failWith($he('expert_bank_activate_needs_id'));
+        }
+
+        ['run' => $run, 'vocabulary' => $vocabulary] = app(ActivateExpertBank::class)->activate($shop->id, $id);
+        $this->line((string) $run->summary());
+        if ($vocabulary === null) {
+            return self::FAILURE;
+        }
+        if (! Features::enabled('enrichment.read_text_in_code', $shop->id)) {
+            $this->warn($he('expert_bank_read_text_off'));
+        }
+        $this->nextSteps($shop, $he('expert_bank_next'));
+
+        return self::SUCCESS;
+    }
+
+    /** @param  callable(string, array<string, scalar>=): string  $he */
+    private function deactivateExpertBank(Shop $shop, callable $he): int
+    {
+        ['run' => $run, 'bank' => $bank] = app(ActivateExpertBank::class)->deactivate($shop->id);
+        $this->line((string) $run->summary());
+        if ($bank === null) {
+            return self::FAILURE;
+        }
+        $this->nextSteps($shop, $he('expert_bank_next_undo'));
+
+        return self::SUCCESS;
+    }
+
+    /** The code reading and the search index, the commands that make a vocabulary's facts and filters. No model is asked. */
+    private function nextSteps(Shop $shop, string $intro): void
+    {
+        $this->line($intro);
+        $this->line('  php artisan enrichment code '.$shop->slug);
+        $this->line('  php artisan search index '.$shop->slug);
     }
 
     /** @param  callable(string, array<string, scalar>=): string  $he */

@@ -14,6 +14,7 @@ use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
 use App\Modules\Catalog\Models\CatalogSibling;
 use App\Modules\Catalog\Models\CatalogVariant;
+use App\Modules\Enrichment\Contracts\ExpertBankNames;
 use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
@@ -93,6 +94,9 @@ final class BuildSearchIndex
 
     /** @var array<string, list<string>> the store-field values each product has (fieldFacets), words of it */
     private array $fieldValues = [];
+
+    /** The category filter was left out because the store's expert bank already sorts its categories (categoryFacet). */
+    private bool $categoriesSorted = false;
 
     /** @var array<string, list<int>> the tag filters each post or page holds (tagFacets), by catalog content id */
     private array $contentTags = [];
@@ -363,7 +367,8 @@ final class BuildSearchIndex
         $brands = $this->brandFacet($facets['facets'], $this->locale($shopId));
         // The store's own tags, where the shop asks for them (a content site) or where it has no categories to narrow by
         // (Chozen files its products by tags alone: "נעליים", "סניקרס", "תיקים"); and how many days each offer lasts.
-        $storeTags = $this->storeTagFacet($facets['facets'], $this->locale($shopId), $categories === []);
+        // (a category filter left out because the expert bank sorts its names is no store without categories)
+        $storeTags = $this->storeTagFacet($facets['facets'], $this->locale($shopId), $categories === [] && ! $this->categoriesSorted);
         $lengths = $this->lengthFacet($facets['facets'], $this->locale($shopId));
         // The store's own fields most of its products have, each a filter of its own: a bookshop's "מחבר".
         // Their values are words of the products either way: "הספר של עומר שם טוב" finds his book, whose title does not say him.
@@ -1457,6 +1462,12 @@ final class BuildSearchIndex
 
         $names = CatalogCategory::query()->whereIn('id', $used->keys()->all())->pluck('name', 'id');
         $at = count($facets);
+        // Where the store's vocabulary is its expert bank, a category whose name a type or a value of the bank says is in
+        // the bank's own filter already (a destination, a theme): not offered again in a heap of every kind. Its products
+        // are still found by its name; only the filter changes. Any other vocabulary leaves the categories as they are.
+        $this->categoriesSorted = false;
+        $sorted = app()->bound(ExpertBankNames::class) ? app(ExpertBankNames::class)->saidByExpertBank($names->map(fn ($name): string => (string) $name)->all()) : null;
+        $sorted = $sorted === null ? null : array_flip($sorted);
         $values = [];
         $index = [];
 
@@ -1469,6 +1480,9 @@ final class BuildSearchIndex
             if ($name === '' || isset($index[(string) $id]) || ! self::shopperCategory($name) || ($total > 0 && $count / $total >= self::CATEGORY_MAX_SHARE)) {
                 continue;
             }
+            if ($sorted !== null && isset($sorted[(string) $id])) {
+                continue;
+            }
 
             // as many as the shop wants (search.category_filter_max): a content site's destinations and subjects run longer
             if (count($values) >= max(2, (int) Settings::get('search.category_filter_max', $this->tenant->id()) ?: self::MAX_CATEGORIES)) {
@@ -1479,7 +1493,10 @@ final class BuildSearchIndex
             $values[] = ['k' => (string) $id, 'l' => $name];
         }
 
-        if (count($values) < 2) {
+        // beside an expert bank, what is left of the categories is a filter only with enough of them (search.category_filter_min_beside_bank)
+        if (count($values) < ($sorted === null ? 2 : max(2, (int) Settings::get('search.category_filter_min_beside_bank', $this->tenant->id())))) {
+            $this->categoriesSorted = $sorted !== null && $sorted !== [];
+
             return [];
         }
 

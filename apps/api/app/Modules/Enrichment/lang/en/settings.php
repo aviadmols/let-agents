@@ -362,4 +362,8 @@ return [
         'label' => 'Attributes a product needs a value in to count as filterable',
         'description' => 'Counted for each product, without the product type.',
     ],
+    'expert_bank_max_value_share' => [
+        'label' => 'Largest share of an attribute\'s products one value may hold',
+        'description' => 'A value held by at least this share of the products that have a value of its attribute separates nothing and is removed; an attribute left with one value goes with it.',
+    ],
 ];
