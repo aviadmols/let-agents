@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Lets · Daily summary · :shop · :date',
+    'title' => 'Let’s · Daily summary · :shop · :date',
     'searches' => 'Yesterday: :searches {searches:search/searches}, :empty with no results, :clicks {clicks:click/clicks} on results.',
     'new_products' => 'New products that came into the system in the last day: :count (:read of them already read and described). In the catalog: :total.',
     'evidence' => 'Reviewed: :empty {empty:search that found/searches that found} nothing, :unclicked {unclicked:search/searches} nobody clicked, :questions {questions:question/questions} the site did not answer.',

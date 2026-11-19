@@ -210,7 +210,7 @@ final class StoreBlogTest extends TestCase
 
         $page->set("destinations.{$id}", ImprovementPost::LETS)->call('approve', $id);
 
-        $this->assertSame([], $this->sent, 'a post on Lets is not sent to the store');
+        $this->assertSame([], $this->sent, 'a post on Let’s is not sent to the store');
         $published = $this->inShop(fn () => $post->fresh());
         $this->assertSame([ImprovementPost::PUBLISHED, ImprovementPost::LETS, ['1']], [$published->status, $published->destination, $published->products]);
         $this->assertTrue($this->inShop(fn () => CatalogContent::query()->where('external_id', $published->contentId())->whereNull('removed_at')->exists()), 'among the store\'s content');

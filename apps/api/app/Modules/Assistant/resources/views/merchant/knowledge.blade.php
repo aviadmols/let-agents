@@ -17,7 +17,7 @@
 
     <div class="lp-page lp-d" data-store-knowledge>
         <div class="lp-d-grid">
-            {{-- teach Lets something --}}
+            {{-- teach Let’s something --}}
             <section class="lp-d-teach" aria-labelledby="teach-title" x-data>
                 <div><h2 id="teach-title">{{ $t('teach.title') }}</h2><p>{{ $t('teach.text') }}</p></div>
                 <div>

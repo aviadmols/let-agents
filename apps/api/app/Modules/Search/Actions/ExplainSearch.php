@@ -183,7 +183,7 @@ final class ExplainSearch
 
     /**
      * Where in the product each word is: its name, a category, one of the store's tags, its brand, a detail the store
-     * gave, or what Lets learned of it (its picture, its tags by meaning, a synonym); a near spelling when none says it.
+     * gave, or what Let’s learned of it (its picture, its tags by meaning, a synonym); a near spelling when none says it.
      *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $words

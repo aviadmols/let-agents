@@ -1,8 +1,8 @@
 /*
- * Lets Search — design tokens.
+ * Let’s Search — design tokens.
  *
  * Two layers:
- *   1. Primitives (--lsp-*): the raw values of the Lets Search look. Components read colour, ground
+ *   1. Primitives (--lsp-*): the raw values of the Let’s Search look. Components read colour, ground
  *      and control/card radius only through the semantic layer; the type scale, small radii,
  *      depth and motion primitives are shared by both looks and read directly.
  *   2. Semantic (--ls-*): what components read. The store look ([data-ls-theme="store"]) replaces

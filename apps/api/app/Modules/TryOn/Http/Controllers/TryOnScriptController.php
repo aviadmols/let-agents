@@ -12,7 +12,7 @@ use Illuminate\Http\Response;
  */
 final class TryOnScriptController
 {
-    public const SCRIPT = "/* Lets Search: Try-On was removed */\n";
+    public const SCRIPT = "/* Let’s Search: Try-On was removed */\n";
 
     public function __invoke(Request $request): Response
     {

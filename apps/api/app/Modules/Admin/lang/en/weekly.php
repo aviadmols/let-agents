@@ -15,7 +15,7 @@ return [
     'searched_title' => 'What they searched',
     'sold_title' => 'What sold through search',
     'to_cart' => '{1} 1 to cart|[0,*] :n to cart',
-    'footer' => 'You get this email every Monday morning because you run this store on Lets.',
+    'footer' => 'You get this email every Monday morning because you run this store on Let’s.',
     'preview' => [
         'title' => 'The weekly email',
         'sub' => 'An example of the email we’ll send every Monday morning, with your store’s real numbers.',

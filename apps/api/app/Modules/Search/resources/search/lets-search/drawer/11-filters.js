@@ -532,7 +532,7 @@
   // after "show all" on a phone, every one, in place
   // how many more products a "show all" or "show more" brings: a few at a time, never the whole list
   var STEP = 12;
-  // a button that waits: the Lets mark turns in it, and a second press does nothing until it is done
+  // a button that waits: the Let’s mark turns in it, and a second press does nothing until it is done
   function busy(btn) {
     if (!btn || btn.getAttribute('aria-busy') === 'true') { return false; }
     btn.setAttribute('aria-busy', 'true'); btn.classList.add('ls-btn--busy');

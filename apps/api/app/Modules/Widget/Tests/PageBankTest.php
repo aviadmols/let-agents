@@ -348,7 +348,7 @@ final class PageBankTest extends TestCase
     public function test_the_old_script_address_serves_the_drawer_with_a_version_tag(): void
     {
         $response = $this->get('/api/v1/widget/let-agents.js')->assertOk()->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
-        $this->assertSame($this->get('/api/v1/search/lets-search.js')->getContent(), $response->getContent(), 'stores on the old plugin get the Lets Search drawer');
+        $this->assertSame($this->get('/api/v1/search/lets-search.js')->getContent(), $response->getContent(), 'stores on the old plugin get the Let’s Search drawer');
         $this->assertStringContainsString('LetAgentsContext', (string) $response->getContent(), 'which reads the old plugin\'s page context');
         $this->assertStringContainsString('if (win.LetsSearch) { return; }', (string) $response->getContent(), 'and loads once on a page that prints both addresses');
 

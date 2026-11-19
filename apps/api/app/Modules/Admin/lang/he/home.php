@@ -55,9 +55,9 @@ return [
     'numbers' => [
         'title' => 'המספרים',
         'visitors' => 'מבקרים',
-        'adds' => 'הוספות לסל דרך Lets',
-        'orders' => 'הזמנות בסיוע Lets',
-        'revenue' => 'הכנסות בסיוע Lets',
+        'adds' => 'הוספות לסל דרך Let’s',
+        'orders' => 'הזמנות בסיוע Let’s',
+        'revenue' => 'הכנסות בסיוע Let’s',
     ],
     'notices' => [
         'title' => 'הודעות ותובנות',

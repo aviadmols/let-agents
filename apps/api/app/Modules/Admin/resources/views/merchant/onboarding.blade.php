@@ -17,7 +17,7 @@
         <symbol id="lp-onb-i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
     </svg>
 
-    {{-- ...and while a Shopify store waits for Lets to be switched on in its theme: the step is marked the moment the store is seen live, with no reload --}}
+    {{-- ...and while a Shopify store waits for Let’s to be switched on in its theme: the step is marked the moment the store is seen live, with no reload --}}
     <div class="lp-onb-wrap" data-onboarding data-step="{{ $step }}" @if ($reading || ($step === 3 && $scanning) || ($step >= 3 && $this->embedUrl() !== null)) wire:poll.10s @endif>
         @unless ($edit)
             <div class="lp-hint" role="note" data-viewer><span class="lp-mark lp-mark-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14a7 7 0 0 1-14 0zM5 21h14a7 7 0 0 0-14 0z" fill="currentColor"/></svg></span><span>{{ $t('viewer') }}</span></div>
@@ -122,7 +122,7 @@
                         @endif
                     </section>
                 @elseif ($step === 2)
-                    {{-- 2 · what Lets found, and the form to fix it (the same saving as Settings · General) --}}
+                    {{-- 2 · what Let’s found, and the form to fix it (the same saving as Settings · General) --}}
                     <section class="lp-onb-pane" data-pane="check">
                         @if ($reading)
                             <div class="lp-onb-reading" data-reading>

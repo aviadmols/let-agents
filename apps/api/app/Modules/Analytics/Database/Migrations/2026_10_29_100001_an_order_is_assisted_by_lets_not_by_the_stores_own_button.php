@@ -6,9 +6,9 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * An order was counted "with Lets" when the visitor had any event before it that was not the search's, and the
- * plugin reports the store's own add-to-cart button too (source "page"): Sela Meir showed seven orders with Lets
- * that Lets never touched (29.10). From now on an add from the store's own page assists nothing (RecordOrder), and
+ * An order was counted "with Let’s" when the visitor had any event before it that was not the search's, and the
+ * plugin reports the store's own add-to-cart button too (source "page"): Sela Meir showed seven orders with Let’s
+ * that Let’s never touched (29.10). From now on an add from the store's own page assists nothing (RecordOrder), and
  * the orders already counted so are counted again by the same rule: nothing else of them changes.
  */
 return new class extends Migration

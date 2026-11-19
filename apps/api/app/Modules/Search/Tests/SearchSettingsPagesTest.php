@@ -134,7 +134,7 @@ final class SearchSettingsPagesTest extends TestCase
             ->assertSee('לבקש דירוג לתשובה')
             ->assertSee('"עזר?" אחרי תשובה של העוזר')
             ->assertSee('כשמוצר או מידה אזלו')
-            ->assertSee('שורת Lets בעמוד המוצר שמציעה מוצרים דומים במלאי, באותה מידה')
+            ->assertSee('שורת Let’s בעמוד המוצר שמציעה מוצרים דומים במלאי, באותה מידה')
             ->assertSee('הזמנה לנסות את החיפוש')
             ->assertSet('data.storefront', true)
             ->assertSet('data.take_over', true)
@@ -174,10 +174,10 @@ final class SearchSettingsPagesTest extends TestCase
             ->set('data.nudge_at', ' header__search-link  icon ')
             ->call('save');
 
-        // the posts Lets wrote: out of the results by default; turned on, saved, and the search index built again at once
+        // the posts Let’s wrote: out of the results by default; turned on, saved, and the search index built again at once
         $this->assertFalse(Features::enabled('search.lets_posts', $this->shop->id));
         $built = Run::query()->where('agent', BuildSearchIndex::AGENT)->count();
-        $page->assertSee('פוסטים של Lets בתוצאות החיפוש')->set('data.lets_posts', true)->call('save');
+        $page->assertSee('פוסטים של Let’s בתוצאות החיפוש')->set('data.lets_posts', true)->call('save');
         $this->assertTrue(Features::enabled('search.lets_posts', $this->shop->id));
         $this->assertSame($built + 1, Run::query()->where('agent', BuildSearchIndex::AGENT)->count(), 'the index is built again when the posts go in or out');
         $page->call('save');

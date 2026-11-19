@@ -14,7 +14,7 @@ use Illuminate\Http\Response;
 /**
  * GET /widget-preview/{shop}?id=...&locale=he|en&theme=lets|store
  *
- * A sample product page of the shop with the Lets Search drawer on it, the same file the stores
+ * A sample product page of the shop with the Let’s Search drawer on it, the same file the stores
  * load, opening with "about this product" from the shop's real page bank and search index. What a
  * shopper would send stays in the page: no event is counted, no question reaches a model, no
  * visitor is remembered, no search is counted. For the display settings screen.

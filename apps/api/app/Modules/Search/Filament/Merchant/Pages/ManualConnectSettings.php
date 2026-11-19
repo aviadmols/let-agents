@@ -18,15 +18,15 @@ use UnitEnum;
 
 /**
  * Settings · Manual theme connection ("search not showing on the site?"), as the designer's panel lays
- * it out: whether Lets already took over the site's search box (shoppers searched lately), whether the
- * plugin or the Shopify app embed is on, and where to tell Lets the box is: a CSS selector of the shop's
+ * it out: whether Let’s already took over the site's search box (shoppers searched lately), whether the
+ * plugin or the Shopify app embed is on, and where to tell Let’s the box is: a CSS selector of the shop's
  * own (search.input_selector, empty for the default), or the two markers any theme can carry.
  */
 class ManualConnectSettings extends Page
 {
     use EditsShopSettings;
 
-    /** Searches from the site in this many days: Lets is on the box. */
+    /** Searches from the site in this many days: Let’s is on the box. */
     public const SEEN_DAYS = 14;
 
     public static string $sideGroup = 'store';
@@ -95,7 +95,7 @@ class ManualConnectSettings extends Page
 
     /**
      * What is known about the site: its platform, whether the plugin answered, its version and when it
-     * was last checked, and whether shoppers searched through Lets lately.
+     * was last checked, and whether shoppers searched through Let’s lately.
      *
      * @return array{platform: string, connected: bool, version: ?string, checked: ?string, seen: bool}
      */

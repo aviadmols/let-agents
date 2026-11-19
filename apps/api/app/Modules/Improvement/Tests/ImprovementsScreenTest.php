@@ -20,7 +20,7 @@ use Tests\TestCase;
 /**
  * The Improvements screen (the redesign, 11.2026): every fix waiting in one list, each with its suggestion; a drafted
  * answer edited and published in one tap; a word that found nothing approved in one tap; "Not relevant" for good; what
- * Lets fixed on its own, with undo; what was approved.
+ * Let’s fixed on its own, with undo; what was approved.
  */
 final class ImprovementsScreenTest extends TestCase
 {
@@ -80,7 +80,7 @@ final class ImprovementsScreenTest extends TestCase
         $page->call('later', 'proposal:'.$gap);
         $this->assertSame([], $page->instance()->fixes(), 'nothing waits now');
 
-        // fixed by Lets, and undone
+        // fixed by Let’s, and undone
         $page->call('show', 'auto')->assertSee('סניקרס')->assertSee('לבטל');
         $family = $this->inShop(fn () => SearchFamilyChoice::query()->value('id'));
         $page->call('undo', 'family:'.$family)->assertNotified();

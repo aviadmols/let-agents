@@ -3,11 +3,11 @@
 // The shop's analytics screen (Analytics\Filament\Merchant\Pages\ShopAnalytics).
 return [
     'title' => 'Analytics',
-    'subheading' => 'What shoppers do with Lets. All in one place.',
+    'subheading' => 'What shoppers do with Let’s. All in one place.',
     'store' => [
         'title' => 'Store information',
         'views' => 'Page views',
-        'opens' => 'Lets opened',
+        'opens' => 'Let’s opened',
         'of_views' => ':n% of views',
         'searches' => 'Searches',
         'by_photo' => ':n by photo',
@@ -15,11 +15,11 @@ return [
         'questions_split' => ':answered answered · :unanswered unanswered · :off not about the store',
         'adds' => 'Added to cart',
         'adds_split' => 'from search :search · from the widget :widget · from the page :page',
-        'orders' => 'Orders Lets helped',
+        'orders' => 'Orders Let’s helped',
         'chart' => [
             'choose' => 'What the chart shows',
             'searches' => 'Searches through the period',
-            'opens' => 'Openings of Lets through the period',
+            'opens' => 'Openings of Let’s through the period',
             'questions' => 'Questions through the period',
             'adds' => 'Adds to cart through the period',
             'tabs' => ['searches' => 'Searches', 'opens' => 'Openings', 'questions' => 'Questions', 'adds' => 'Adds to cart'],

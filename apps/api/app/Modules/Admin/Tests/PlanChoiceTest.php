@@ -43,7 +43,7 @@ final class PlanChoiceTest extends TestCase
         // Plan and billing (the redesign, 11.2026)
         // a store no platform bills (WordPress) sees the plans and changes none itself: the team does (Aviad, 12.11)
         $plans = collect(Livewire::test(PlanSettings::class)->assertSee('התוכנית שלכם')->assertSee('הפסקת תשלומים')->assertSee('settings/privacy', false)
-            ->assertSee('את החבילה של החנות משנה צוות Lets')->assertDontSee('data-plan-move', false)->assertDontSee('לבחור חבילה')
+            ->assertSee('את החבילה של החנות משנה צוות Let’s')->assertDontSee('data-plan-move', false)->assertDontSee('לבחור חבילה')
             ->instance()->details()['plans'])->keyBy('code');
 
         $this->assertTrue($plans['starter']['current']);

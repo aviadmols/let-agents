@@ -37,7 +37,7 @@ use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
- * The scan summary, as the designer's panel lays it out: how Lets understood each product, and what
+ * The scan summary, as the designer's panel lays it out: how Let’s understood each product, and what
  * was read from each page and post, all fixable from here. Products: the numbers, a list (search,
  * missing details, picture not read, edited by hand) and the chosen product: its tags with where
  * each came from, the spec that was built with what is missing, and what the picture showed.

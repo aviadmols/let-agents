@@ -17,7 +17,7 @@ use Livewire\Attributes\Url;
 use UnitEnum;
 
 /**
- * The Lets Search drawer on a store, and links that show it to the store team before it is live
+ * The Let’s Search drawer on a store, and links that show it to the store team before it is live
  * for everyone: the page address plus ?let_agents_preview=<key>. The key stays in a cookie for
  * 30 days, so the team can keep browsing the store.
  */

@@ -73,7 +73,7 @@ final class OnboardingFoundTest extends TestCase
         FirstScan::mark($shop->id, 'pictures', FirstScan::RUNNING);
 
         Livewire::test(Onboarding::class)->set('step', 3)
-            ->assertSee('Lets מכיר את החנות')
+            ->assertSee('Let’s מכיר את החנות')
             ->assertSeeHtml('data-scan-row="products" data-state="done"')
             ->assertSeeHtml('data-scan-row="images" data-state="running"')
             ->assertSeeHtml('data-scan-row="pages" data-state="waiting"')

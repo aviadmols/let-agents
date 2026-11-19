@@ -54,7 +54,7 @@ return [
         'words_store_tag' => ':words בתגית של החנות ":where".',
         'words_brand' => ':words במותג ":where".',
         'words_attribute' => ':words בפרט ":where" של המוצר.',
-        'words_lets' => ':words במה ש־Lets למדה על המוצר (מהתמונה, מהתיאור או ממילה נרדפת).',
+        'words_lets' => ':words במה ש־Let’s למדה על המוצר (מהתמונה, מהתיאור או ממילה נרדפת).',
         'words_close' => ':words באיות קרוב, לא בדיוק כפי שנכתב.',
         'some_words' => 'מכיל רק חלק מהמילים.',
         'meaning' => 'קרוב במשמעות למה שנכתב, גם בלי אותן מילים.',

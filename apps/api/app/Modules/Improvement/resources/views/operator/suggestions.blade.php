@@ -337,7 +337,7 @@
                                 @elseif ($r['open'])
                                     @php($where = $this->destinations[$p->id] ?? 'lets')
                                     @php($storeOk = $this->storeTakesPosts())
-                                    {{-- where the post will live: the store's own site, or a page on Lets --}}
+                                    {{-- where the post will live: the store's own site, or a page on Let’s --}}
                                     <div class="rec-where" role="radiogroup" aria-label="{{ __('improvement::ui.post.where') }}" data-where>
                                         <div style="{{ $small }}">{{ __('improvement::ui.post.where') }}</div>
                                         <label @class(['rec-where__opt', 'is-on' => $where === 'store', 'is-off' => ! $storeOk])>

@@ -14,7 +14,7 @@ return [
         'description' => 'A field most products have in the store\'s feed (for books: the author) becomes a filter beside the results, named as the store names it. Read from the data, with no setup per kind of store.',
     ],
     'storefront' => [
-        'label' => 'Lets search in the store\'s search box',
+        'label' => 'Let’s search in the store\'s search box',
         'description' => 'Typo-tolerant suggestions while typing, and results grouped into products, guides and categories. The store also turns it on in the plugin.',
     ],
     'semantic' => [
@@ -83,7 +83,7 @@ return [
     ],
     'take_over_field' => [
         'label' => 'Smart search in the site\'s search box',
-        'description' => 'Lets takes over the theme\'s search box and search buttons. Off: only the Lets button, the product page row and what is marked data-lets-search or data-lets-open open the search.',
+        'description' => 'Let’s takes over the theme\'s search box and search buttons. Off: only the Let’s button, the product page row and what is marked data-lets-search or data-lets-open open the search.',
     ],
     'rate_answers' => [
         'label' => 'Ask to rate an answer',
@@ -91,15 +91,15 @@ return [
     ],
     'out_of_stock_similar' => [
         'label' => 'When a product or a size is sold out',
-        'description' => 'A Lets row on the product page when the product or the chosen variant is sold out: similar products in stock, in the same size. No model.',
+        'description' => 'A Let’s row on the product page when the product or the chosen variant is sold out: similar products in stock, in the same size. No model.',
     ],
     'nudge' => [
         'label' => 'Invite shoppers to try the search',
         'description' => 'A small line beside the search icon: "Try our new search". It shows once only to each new shopper, on their first visit, and goes away by itself after a few seconds. A shopper who visited before never sees it.',
     ],
     'lets_posts' => [
-        'label' => 'Lets posts in search results',
-        'description' => 'Posts Lets wrote and the store published live at Lets\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
+        'label' => 'Let’s posts in search results',
+        'description' => 'Posts Let’s wrote and the store published live at Let’s\' address, not on the site itself, so opening one takes the shopper away from the store. Off: they are not search results, and the assistant still answers from them. On: they show like any guide.',
     ],
     'learning' => [
         'label' => 'Search learns from shoppers',

@@ -5,7 +5,7 @@
 @section('body')
     <section class="hero">
         <span class="hero__glow" aria-hidden="true"></span>
-        <span class="brand"><i aria-hidden="true"></i>Lets</span>
+        <span class="brand"><i aria-hidden="true"></i>Let’s</span>
         <h1>{{ $t('verify.title') }}</h1>
         <p class="lede">{{ $t('verify.lede', ['email' => $site->email]) }}</p>
     </section>

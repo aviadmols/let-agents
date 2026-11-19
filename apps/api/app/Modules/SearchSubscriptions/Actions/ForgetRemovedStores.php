@@ -11,7 +11,7 @@ use App\Modules\SearchSubscriptions\Models\SearchSubscriptionProduct;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionSend;
 
 /**
- * A store that removed Lets (its connection failed, as an uninstall leaves it) gets nothing sent at once (SendWeekly
+ * A store that removed Let’s (its connection failed, as an uninstall leaves it) gets nothing sent at once (SendWeekly
  * skips it), and its subscribers' data is deleted search_subscriptions.forget_after_days later (daily, from the
  * scheduler). A store erased altogether (shop/redact) loses them with the store itself.
  */

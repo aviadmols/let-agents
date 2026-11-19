@@ -12,7 +12,7 @@
     // a magnifier and two sparks
     sparks: LENS + '<path class="ls-spark" d="' + SPARK + '" fill="currentColor"/>' +
       '<path class="ls-spark ls-spark--2" d="M21.4 9.6c.15 1.1.6 1.55 1.7 1.7-1.1.15-1.55.6-1.7 1.7-.15-1.1-.6-1.55-1.7-1.7 1.1-.15 1.55-.6 1.7-1.7z" fill="currentColor"/>',
-    // a magnifier with the Lets mark on a small badge at its corner
+    // a magnifier with the Let’s mark on a small badge at its corner
     badge: LENS + '<g class="ls-badge"><circle cx="18.6" cy="5.4" r="4.6" fill="currentColor"/><path d="M16.6 3.2h4a2 2 0 0 1-4 0zM16.6 7.6h4a2 2 0 0 0-4 0z" fill="var(--ls-bg, #fff)"/></g>',
     // a magnifier and a lime dot: "something new here"
     dot: '<circle class="ls-lens" cx="10.5" cy="10.5" r="7"/><path class="ls-handle" d="m16 16 4.5 4.5"/><circle class="ls-dot" cx="18.8" cy="4.6" r="3.2" fill="#e2ff78" stroke="currentColor" stroke-width="1.4"/>',
@@ -161,7 +161,7 @@
   }
   // The saved list's heart in the site's header, beside the search, where the shop turned it on (search.header_heart, off by
   // default, as Aviad asked 17.11): an outline in the colour of the site's own icons, full once something is saved, and a
-  // press opens the list. Beside Lets' own button in the header, else the theme's search icon; nowhere to stand, none.
+  // press opens the list. Beside Let’s' own button in the header, else the theme's search icon; nowhere to stand, none.
   var HEADER_HEART = null;
   function placeHeart() {
     var wanted = LOOK.heart === true && !(SHORT && SHORT.wishlist === false);
@@ -185,7 +185,7 @@
     HEADER_HEART = h;
     paintHeart();
   }
-  // where it stands: after Lets' own button in the header, else after the theme's first search icon a shopper can see
+  // where it stands: after Let’s' own button in the header, else after the theme's first search icon a shopper can see
   function heartAnchor() {
     var own = LAUNCHERS.map(function (b) { return b.getRootNode && b.getRootNode().host; }).filter(function (host) { return host && host !== FLOAT && host.isConnected && host.getClientRects().length > 0; })[0];
     if (own) { return own; }

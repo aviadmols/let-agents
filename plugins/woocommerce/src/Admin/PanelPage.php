@@ -8,10 +8,10 @@ use LetAgents\Storefront\LetAgentsApi;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * "Lets Search" in the wp-admin menu: the shop's Lets panel, inside WordPress.
+ * "Let’s Search" in the wp-admin menu: the shop's Let’s panel, inside WordPress.
  *
  * Each opening asks Let Agents, signed with the store's token, for a one-time sign-in address good
- * for a minute, and the frame opens it: the store's own Lets account is signed in, in this shop's
+ * for a minute, and the frame opens it: the store's own Let’s account is signed in, in this shop's
  * panel only. The token never reaches the browser, and the address works once. Only people who
  * manage the store in WordPress see the page.
  */
@@ -21,7 +21,7 @@ final class PanelPage {
 
 	private const CAPABILITY = 'manage_woocommerce';
 
-	/** The Lets mark: two halves of a circle, as the drawer's launcher draws it. */
+	/** The Let’s mark: two halves of a circle, as the drawer's launcher draws it. */
 	private const ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCI+PHBhdGggZmlsbD0iI2EwYTVhYSIgZD0iTTQgM2gxMmE2IDYgMCAwIDEtMTIgMHpNNCAxN2gxMmE2IDYgMCAwIDAtMTIgMHoiLz48L3N2Zz4=';
 
 	public static function register(): void {
@@ -29,7 +29,7 @@ final class PanelPage {
 	}
 
 	public static function menu(): void {
-		add_menu_page( 'Lets Search', 'Lets Search', self::capability(), self::SLUG, array( self::class, 'render' ), self::ICON, 56 );
+		add_menu_page( 'Let’s Search', 'Let’s Search', self::capability(), self::SLUG, array( self::class, 'render' ), self::ICON, 56 );
 	}
 
 	public static function render(): void {
@@ -40,7 +40,7 @@ final class PanelPage {
 		echo '<style>#wpcontent{padding-inline-start:0}#wpbody-content{padding-bottom:0}#wpfooter{display:none}.lets-panel{display:block;width:100%;height:calc(100vh - 32px);border:0;background:#f6f6f7}@media (max-width:782px){.lets-panel{height:calc(100vh - 46px)}}.lets-panel-note{max-width:640px;margin:48px auto;padding:0 20px;font-size:14px;line-height:1.6}.lets-panel-note h1{font-size:20px}</style>';
 
 		if ( null === AccessToken::current() ) {
-			self::note( __( 'Connect the store to Lets first', 'let-agents' ), __( 'Create an access token in the plugin settings and connect it in Lets. The panel opens here once the store is connected.', 'let-agents' ), true );
+			self::note( __( 'Connect the store to Let’s first', 'let-agents' ), __( 'Create an access token in the plugin settings and connect it in Let’s. The panel opens here once the store is connected.', 'let-agents' ), true );
 			return;
 		}
 
@@ -54,7 +54,7 @@ final class PanelPage {
 		);
 
 		if ( is_wp_error( $answer ) || empty( $answer['url'] ) || ! is_string( $answer['url'] ) ) {
-			$why = is_wp_error( $answer ) ? $answer->get_error_message() : __( 'Lets did not answer as expected.', 'let-agents' );
+			$why = is_wp_error( $answer ) ? $answer->get_error_message() : __( 'Let’s did not answer as expected.', 'let-agents' );
 			self::note( __( 'The panel could not open', 'let-agents' ), $why, true );
 			return;
 		}
@@ -62,7 +62,7 @@ final class PanelPage {
 		printf(
 			'<iframe class="lets-panel" src="%s" title="%s" allow="clipboard-write" referrerpolicy="no-referrer"></iframe>',
 			esc_url( $answer['url'] ),
-			esc_attr__( 'Lets Search panel', 'let-agents' )
+			esc_attr__( 'Let’s Search panel', 'let-agents' )
 		);
 	}
 

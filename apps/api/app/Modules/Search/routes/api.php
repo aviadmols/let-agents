@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 
 // Prefixed /api/v1 by the module loader. Public: the storefront calls these from every visitor,
 // except the plugin route, which the store's own server signs.
-// The Lets Search drawer (built: resources/search/lets-search/build.js). Before search/{site}.
+// The Let’s Search drawer (built: resources/search/lets-search/build.js). Before search/{site}.
 Route::get('search/lets-search.js', LetsSearchScriptController::class)->name('api.search.lets-search');
 // The old search script's address, still printed by stores on older plugins and the Shopify embed:
 // it serves the same drawer, which reads their LetAgentsSearchContext as its settings.
@@ -49,7 +49,7 @@ Route::middleware('throttle:search')->group(function (): void {
     Route::get('search/{site}/llms.txt', [AgentDiscoveryController::class, 'llms'])->name('api.search.llms');
 });
 
-// Lets Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector), every store
+// Let’s Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector), every store
 // of it at one address. Its calls come from the AI's own servers, many shoppers to an address.
 Route::match(['get', 'post', 'delete'], 'mcp', AppMcpController::class)
     ->middleware('throttle:search-app')

@@ -6,7 +6,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
 /**
- * One scale for every line on the shop's analytics chart (searches, openings of Lets, questions, adds
+ * One scale for every line on the shop's analytics chart (searches, openings of Let’s, questions, adds
  * to the cart), so they read alike: hours for a day, days up to four months, months beyond, in Israel
  * time. A module counts its own by key() and returns them under figures()['series'][its name]; the
  * screen turns them into points().

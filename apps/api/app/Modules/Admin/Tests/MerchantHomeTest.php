@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * Today, the shop owner's home, as the designer's redesign lays it out (11.2026). A store no shopper has searched yet
- * sees its first day: what is done, what Lets already knows, the live searches waiting for the first shopper, and the
+ * sees its first day: what is done, what Let’s already knows, the live searches waiting for the first shopper, and the
  * weekly email. The period is 7 days by default, and 30, 90 or dates. The panel opens in English; Hebrew is the
  * person's choice. Nothing about models or money spent on them. (A store with searches: Search's TodayTest.)
  */
@@ -37,7 +37,7 @@ final class MerchantHomeTest extends TestCase
             ->assertSee('data-first-day', false)
             ->assertSee('היום הראשון')
             ->assertSee('החיפוש החכם פועל באתר שלכם.')
-            ->assertSee('מה Lets כבר יודע על החנות שלכם')
+            ->assertSee('מה Let’s כבר יודע על החנות שלכם')
             ->assertSee('עוד אין מה לתקן')
             ->assertSee('מחכים לגולש הראשון')
             ->assertSee('data-live-feed', false)

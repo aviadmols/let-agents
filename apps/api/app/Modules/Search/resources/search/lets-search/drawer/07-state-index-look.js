@@ -48,7 +48,7 @@
         S.index = d;
         // the index carries the shop's look too (and is all a preview reads): the same choices as /look
         if (S.config.theme) { applyLook(S.config); }
-        if (!CFG.assistant) { CFG.assistant = (S.config.shopName || 'Lets') + ' AI'; }
+        if (!CFG.assistant) { CFG.assistant = (S.config.shopName || 'Let’s') + ' AI'; }
         shopSettings();
         render();
         return d;
@@ -78,7 +78,7 @@
 
   // ---------------------------------------------------------------- the shop's look (settings · how it looks, search window)
   // Read once a page, before the index is needed (small, cached by the browser for minutes), and kept for the
-  // next page. Each choice is applied where it shows: the language of every word, Lets' look or the site's,
+  // next page. Each choice is applied where it shows: the language of every word, Let’s' look or the site's,
   // the assistant's name, the theme's own search box, the product page's row for a product sold out.
   // resolves true once this page read the fresh look (the invitation waits for it: a first visit has no look kept)
   function fetchLook() {

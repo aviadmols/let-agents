@@ -25,7 +25,7 @@ final class Plugin {
 
 	public static function boot(): void {
 		Legacy::migrate();
-		// 0.9.0: the widget's and the search's modes become the one mode of Lets Search.
+		// 0.9.0: the widget's and the search's modes become the one mode of Let’s Search.
 		Settings::migrate();
 		add_action( 'init', array( self::class, 'load_translations' ) );
 		add_action( 'init', array( self::class, 'forget_cart_capture' ) );
@@ -33,7 +33,7 @@ final class Plugin {
 		// The one write route: drafts of the posts the store team publishes in Let Agents.
 		add_action( 'rest_api_init', array( PostRoutes::class, 'register' ) );
 
-		// Lets Search, the one storefront script. The page it runs on travels in its context.
+		// Let’s Search, the one storefront script. The page it runs on travels in its context.
 		Search::register();
 		// [lets_cta] in old posts prints nothing now.
 		CallToAction::register();
@@ -48,7 +48,7 @@ final class Plugin {
 		if ( is_admin() ) {
 			SettingsPage::register();
 			ReportsPage::register();
-			// "Lets Search" in the menu: the shop's Lets panel inside WordPress, signed in by the token.
+			// "Let’s Search" in the menu: the shop's Let’s panel inside WordPress, signed in by the token.
 			PanelPage::register();
 		}
 	}

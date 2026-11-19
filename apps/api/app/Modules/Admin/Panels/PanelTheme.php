@@ -31,7 +31,7 @@ final class PanelTheme
         return new HtmlString('<style data-lets-theme>'.self::$css.'</style>');
     }
 
-    /** The merchant panel's own layer, after the shared one: the Lets Search language (merchant.css). */
+    /** The merchant panel's own layer, after the shared one: the Let’s Search language (merchant.css). */
     public static function merchant(): HtmlString
     {
         self::$merchant ??= (string) file_get_contents(dirname(__DIR__).'/resources/css/merchant.css');

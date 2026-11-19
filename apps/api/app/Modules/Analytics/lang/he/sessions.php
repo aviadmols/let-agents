@@ -120,7 +120,7 @@ return [
         'searched' => 'חיפש ״:q״',
         'photo' => 'חיפש לפי תמונה',
         'asked' => 'שאל: ״:q״',
-        'opened' => 'פתח את Lets',
+        'opened' => 'פתח את Let’s',
         'saved' => 'שמר לרשימת המשאלות',
         'saved_product' => 'שמר לרשימה: :title',
         'added' => 'הוסיף לסל',

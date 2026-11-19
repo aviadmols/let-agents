@@ -55,9 +55,9 @@ return [
     'numbers' => [
         'title' => 'The numbers',
         'visitors' => 'Visitors',
-        'adds' => 'Added to cart through Lets',
-        'orders' => 'Orders Lets helped',
-        'revenue' => 'Revenue Lets helped',
+        'adds' => 'Added to cart through Let’s',
+        'orders' => 'Orders Let’s helped',
+        'revenue' => 'Revenue Let’s helped',
     ],
     'notices' => [
         'title' => 'Notices and insights',

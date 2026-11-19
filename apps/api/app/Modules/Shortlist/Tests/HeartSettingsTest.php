@@ -54,9 +54,9 @@ final class HeartSettingsTest extends TestCase
     {
         Livewire::test(HeartSettings::class)
             ->assertSee('הלב ורשימת המשאלות')
-            ->assertSee('לב על כל מוצר. גולש שומר, חוזר, משתף. הרשימה היא של Lets, לא של התבנית, אז היא עובדת בכל חנות.')
+            ->assertSee('לב על כל מוצר. גולש שומר, חוזר, משתף. הרשימה היא של Let’s, לא של התבנית, אז היא עובדת בכל חנות.')
             ->assertSee('ליד כפתור ההוספה לסל. נכנס לבד.')
-            ->assertSee('בתוצאות החיפוש של Lets')
+            ->assertSee('בתוצאות החיפוש של Let’s')
             ->assertSee('נשמר ונפתחת הרשימה')
             ->assertSee('זיהוי אוטומטי בדפי קטגוריה')
             ->assertSee('rocks-gold.example/product-category/…')

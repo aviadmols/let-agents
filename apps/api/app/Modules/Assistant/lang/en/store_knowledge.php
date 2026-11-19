@@ -4,10 +4,10 @@
 return [
     'nav' => 'Store knowledge',
     'title' => 'Store knowledge',
-    'lede' => 'Everything Lets knows about your store, and where it learned it. What your pages don’t say, you add here.',
+    'lede' => 'Everything Let’s knows about your store, and where it learned it. What your pages don’t say, you add here.',
 
     'teach' => [
-        'title' => 'Teach Lets something',
+        'title' => 'Teach Let’s something',
         'text' => 'One sentence is enough. The assistant uses it in answers from the very next search.',
         'label' => 'Something your pages don’t say',
         'placeholder' => 'For example: we gift wrap for free, just ask at checkout',
@@ -133,7 +133,7 @@ return [
     ],
 
     'knows' => [
-        'title' => 'What Lets knows',
+        'title' => 'What Let’s knows',
         'products' => 'Products',
         'photos' => 'Photos read',
         'pages' => 'Pages and posts',
@@ -144,6 +144,6 @@ return [
 
     'tip' => [
         'title' => 'Nothing changes on your site',
-        'text' => 'Lets only reads your store. What you add here improves search and answers, and your pages stay exactly as they are.',
+        'text' => 'Let’s only reads your store. What you add here improves search and answers, and your pages stay exactly as they are.',
     ],
 ];

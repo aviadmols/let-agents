@@ -25,7 +25,7 @@ use UnitEnum;
 
 /**
  * A new shop's first-run screens, as the designer's panel lays them out (2026-10-18): connect the store,
- * check what Lets found, the scan beside a live try, and the first steps. A Shopify store came from its
+ * check what Let’s found, the scan beside a live try, and the first steps. A Shopify store came from its
  * app store already connected and starts at the second. The shop's panel opens here until the manager
  * goes through to the first steps (FinishOnboarding), and never again after. Every figure comes from the
  * modules (ShopFacts, ConnectionFacts, ShopScan, FirstSteps); a row with nothing real to say is left out.
@@ -49,7 +49,7 @@ final class Onboarding extends Page
     /** The screen being shown, 1 to 4. */
     public int $step = 1;
 
-    /** The form to fix what Lets found is open. */
+    /** The form to fix what Let’s found is open. */
     public bool $fixing = false;
 
     /** WooCommerce's store chose the Shopify card: how a Shopify store connects. */
@@ -156,7 +156,7 @@ final class Onboarding extends Page
         return $user instanceof User && $user->canEditShop($this->shop());
     }
 
-    /** Only an owner (or an operator) makes a token: it decides which store Lets reads. */
+    /** Only an owner (or an operator) makes a token: it decides which store Let’s reads. */
     public function canConnect(): bool
     {
         $user = Auth::user();
@@ -251,10 +251,10 @@ final class Onboarding extends Page
         $this->step = 2;
     }
 
-    // ------------------------------------------------------------------ 2 · what Lets found
+    // ------------------------------------------------------------------ 2 · what Let’s found
 
     /**
-     * What Lets found, a row each, only what something real says.
+     * What Let’s found, a row each, only what something real says.
      *
      * @return list<array{key: string, label: string, value: string}>
      */
@@ -474,7 +474,7 @@ final class Onboarding extends Page
     }
 
     /**
-     * Where a Shopify store switches Lets on in its theme, while it is not live: there the search is in the
+     * Where a Shopify store switches Let’s on in its theme, while it is not live: there the search is in the
      * store only once the app embed is on, so the try asks for it first (the first step "on" has the link).
      */
     public function embedUrl(): ?string

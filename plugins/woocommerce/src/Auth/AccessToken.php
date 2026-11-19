@@ -44,8 +44,8 @@ final class AccessToken {
 	}
 
 	/**
-	 * A token made in Lets (Settings > Connection and plan) and pasted here: kept like one made here, by
-	 * its hash only. Lets holds the same token, so the two reach the same keys.
+	 * A token made in Let’s (Settings > Connection and plan) and pasted here: kept like one made here, by
+	 * its hash only. Let’s holds the same token, so the two reach the same keys.
 	 *
 	 * @return bool false when the text is not a token
 	 */

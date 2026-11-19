@@ -49,7 +49,7 @@ class Plan extends Model
         return $code === null || $code === '' ? null : self::query()->where('code', $code)->first();
     }
 
-    /** The plan as the store's bill names it: "Lets Growth". Shopify's subscription is found by it again. */
+    /** The plan as the store's bill names it: "Lets Growth" (kept: existing subscriptions are matched by it). Shopify's subscription is found by it again. */
     public function billingName(): string
     {
         return 'Lets '.$this->name;

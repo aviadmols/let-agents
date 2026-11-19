@@ -21,9 +21,9 @@ use Illuminate\Support\Facades\Route;
 /**
  * Two of the shop's first steps, the search's own:
  *
- *   on     Lets is live in the store. The store decides that (the plugin's mode, the Shopify app embed),
- *          so it is read from what shoppers did: in preview no shopper sees Lets, so a page of the store
- *          that loaded Lets outside the preview (a visit), shoppers who saw or opened it, or several of them
+ *   on     Let’s is live in the store. The store decides that (the plugin's mode, the Shopify app embed),
+ *          so it is read from what shoppers did: in preview no shopper sees Let’s, so a page of the store
+ *          that loaded Let’s outside the preview (a visit), shoppers who saw or opened it, or several of them
  *          searching, mean it is live. A visit is the first sign: a new store had no suggestion yet to see or
  *          click, one person searching, and stayed "In preview" with its search on (17.11).
  *   look   the merchant saw it as a shopper: the store with the preview link, in a new tab. Done when
@@ -49,7 +49,7 @@ final class SearchFirstSteps implements FirstSteps
             $preview = route('filament.merchant.pages.search.check', ['tenant' => $shop]);
         }
         $looked = DB::table('shop_notices_done')->where('shop_id', $shop->id)->where('key', self::LOOK_DONE)->exists();
-        // a Shopify store switches Lets on in its theme: the theme editor opens with the app embed on, one Save away
+        // a Shopify store switches Let’s on in its theme: the theme editor opens with the app embed on, one Save away
         $embed = $shop->platform === ShopPlatform::Shopify ? $this->embedUrl($shop) : null;
 
         return [
@@ -77,7 +77,7 @@ final class SearchFirstSteps implements FirstSteps
         ];
     }
 
-    /** Where the store's platform switches Lets on in its theme (ConnectionFacts' embed_url), when it says. */
+    /** Where the store's platform switches Let’s on in its theme (ConnectionFacts' embed_url), when it says. */
     private function embedUrl(Shop $shop): ?string
     {
         foreach (app()->tagged(ConnectionFacts::TAG) as $source) {
@@ -91,8 +91,8 @@ final class SearchFirstSteps implements FirstSteps
     }
 
     /**
-     * A Shopify store loads Lets only through its app embed: any page of it that loaded Lets, the team's own look in
-     * preview too, means the embed is on. "Turn Lets on in the store" stayed open after it was switched on and saved,
+     * A Shopify store loads Let’s only through its app embed: any page of it that loaded Let’s, the team's own look in
+     * preview too, means the embed is on. "Turn Let’s on in the store" stayed open after it was switched on and saved,
      * a store behind its password having no shopper to visit it (App Store review, 17.11). Paused, it is not on.
      */
     private function embedded(Shop $shop): bool

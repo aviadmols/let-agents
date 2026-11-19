@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 
 /**
  * The store plugin from the shop's own panel ("Connection and plan"): the zip to install, a connection
- * token made here and pasted into the plugin's settings (the plugin keeps only its hash, Lets keeps the
+ * token made here and pasted into the plugin's settings (the plugin keeps only its hash, Let’s keeps the
  * token, the same as a token made in the plugin and pasted here), and what the connection says now.
  */
 final class MerchantStorePlugin implements ConnectionFacts, StorePlugin

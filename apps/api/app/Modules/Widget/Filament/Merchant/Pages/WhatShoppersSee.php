@@ -25,8 +25,8 @@ use Illuminate\Support\Facades\Route;
 use UnitEnum;
 
 /**
- * What shoppers see, as the designer's redesign lays it out (Tomer, 11.2026): everything Lets shows on the store, in
- * one place, beside a live preview that follows every change. The look (Lets' own or the store's) and how photos sit;
+ * What shoppers see, as the designer's redesign lays it out (Tomer, 11.2026): everything Let’s shows on the store, in
+ * one place, beside a live preview that follows every change. The look (Let’s' own or the store's) and how photos sit;
  * the search window (suggestions while typing, answers, the camera, prices); saving and comparing; and what happens
  * when the assistant does not know (WhatsApp, its number, the hours). Each control saves the moment it changes, the
  * shop's own word kept only where it differs from what it would inherit, as the settings pages keep it; a switch the
@@ -120,7 +120,7 @@ final class WhatShoppersSee extends Page
     /**
      * The controls the shop's plan holds: shown as they are, not changed here, "Requires upgrade" beside them. Held is
      * what the plan keeps from the shop (a feature it does not include, a choice it makes), whether or not the shop's
-     * value happens to be the plan's now: Starter with the Lets look still cannot pick the store's own.
+     * value happens to be the plan's now: Starter with the Let’s look still cannot pick the store's own.
      *
      * @return list<string>
      */

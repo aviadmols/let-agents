@@ -62,7 +62,7 @@ final class MerchantPanelProvider extends PanelProvider
             ->navigation(fn (NavigationBuilder $builder): NavigationBuilder => MerchantNavigation::build($builder))
             ->renderHook(PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE, fn (array $scopes): HtmlString => MerchantNavigation::section($scopes));
 
-        // The Lets Search look on top of the shared one: the drawer's tokens, the mark in ink (merchant.css).
+        // The Let’s Search look on top of the shared one: the drawer's tokens, the mark in ink (merchant.css).
         // a designer's session ends with its pass (EndDesignPass)
         PanelDefaults::apply($panel, 'Merchant', [EndDesignPass::class]);
 
@@ -126,7 +126,7 @@ final class MerchantPanelProvider extends PanelProvider
     }
 
     /**
-     * Whether shoppers see Lets, and where the store is: from the first steps, at most every 5 minutes.
+     * Whether shoppers see Let’s, and where the store is: from the first steps, at most every 5 minutes.
      *
      * @return array{0: bool, 1: string|null}
      */
@@ -147,7 +147,7 @@ final class MerchantPanelProvider extends PanelProvider
     }
 
     /**
-     * The top bar as the design draws it: the store, whether Lets is live in it, the language, the store
+     * The top bar as the design draws it: the store, whether Let’s is live in it, the language, the store
      * itself, and the person with their menu. An operator in someone else's store sees that, and the way back.
      */
     private static function topbar(): HtmlString

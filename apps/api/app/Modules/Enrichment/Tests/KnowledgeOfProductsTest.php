@@ -68,10 +68,10 @@ final class KnowledgeOfProductsTest extends TestCase
 
         $this->actingAs($merchant)->get("/merchant/{$shop->slug}/about-store?tab=products")
             ->assertOk()
-            ->assertSee('Teach Lets something')
+            ->assertSee('Teach Let’s something')
             ->assertSee('What we understood')
             ->assertSee('Wide-brim straw hat')
             ->assertSee('from the title')
-            ->assertSee('What Lets knows');
+            ->assertSee('What Let’s knows');
     }
 }

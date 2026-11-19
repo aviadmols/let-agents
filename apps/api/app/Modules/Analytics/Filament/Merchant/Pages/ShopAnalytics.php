@@ -20,7 +20,7 @@ use Throwable;
 use UnitEnum;
 
 /**
- * The shop's analytics, as the designer's panel lays them out: everything shoppers did with Lets in one
+ * The shop's analytics, as the designer's panel lays them out: everything shoppers did with Let’s in one
  * place. The store's numbers with adds by day; popular products; the wishlist; the words searched most;
  * the questions asked most; the searches that failed (nothing found, or nothing clicked); and each list
  * in full ("the whole list", searched and sorted). Every module gives its part (ShopReport); nothing
@@ -64,7 +64,7 @@ final class ShopAnalytics extends Page
     #[Url(as: 'find')]
     public string $search = '';
 
-    /** What the chart shows through the period: searches, openings of Lets, questions or adds to the cart. */
+    /** What the chart shows through the period: searches, openings of Let’s, questions or adds to the cart. */
     public string $measure = 'searches';
 
     #[Url]

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * GET /api/v1/search/lets-search.js — the Lets Search drawer, one file with the engine and its
+ * GET /api/v1/search/lets-search.js — the Let’s Search drawer, one file with the engine and its
  * stylesheets inside. Built by resources/search/lets-search/build.js and committed; served from
  * disk, so every store runs the newest version minutes after a deploy. The old address,
  * /api/v1/search/let-agents-search.js, serves the same file.

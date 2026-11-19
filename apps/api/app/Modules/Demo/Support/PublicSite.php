@@ -88,7 +88,7 @@ final class PublicSite
     }
 
     /**
-     * Whether the site runs on what Lets connects to, Shopify or WordPress (a store on WooCommerce or a content site):
+     * Whether the site runs on what Let’s connects to, Shopify or WordPress (a store on WooCommerce or a content site):
      * its home page says so (Shopify's CDN, WordPress's folders or generator), else its Shopify product feed or its
      * WordPress API answers. A site on anything else gets no demo it could never connect as.
      */

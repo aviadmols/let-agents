@@ -69,7 +69,7 @@ final class CountSearch
     /**
      * A product opened from the search. When the visitor is known, kept with the shop's events too, so an add
      * to the cart from the product's own page afterwards, and an order, are the search's (Analytics\Actions\RecordOrder;
-     * Aviad, 29.10: a product opened from Lets and added on its page is Lets' product).
+     * Aviad, 29.10: a product opened from Let’s and added on its page is Let’s' product).
      *
      * @param  array<string, string|null>  $visit
      */

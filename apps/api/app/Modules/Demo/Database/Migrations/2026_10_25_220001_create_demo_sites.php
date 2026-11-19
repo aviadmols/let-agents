@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * A store someone asked to see Lets on, by its address and their email: the code that proves the email is theirs,
+ * A store someone asked to see Let’s on, by its address and their email: the code that proves the email is theirs,
  * the demo store built from what the store publishes (a shop of its own, status demo, deleted with everything it
  * holds when the demo ends), the store's picture behind the demo, and when it ends. The row stays a while after,
  * without the picture, for the team to see who asked; the store's data does not.

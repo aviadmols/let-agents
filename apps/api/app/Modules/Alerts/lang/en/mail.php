@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'subject_one' => 'Lets: :title',
-    'subject_many' => 'Lets: :count problems in the system',
+    'subject_one' => 'Let’s: :title',
+    'subject_many' => 'Let’s: :count problems in the system',
     'urgent' => 'Urgent:',
     'urgent_badge' => 'Urgent',
     'lead' => 'System check, :at',

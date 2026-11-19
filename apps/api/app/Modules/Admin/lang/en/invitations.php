@@ -3,10 +3,10 @@
 // An invitation to a shop's panel: the email, and the page its link opens (InvitationController).
 return [
     'mail' => [
-        'subject' => 'An invitation to :shop on Lets',
+        'subject' => 'An invitation to :shop on Let’s',
         'title' => 'You are invited to :shop',
-        'by' => ':name invited you to the :shop panel on Lets.',
-        'by_team' => 'You are invited to the :shop panel on Lets.',
+        'by' => ':name invited you to the :shop panel on Let’s.',
+        'by_team' => 'You are invited to the :shop panel on Let’s.',
         'as' => 'Your role: :role (:what).',
         'button' => 'Set a password and come in',
         'expires' => 'The link works until :date. If it expires, ask the account owner to send it again.',

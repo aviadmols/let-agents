@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>Lets</title>
+    <title>Let’s</title>
     <link rel="stylesheet" href="{{ \App\Modules\Admin\Panels\PanelTheme::FONT_URL }}">
     <style>
         :root { color-scheme: light dark; --paper: #fff; --plane: #f4f3ef; --ink: #111; --muted: #6b6b6b; }

@@ -147,7 +147,7 @@ final class WidgetSettingsPagesTest extends TestCase
     {
         $screen = Livewire::test(OpeningHours::class)
             ->assertSee('מתי הצוות עונה')
-            ->assertSee('בשעות האלה Lets מציע וואטסאפ; מחוץ להן, השארת פרטים')
+            ->assertSee('בשעות האלה Let’s מציע וואטסאפ; מחוץ להן, השארת פרטים')
             ->assertSee('שמירה')
             ->assertSet('data.days.sunday.open', true)
             ->assertSet('data.days.sunday.from', '09:00')

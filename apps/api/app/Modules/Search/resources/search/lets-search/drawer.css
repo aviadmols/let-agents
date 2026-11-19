@@ -1,5 +1,5 @@
 /*
- * Lets Search — the live drawer: what the component sheet doesn't hold.
+ * Let’s Search — the live drawer: what the component sheet doesn't hold.
  * Reads only --ls-* / shared primitives, logical properties throughout.
  */
 
@@ -327,7 +327,7 @@
 /* the key specs, first under the product: a little bolder than the sections after them */
 .ls-specs-box > summary .ls-block__title { font-size: var(--lsp-text-md); font-weight: 700; }
 .ls-specs-box .ls-specs td { font-weight: 500; }
-/* open from the start, with room before what Lets offers to ask under it */
+/* open from the start, with room before what Let’s offers to ask under it */
 .ls-specs-box { margin-bottom: 22px; }
 .ls-faq { border-top: 1px solid var(--ls-line); }
 .ls-faq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 0; font-size: var(--lsp-text-md); font-weight: 500; }

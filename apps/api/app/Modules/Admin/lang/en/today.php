@@ -132,7 +132,7 @@ return [
     'n_photos' => '{1} 1 photo|[0,*] :n photos',
 
     'learned' => [
-        'title' => 'What Lets already knows about your store',
+        'title' => 'What Let’s already knows about your store',
         'sub' => 'From the first read. It updates on its own when you add products.',
         'products' => '{1} product|[0,*] products',
         'photos' => '{1} photo read|[0,*] photos read',

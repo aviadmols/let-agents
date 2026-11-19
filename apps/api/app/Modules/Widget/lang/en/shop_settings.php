@@ -14,7 +14,7 @@ return [
         'popularity_tip' => 'A product viewed a lot in the last 30 days compared with the rest of its category.',
         'promises' => '"What the store promises"',
         'promises_sub' => 'Returns, shipping, warranty, from the site pages',
-        'promises_tip' => 'Returns, shipping and warranty, as your site pages say them. Lets never promises what is not written.',
+        'promises_tip' => 'Returns, shipping and warranty, as your site pages say them. Let’s never promises what is not written.',
         'parts' => 'What the block shows',
         'parts_tip' => 'The parts of the block on the product page. The order is learned from what shoppers open.',
         'part_names' => [
@@ -51,8 +51,8 @@ return [
     'hours' => [
         'nav' => 'Answering hours',
         'title' => 'When the team answers',
-        'sample' => 'During these hours Lets offers WhatsApp; outside them, leaving details',
-        'tip' => 'During these hours Lets offers WhatsApp with "The team is available now". Outside them: leaving details, with "We\'ll get back to you".',
+        'sample' => 'During these hours Let’s offers WhatsApp; outside them, leaving details',
+        'tip' => 'During these hours Let’s offers WhatsApp with "The team is available now". Outside them: leaving details, with "We\'ll get back to you".',
         'save' => 'Save',
         'from' => 'From',
         'until' => 'Until',

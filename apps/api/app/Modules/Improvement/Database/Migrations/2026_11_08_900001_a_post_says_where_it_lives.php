@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Where a post lives, as the team chose it: on the store's own site (sent to its blog as a draft) or on Lets (a page
+ * Where a post lives, as the team chose it: on the store's own site (sent to its blog as a draft) or on Let’s (a page
  * at its own address, among the store's content). Null: a post published before the choice, which went to both.
  */
 return new class extends Migration

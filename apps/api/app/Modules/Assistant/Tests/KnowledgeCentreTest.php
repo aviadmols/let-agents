@@ -159,7 +159,7 @@ final class KnowledgeCentreTest extends TestCase
         Queue::fake();
 
         $page = Livewire::test(AboutStore::class)
-            ->assertSee('ללמד את Lets משהו')
+            ->assertSee('ללמד את Let’s משהו')
             ->set('newInfo', 'חיתוך פלטות לפי מידה בחנות בלבד, 8 ש"ח לחיתוך.')
             ->call('addInfo')
             ->assertSet('newInfo', '')

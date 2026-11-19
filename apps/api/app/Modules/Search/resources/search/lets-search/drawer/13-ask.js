@@ -342,7 +342,7 @@
     html += setHtml(turn);
     html += alsoHtml(turn);
     html += relatedHtml(turn);
-    // a page the shopper can open, never what Lets gathered of the store with no page of its own ("מה שהפוסטים…")
+    // a page the shopper can open, never what Let’s gathered of the store with no page of its own ("מה שהפוסטים…")
     // ...and none under an answer that only hands over to the team: it rests on no page (QA, 16.11: "This is one for our
     // team to check" said "From: Shipping & Returns")
     var src = handsOver(turn.answer) ? [] : (turn.sources || []).filter(function (s) { return s && ((s.title && s.url) || s.product); });

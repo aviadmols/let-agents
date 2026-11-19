@@ -100,7 +100,7 @@ class CatalogContent extends Model
 
     /**
      * Pages a shopper opens on the store's own site: not those the platform serves at its own address
-     * (a post Lets wrote and the team published, at /g/{shop}/{post}), which take the shopper away
+     * (a post Let’s wrote and the team published, at /g/{shop}/{post}), which take the shopper away
      * from the store. They stay the store's content for the assistant to answer from.
      *
      * @param  Builder<CatalogContent>  $query

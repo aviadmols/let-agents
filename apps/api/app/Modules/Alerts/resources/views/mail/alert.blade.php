@@ -5,7 +5,7 @@
 <body style="margin:0;padding:24px;background:#f6f6f7;font-family:'Google Sans',Heebo,Arial,sans-serif;color:#0b0b0c">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:24px;overflow:hidden">
         <div style="background:#0b0b0c;color:#fff;padding:22px 28px">
-            <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">Lets</p>
+            <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">Let’s</p>
             <p style="margin:4px 0 0;font-size:13px;color:#b9b9c0">{{ __('alerts::mail.lead', ['at' => now()->timezone('Asia/Jerusalem')->format('j.n.Y H:i')]) }}</p>
         </div>
         <div style="padding:8px 28px 28px">

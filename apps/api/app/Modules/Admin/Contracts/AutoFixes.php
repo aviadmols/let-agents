@@ -5,7 +5,7 @@ namespace App\Modules\Admin\Contracts;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
- * "Fixed by Lets" on the Improvements screen (the redesign, 11.2026): what was clear enough to fix without the owner
+ * "Fixed by Let’s" on the Improvements screen (the redesign, 11.2026): what was clear enough to fix without the owner
  * (a typo, an obvious word of the same meaning), each with what shoppers found since, and the one tap that undoes it.
  * A module tags its class 'admin.auto_fixes'. Plain arrays only.
  */

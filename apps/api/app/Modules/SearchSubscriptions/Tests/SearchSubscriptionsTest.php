@@ -378,7 +378,7 @@ final class SearchSubscriptionsTest extends TestCase
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->where('shop_id', $this->shop->id)->update(['status' => ConnectionStatus::Failed]));
         $this->product('n', 'Jeans jacket new', now()->subHour());
         $this->found = ['n'];
-        $this->assertSame(0, app(SendWeekly::class)->handle(onlyShop: $this->shop->id), 'a store that removed Lets gets nothing sent');
+        $this->assertSame(0, app(SendWeekly::class)->handle(onlyShop: $this->shop->id), 'a store that removed Let’s gets nothing sent');
         $this->assertSame(0, app(ForgetRemovedStores::class)->handle(), 'not yet');
         $this->travel(31)->days();
         $this->assertSame(1, app(ForgetRemovedStores::class)->handle());

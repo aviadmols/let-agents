@@ -11,7 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The display settings screen shows the Lets Search drawer as the shop's shoppers would, on a
+ * The display settings screen shows the Let’s Search drawer as the shop's shoppers would, on a
  * sample product page of the shop, from its real information; nothing in the preview is counted
  * or sent to a model, and a shop manager can preview only their own shop.
  */

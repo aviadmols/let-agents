@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * A store someone asked to see Lets on, built from what it publishes and shown on our own page (see DemoController).
+ * A store someone asked to see Let’s on, built from what it publishes and shown on our own page (see DemoController).
  * Its catalogue is read by PublicStoreFeed, the Connections registry's reader for platform "demo".
  */
 final class DemoServiceProvider extends ModuleServiceProvider

@@ -1,5 +1,5 @@
 {{-- The demo in its phone (DemoController::phone): what the demo is, plainly on its screen in the demo's language and
-     Lets' fonts, with Lets' floating search on it (which takes the page's font, so Lets' too, and speaks the store's
+     Let’s' fonts, with Let’s' floating search on it (which takes the page's font, so Let’s' too, and speaks the store's
      language). Framed by the demo page; on a phone it fills the screen. --}}
 @php($t = fn (string $key, array $params = []) => __('demo::page.view.'.$key, $params))
 @php($limit = (int) \App\Core\Facades\Settings::get('demo.max_products'))

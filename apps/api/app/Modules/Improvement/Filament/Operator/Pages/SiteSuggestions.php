@@ -61,7 +61,7 @@ class SiteSuggestions extends Page
     /** @var array<string, list<string>> the post's products as the team leaves them (store ids, in order), by proposal */
     public array $products = [];
 
-    /** @var array<string, string> where the post will live: store (the store's blog) or lets (a page on Lets), by proposal */
+    /** @var array<string, string> where the post will live: store (the store's blog) or lets (a page on Let’s), by proposal */
     public array $destinations = [];
 
     /** @var array<string, string> the words typed to find a product to add, by proposal */

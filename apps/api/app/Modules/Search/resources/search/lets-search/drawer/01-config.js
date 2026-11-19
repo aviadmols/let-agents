@@ -40,7 +40,7 @@
     return out;
   }
   var CFG = Object.assign({}, DEFAULTS, legacyConfig(), win.LetsSearchConfig || {});
-  // The shop's look, as its team chose it (/search/{site}/look): Lets' look or the site's, the widget's
+  // The shop's look, as its team chose it (/search/{site}/look): Let’s' look or the site's, the widget's
   // language, the assistant's name, whether the theme's own search box opens us. The last one this browser
   // read is used at once, so the page never flashes the wrong language; the fresh one follows (applyLook).
   // In the team's preview, what the preview page itself set wins.

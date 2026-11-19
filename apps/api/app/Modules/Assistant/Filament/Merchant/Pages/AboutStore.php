@@ -24,10 +24,10 @@ use Throwable;
 use UnitEnum;
 
 /**
- * Store knowledge, as the designer's redesign lays it out (Tomer, 11.2026): everything Lets knows about the store and
+ * Store knowledge, as the designer's redesign lays it out (Tomer, 11.2026): everything Let’s knows about the store and
  * where it learned it. One line to teach it something; then the pages and policies it read (with its posts and what the
  * product pages repeat), the products and what was understood of each, what the team added, and the rules of its
- * products; beside them, what Lets knows in numbers and when it last read the store. The products come from the scan
+ * products; beside them, what Let’s knows in numbers and when it last read the store. The products come from the scan
  * through KnowledgeProducts; the rest is this module's own (the operator's page, whose methods this one keeps). The
  * shop is fixed.
  */

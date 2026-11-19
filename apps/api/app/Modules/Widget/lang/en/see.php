@@ -28,7 +28,7 @@ return [
         'title' => 'The look',
         'style' => 'Style',
         'style_text' => 'Lets’ own look, or your store’s colors, font and corners',
-        'lets' => 'Lets',
+        'lets' => 'Let’s',
         'store' => 'Your store’s',
         'photos' => 'Product photos',
         'photos_text' => 'Fill the frame, or show the whole photo',

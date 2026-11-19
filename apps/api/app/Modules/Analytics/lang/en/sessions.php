@@ -120,7 +120,7 @@ return [
         'searched' => 'Searched ":q"',
         'photo' => 'Searched by photo',
         'asked' => 'Asked: ":q"',
-        'opened' => 'Opened Lets',
+        'opened' => 'Opened Let’s',
         'saved' => 'Saved to the wishlist',
         'saved_product' => 'Saved to the list: :title',
         'added' => 'Added to cart',

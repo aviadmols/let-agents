@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Cache;
 /**
  * POST /api/v1/mcp
  *
- * Lets Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector): one
+ * Let’s Search as one app inside a shopper's AI (a ChatGPT plugin, a Claude connector): one
  * address for every store that offers its catalogue to a shopper's AI, the store named in each
  * call. A Model Context Protocol server over plain HTTP, stateless, JSON-RPC answered with JSON,
  * no login: everything is the stores' public catalogues and what they approved of them. Tools to
@@ -96,7 +96,7 @@ final class AppMcpController
             'initialize' => self::result($id, [
                 'protocolVersion' => in_array($params['protocolVersion'] ?? null, McpController::VERSIONS, true) ? $params['protocolVersion'] : McpController::VERSIONS[0],
                 'capabilities' => ['tools' => ['listChanged' => false], 'resources' => ['listChanged' => false]],
-                'serverInfo' => ['name' => 'lets-search', 'title' => 'Lets Search', 'version' => '1.0.0'],
+                'serverInfo' => ['name' => 'lets-search', 'title' => 'Let’s Search', 'version' => '1.0.0'],
                 'instructions' => $t('instructions'),
             ]),
             'ping' => self::result($id, (object) []),
@@ -122,7 +122,7 @@ final class AppMcpController
                 ->map(fn (StoreConnection $c): array => ['store' => (string) $c->site_key, 'name' => (string) ($c->shop?->name ?? ''), 'url' => (string) $c->site_url])
                 ->values()->all();
 
-            return self::answered($id, ['stores' => $stores], $stores === [] ? 'No store of Lets Search matches; ask the shopper for the store\'s web address.' : null);
+            return self::answered($id, ['stores' => $stores], $stores === [] ? 'No store of Let’s Search matches; ask the shopper for the store\'s web address.' : null);
         }
 
         if (! in_array($tool, ['search_products', 'get_product', 'store_policies', 'create_cart_link', 'calculate_cart'], true)) {

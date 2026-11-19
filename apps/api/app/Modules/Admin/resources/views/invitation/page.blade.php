@@ -10,7 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>{{ $shop ? $t('title', ['shop' => $shop->name]) : 'Lets' }}</title>
+    <title>{{ $shop ? $t('title', ['shop' => $shop->name]) : 'Let’s' }}</title>
     <link rel="stylesheet" href="{{ \App\Modules\Admin\Panels\PanelTheme::FONT_URL }}">
     <style>
         :root { color-scheme: light dark; --paper: #fff; --plane: #f4f3ef; --ink: #111; --muted: #6b6b6b; --line: #e4e2dc; --bad: #d23c3c; }
@@ -31,7 +31,7 @@
 </head>
 <body>
 <main>
-    <p class="brand">Lets</p>
+    <p class="brand">Let’s</p>
     @if ($state === 'accept')
         <h1>{{ $t('title', ['shop' => $shop?->name]) }}</h1>
         <p>{{ $t('lead', ['role' => $invitation->role->label(), 'what' => $invitation->role->description()]) }}</p>

@@ -1,5 +1,5 @@
 /*!
- * Lets Search — the drawer (studio build).
+ * Let’s Search — the drawer (studio build).
  *
  * One script tag. It finds the store's search field and header, adds the smart-magnifier launcher,
  * and runs every part of the search inside one drawer: instant suggestions, results with filters,

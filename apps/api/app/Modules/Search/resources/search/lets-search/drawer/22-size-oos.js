@@ -144,7 +144,7 @@
   }
 
   // ---------------------------------------------------------------- a product or a variant sold out (search.out_of_stock_similar)
-  // On a product page whose product is sold out, or whose chosen variant is (a size, a colour), a Lets row under
+  // On a product page whose product is sold out, or whose chosen variant is (a size, a colour), a Let’s row under
   // "add to cart", only while it is so: a press opens similar products that are in stock, in the same size.
   // What is sold out is read from the page as the store draws it: WooCommerce's own stock line and its
   // variation events; Shopify's product JSON and the variant the page has chosen.

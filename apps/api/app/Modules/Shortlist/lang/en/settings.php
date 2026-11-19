@@ -27,7 +27,7 @@ return [
         'options' => ['corner' => 'Corner of the picture', 'price' => 'Beside the price', 'cart' => 'Beside add to cart'],
     ],
     'heart_in_results' => [
-        'label' => 'Heart in Lets search results',
+        'label' => 'Heart in Let’s search results',
         'description' => 'A heart on every product in the search window. Off: saving only from the store pages.',
     ],
     'heart_click' => [

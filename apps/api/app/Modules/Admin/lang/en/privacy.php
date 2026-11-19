@@ -12,7 +12,7 @@ return [
         'note' => 'The file holds shoppers\' personal details. Keep it somewhere safe.',
         'going' => 'Preparing the file.',
         'going_sub' => 'The download starts by itself within a few minutes. You can keep working meanwhile; just leave this tab open.',
-        'readme' => "The data of :shop at Lets, as of :date.\n\n"
+        'readme' => "The data of :shop at Let’s, as of :date.\n\n"
             ."shop.csv: the shop. team.csv: its people and roles. settings.csv: the settings chosen for it.\n"
             ."In the folders: a table for each kind of data, by area (Catalog, Leads, Shortlist: saved lists, Search, Assistant: questions and answers, Analytics: visits and orders, and more).\n\n"
             ."It holds shoppers' personal details (phone, email, name). Keep it somewhere safe, and delete it when no longer needed.\n"
@@ -58,14 +58,14 @@ return [
         'confirm_button' => 'Delete my account',
         'phrase_wrong' => 'Type exactly :phrase, in capital letters.',
         'alone' => 'You are the only owner of :shops. First make someone else an owner on the users page, or delete the shop.',
-        'operator' => 'A Lets team account is not deleted from here.',
+        'operator' => 'A Let’s team account is not deleted from here.',
     ],
 
     'mail' => [
         'asked' => [
             'subject' => ':shop will be deleted in a few days',
             'title' => ':shop will be deleted',
-            'lead' => ':name asked for :shop to be deleted from Lets. The search is already off the site and the plan is cancelled. On :date the shop will be deleted with all its data.',
+            'lead' => ':name asked for :shop to be deleted from Let’s. The search is already off the site and the plan is cancelled. On :date the shop will be deleted with all its data.',
             'keep_lead' => 'Changed your mind? Until :date you can keep the shop, and nothing will be deleted.',
             'button' => 'Keep the shop',
             'note' => 'If you asked for the deletion, there is nothing to do.',

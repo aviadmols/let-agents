@@ -12,7 +12,7 @@ use Illuminate\Http\Response;
  */
 final class ShortlistScriptController
 {
-    public const SCRIPT = "/* Lets Search: the saved list lives in the search drawer now */\n";
+    public const SCRIPT = "/* Let’s Search: the saved list lives in the search drawer now */\n";
 
     public function __invoke(Request $request): Response
     {

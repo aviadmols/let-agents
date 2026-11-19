@@ -174,7 +174,7 @@ final class SearchIndexController
      * GET /api/v1/search/{site}/look
      *
      * How the drawer looks and where it takes over, read on every page before the index is needed: the
-     * shop's look (Lets or the site's), the widget's language, the assistant's name, whether the theme's
+     * shop's look (Let’s or the site's), the widget's language, the assistant's name, whether the theme's
      * own search box opens the drawer, and the out-of-stock row on a product page. Small and cached.
      */
     public function look(Request $request, TenantContext $tenant, string $site): JsonResponse|Response
@@ -213,8 +213,8 @@ final class SearchIndexController
             // null: as the site (the page's own language)
             'lang' => in_array($language, ['he', 'en'], true) ? $language : null,
             // the assistant's name beside its answers: the shop's own, else "<shop> AI"
-            'assistant' => $name !== '' ? $name : trim((string) (Shop::query()->whereKey($shopId)->value('name') ?? 'Lets')).' AI',
-            // the theme's own search box and search buttons open the drawer; off: only Lets' own and what is marked data-lets-*
+            'assistant' => $name !== '' ? $name : trim((string) (Shop::query()->whereKey($shopId)->value('name') ?? 'Let’s')).' AI',
+            // the theme's own search box and search buttons open the drawer; off: only Let’s' own and what is marked data-lets-*
             'takeOver' => Features::enabled('search.take_over_field', $shopId),
             // "Helpful?" under an assistant's answer
             'rate' => Features::enabled('search.rate_answers', $shopId),
@@ -224,7 +224,7 @@ final class SearchIndexController
             'nudge' => Features::enabled('search.nudge', $shopId),
             // what it points at: the site's own search icon, when the shop named it; '' = the drawer finds it
             'nudgeAt' => self::nudgeAt((string) Settings::get('search.nudge_at', $shopId)),
-            // the round button at the bottom of the screen (where Lets found no place in the header): shown or not, on which
+            // the round button at the bottom of the screen (where Let’s found no place in the header): shown or not, on which
             // side ('auto': the page's end, as its direction), and how high, clear of the site's own floating buttons
             'float' => (bool) Settings::get('search.float_button', $shopId),
             'floatSide' => (string) Settings::get('search.float_side', $shopId),

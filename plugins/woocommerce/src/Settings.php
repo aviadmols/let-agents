@@ -21,7 +21,7 @@ final class Settings {
 	private const LEGACY_KEYS = array( 'widget_mode', 'search_mode', 'cta_after_paragraph' );
 
 	/**
-	 * Whether Lets Search loads on the store, and for whom. New installs start in preview.
+	 * Whether Let’s Search loads on the store, and for whom. New installs start in preview.
 	 *
 	 * Until 0.9.0 the product-page widget and the search had a mode each; a store that never saved
 	 * the new one is read from those (see legacy_mode()), so it keeps working before migrate() ran.

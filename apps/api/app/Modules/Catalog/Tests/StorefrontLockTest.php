@@ -20,12 +20,12 @@ final class StorefrontLockTest extends TestCase
         <html class="no-js" lang="en">
         <head>
           <meta charset="utf-8">
-          <title>Lets Shop</title>
+          <title>Let’s Shop</title>
           <link href="//lets-shop.myshopify.com/cdn/shop/t/1/assets/base.css?v=1" rel="stylesheet" type="text/css" media="all" />
           <script>window.Shopify = window.Shopify || {}; Shopify.shop = "lets-shop.myshopify.com";</script>
         </head>
         <body class="password">
-          <div class="password-header"><h1 class="password-header__title">Lets Shop</h1></div>
+          <div class="password-header"><h1 class="password-header__title">Let’s Shop</h1></div>
           <main id="MainContent" class="password-main">
             <section class="newsletter">
               <h2>Opening soon</h2>
@@ -46,7 +46,7 @@ final class StorefrontLockTest extends TestCase
     /** A product page with a login drawer in its header and a password in its words: a page of the store. */
     private const PRODUCT = <<<'HTML'
         <!doctype html>
-        <html lang="he"><head><title>טבעת זהב | Lets Shop</title></head>
+        <html lang="he"><head><title>טבעת זהב | Let’s Shop</title></head>
         <body class="template-product">
           <header>
             <a href="/account/login">התחברות</a>
@@ -85,11 +85,11 @@ final class StorefrontLockTest extends TestCase
         $this->assertNull(StorefrontLock::of(new Response(new Psr7Response(302, ['Location' => 'https://lets-shop.test/collections/rings']))));
 
         // A theme with neither the form's marks nor its template's class: the password field and its words.
-        $bare = '<html><body><div class="gate"><h1>Lets Shop</h1><p>Enter store password</p><input name="password" type="password"><button>Enter</button></div></body></html>';
+        $bare = '<html><body><div class="gate"><h1>Let’s Shop</h1><p>Enter store password</p><input name="password" type="password"><button>Enter</button></div></body></html>';
         $this->assertSame(StorefrontLock::PASSWORD, StorefrontLock::page($bare));
 
         // In Hebrew.
-        $hebrew = '<html><body><main><h1>Lets Shop</h1><p>החנות הזו מוגנת בסיסמה.</p><p>הזינו את סיסמת החנות</p><input type="password" name="password"></main></body></html>';
+        $hebrew = '<html><body><main><h1>Let’s Shop</h1><p>החנות הזו מוגנת בסיסמה.</p><p>הזינו את סיסמת החנות</p><input type="password" name="password"></main></body></html>';
         $this->assertSame(StorefrontLock::PASSWORD, StorefrontLock::page($hebrew));
     }
 

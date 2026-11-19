@@ -58,7 +58,7 @@ final class SettingsPage {
 		}
 
 		// No WooCommerce: a content site. Let Agents reads what it offers (tours, courses, events) and its articles from what
-		// the site publishes, and Lets Search finds them; nothing here needs WooCommerce. Shown on this plugin's pages only.
+		// the site publishes, and Let’s Search finds them; nothing here needs WooCommerce. Shown on this plugin's pages only.
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 		if ( null === $screen || false === strpos( (string) $screen->id, self::SLUG ) ) {
 			return;
@@ -79,7 +79,7 @@ final class SettingsPage {
 		exit;
 	}
 
-	/** A token made in Lets, pasted here: the store is connected with it. */
+	/** A token made in Let’s, pasted here: the store is connected with it. */
 	public static function paste_token(): void {
 		self::authorize( 'let_agents_paste_token' );
 
@@ -228,13 +228,13 @@ final class SettingsPage {
 				</form>
 			<?php endif; ?>
 
-			<h3><?php esc_html_e( 'Have a token from Lets?', 'let-agents' ); ?></h3>
-			<p class="description"><?php esc_html_e( 'In Lets: Settings > Connection and plan > Create a connection token. Paste it here and save; Lets reads the store with it.', 'let-agents' ); ?></p>
+			<h3><?php esc_html_e( 'Have a token from Let’s?', 'let-agents' ); ?></h3>
+			<p class="description"><?php esc_html_e( 'In Let’s: Settings > Connection and plan > Create a connection token. Paste it here and save; Let’s reads the store with it.', 'let-agents' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="let_agents_paste_token" />
 				<?php wp_nonce_field( 'let_agents_paste_token' ); ?>
 				<p>
-					<label for="let-agents-paste-token" class="screen-reader-text"><?php esc_html_e( 'Token from Lets', 'let-agents' ); ?></label>
+					<label for="let-agents-paste-token" class="screen-reader-text"><?php esc_html_e( 'Token from Let’s', 'let-agents' ); ?></label>
 					<input type="text" id="let-agents-paste-token" name="token" class="large-text code" dir="ltr" autocomplete="off" placeholder="lat_…" required />
 				</p>
 				<?php
@@ -248,7 +248,7 @@ final class SettingsPage {
 				?>
 			</form>
 
-			<h2><?php esc_html_e( 'Lets Search on the store', 'let-agents' ); ?></h2>
+			<h2><?php esc_html_e( 'Let’s Search on the store', 'let-agents' ); ?></h2>
 			<p><?php esc_html_e( 'One script from Let Agents: it opens from the store\'s search box and search icons, and on product pages and articles it starts with what matters about the page. Suggestions forgive spelling mistakes, results come with live prices and add to cart, and shoppers can ask questions and keep a wishlist. If Let Agents does not answer, the store\'s own search runs as before.', 'let-agents' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="let_agents_save_mode" />
@@ -257,8 +257,8 @@ final class SettingsPage {
 				$mode  = Settings::mode();
 				$modes = array(
 					'off'     => array( __( 'Off', 'let-agents' ), __( 'Nothing is added to the store.', 'let-agents' ) ),
-					'preview' => array( __( 'Preview', 'let-agents' ), __( 'Only the store team sees Lets Search: managers logged in to WordPress, or a browser that opened a preview link from Let Agents.', 'let-agents' ) ),
-					'live'    => array( __( 'Live', 'let-agents' ), __( 'Every visitor sees Lets Search.', 'let-agents' ) ),
+					'preview' => array( __( 'Preview', 'let-agents' ), __( 'Only the store team sees Let’s Search: managers logged in to WordPress, or a browser that opened a preview link from Let Agents.', 'let-agents' ) ),
+					'live'    => array( __( 'Live', 'let-agents' ), __( 'Every visitor sees Let’s Search.', 'let-agents' ) ),
 				);
 				?>
 				<fieldset>
@@ -270,7 +270,7 @@ final class SettingsPage {
 					<?php endforeach; ?>
 				</fieldset>
 				<?php if ( null === $token ) : ?>
-					<p class="description"><?php esc_html_e( 'Lets Search loads only after a token is created and connected in Let Agents.', 'let-agents' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Let’s Search loads only after a token is created and connected in Let Agents.', 'let-agents' ); ?></p>
 				<?php endif; ?>
 				<p class="description"><?php esc_html_e( 'Put [let_agents_wishlist] in a header or a menu for a heart that opens the wishlist, or link to #wishlist.', 'let-agents' ); ?></p>
 				<?php submit_button( __( 'Save', 'let-agents' ) ); ?>
@@ -331,10 +331,10 @@ final class SettingsPage {
 		$messages = array(
 			'revoked' => array( 'warning', __( 'The token was revoked. Let Agents can no longer read this store.', 'let-agents' ) ),
 			'saved'   => array( 'success', __( 'Settings saved.', 'let-agents' ) ),
-			'pasted'  => array( 'success', __( 'The token from Lets was saved. Go back to Lets and check the connection.', 'let-agents' ) ),
-			'paste_invalid' => array( 'error', __( 'That is not a Lets connection token. Copy it again from Lets: Settings > Connection and plan.', 'let-agents' ) ),
+			'pasted'  => array( 'success', __( 'The token from Let’s was saved. Go back to Let’s and check the connection.', 'let-agents' ) ),
+			'paste_invalid' => array( 'error', __( 'That is not a Let’s connection token. Copy it again from Let’s: Settings > Connection and plan.', 'let-agents' ) ),
 			'history' => array( 'success', __( 'Sending past orders to Let Agents. It runs in the background and can take a while in a large store.', 'let-agents' ) ),
-			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Let Agents and Lets Search is not off.', 'let-agents' ) ),
+			'history_unavailable' => array( 'warning', __( 'Past orders can be sent only when the store is connected to Let Agents and Let’s Search is not off.', 'let-agents' ) ),
 		);
 
 		if ( 'generated' === $notice && ! $token_shown ) {

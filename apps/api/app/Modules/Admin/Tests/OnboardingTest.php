@@ -19,7 +19,7 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * A new shop's first-run screens: connect (a Shopify store skips it), what Lets found (only what is real,
+ * A new shop's first-run screens: connect (a Shopify store skips it), what Let’s found (only what is real,
  * fixed with Settings · General's own saving), the scan beside a try, and the first steps; once through,
  * the panel opens on the home and never sends the shop here again. A viewer goes through and changes nothing.
  */
@@ -187,7 +187,7 @@ final class OnboardingTest extends TestCase
 
         Livewire::test(Onboarding::class)
             ->set('step', 3)
-            ->assertSee('Lets מכיר את החנות')
+            ->assertSee('Let’s מכיר את החנות')
             ->assertSee('data-scan-row="products"', false)
             ->call('toFirstSteps')
             ->assertSet('step', 4)
@@ -212,7 +212,7 @@ final class OnboardingTest extends TestCase
             ->assertDontSee('data-try', false)
             ->assertDontSee('lp-onb-try-field', false);
 
-        // once Lets is live there is nothing to switch on
+        // once Let’s is live there is nothing to switch on
         OnboardingTestSteps::$live = true;
         Livewire::test(Onboarding::class)->set('step', 3)->assertDontSee('data-embed-link', false)->assertDontSee('lp-onb-try-field', false);
 

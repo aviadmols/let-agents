@@ -8,7 +8,7 @@ use LetAgents\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Lets Search on the store: one script from the Let Agents server, the drawer.
+ * Let’s Search on the store: one script from the Let Agents server, the drawer.
  *
  * It answers the store's search box and search icons, and on a product page or an article it
  * starts with "about this page" and learns from it. Since 0.9.0 it is the only script: the
@@ -46,7 +46,7 @@ final class Search {
 		add_filter( 'posts_search', array( self::class, 'drop_like_search' ), 10, 2 );
 	}
 
-	/** Whether this visitor gets Lets Search now. */
+	/** Whether this visitor gets Let’s Search now. */
 	public static function active(): bool {
 		$mode = Settings::mode();
 

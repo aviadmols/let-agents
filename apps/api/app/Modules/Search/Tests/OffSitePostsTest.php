@@ -14,9 +14,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * A post Lets wrote and the team published is served at the platform's own address: a search result
+ * A post Let’s wrote and the team published is served at the platform's own address: a search result
  * would take the shopper off the store's site, so it is never one. The store's own posts and the
- * pages Lets read from the store's site stay.
+ * pages Let’s read from the store's site stay.
  */
 final class OffSitePostsTest extends TestCase
 {

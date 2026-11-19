@@ -13,7 +13,7 @@ use App\Modules\Tenancy\Models\Shop;
 use Illuminate\Support\Carbon;
 
 /**
- * What the search fixed on its own, for "Fixed by Lets": the searches that found nothing which the night resolved (to
+ * What the search fixed on its own, for "Fixed by Let’s": the searches that found nothing which the night resolved (to
  * products, or to a word of the same meaning) with no one deciding, and the word families its judge approved. Each
  * with what shoppers found since, and an undo that does what the operator's screens do: the resolution set aside with
  * its synonym, the family called wrong. Code only.

@@ -50,7 +50,7 @@ final class OrderReporter {
 	 * @param \WC_Order|false|null $order
 	 */
 	private static function queue( $order ): void {
-		// Reported while Lets Search is not off: it counts the purchases it led to.
+		// Reported while Let’s Search is not off: it counts the purchases it led to.
 		if ( ! $order instanceof \WC_Order || 'off' === Settings::mode() || null === SiteKeys::site() ) {
 			return;
 		}

@@ -156,7 +156,7 @@ final class PhoneWishlistTest extends TestCase
         $this->assertSame('0545551212', $this->sent[0]['sms']['destinations']['phone']);
         $this->getJson('/api/v1/shortlist/'.SiteKeys::site(self::TOKEN).'/config')->assertJsonPath('phoneLogin', true);
 
-        Livewire::test(SmsSettings::class)->set('sender', 'Lets Agents Shop')->call('save');
+        Livewire::test(SmsSettings::class)->set('sender', 'Let’s Agents Shop')->call('save');
         $this->assertSame('LETS', SmsAccount::query()->sole()->sender, 'a sender of more than 11 letters is refused');
     }
 }

@@ -11,7 +11,7 @@ return [
         'step_mode' => 'In the plugin settings in WordPress, choose "Preview": only the store team sees the widget, visitors do not.',
         'step_open' => 'Open one of the links below. Store managers logged in to WordPress see the widget without a link too.',
         'any_page' => 'You can add this to any address in the store. The store remembers preview in this browser for 30 days:',
-        'drawer_heading' => 'The Lets Search drawer',
+        'drawer_heading' => 'The Let’s Search drawer',
         'drawer_where' => 'Opens from the store\'s search and from the question row under the buy button. On a product page it opens with "About this product": what is known about it, what goes with it, shoppers\' questions and answers.',
         'about_product' => 'Opens with "About this product"',
         'about_content' => 'On: what readers do on the article is counted, for learning',

@@ -77,7 +77,7 @@ final class SearchServiceProvider extends ModuleServiceProvider
         $this->app->tag([SearchPoorAnswers::class], PoorAnswers::TAG);
         // the Searches screen: what shoppers look for, in their own words, and what they find
         $this->app->tag([SearchScreen::class], SearchesScreen::TAG);
-        // "Fixed by Lets": what the search fixed on its own, with its undo
+        // "Fixed by Let’s": what the search fixed on its own, with its undo
         $this->app->tag([SearchAutoFixes::class], AutoFixes::TAG);
     }
 

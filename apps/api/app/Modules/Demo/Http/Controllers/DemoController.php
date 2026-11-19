@@ -18,12 +18,12 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 
 /**
- * The demo, as whoever asked for it goes through it, in Lets' own look (lets.co.il):
+ * The demo, as whoever asked for it goes through it, in Let’s' own look (lets.co.il):
  *
  *   GET  /demo                  the store's address, their email, what the site is and what matters in its search
  *   POST /demo                  checked (StartDemo): a code goes to the email
  *   GET  /demo/{token}          by where it stands: the code to type, the scan as a real store's first run shows it,
- *                               the demo itself (a phone with Lets' floating search in it), or its end
+ *                               the demo itself (a phone with Let’s' floating search in it), or its end
  *   POST /demo/{token}/verify   the code (VerifyDemo): the demo store is built and its scan starts
  *   POST /demo/{token}/code     a new code
  *   GET  /demo/{token}/progress the preparation and the scan so far, for the screen to draw, or the problem it hit;

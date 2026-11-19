@@ -35,7 +35,7 @@ use Throwable;
  *   skipped, and the database holds one weekly email per address and store week (period).
  *
  * An address whose last search_subscriptions.unopened_stop emails were neither opened nor clicked is stopped instead.
- * A subscription past its end is stopped. A store no longer connected (Lets removed) is skipped: ForgetRemovedStores
+ * A subscription past its end is stopped. A store no longer connected (Let’s removed) is skipped: ForgetRemovedStores
  * deletes its subscriptions after a while.
  */
 final class SendWeekly
@@ -101,7 +101,7 @@ final class SendWeekly
         return $planned;
     }
 
-    /** One store's run (a job's): nothing when the feature is off or Lets was removed since. */
+    /** One store's run (a job's): nothing when the feature is off or Let’s was removed since. */
     public function forShop(Shop $shop, Carbon $now): int
     {
         $shopId = (string) $shop->id;

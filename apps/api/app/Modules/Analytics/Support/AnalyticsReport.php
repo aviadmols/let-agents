@@ -14,8 +14,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Analytics' part of the shop's analytics screen: page views and openings of Lets (from the visits),
- * adds to the cart by where they came from, the orders Lets had a part in and their money, adds by
+ * Analytics' part of the shop's analytics screen: page views and openings of Let’s (from the visits),
+ * adds to the cart by where they came from, the orders Let’s had a part in and their money, adds by
  * day, and the products added most. Counts only.
  */
 final class AnalyticsReport implements ShopReport
@@ -92,7 +92,7 @@ final class AnalyticsReport implements ShopReport
     }
 
     /**
-     * Openings of Lets and adds to the cart through the period, at the chart's scale (ReportSeries).
+     * Openings of Let’s and adds to the cart through the period, at the chart's scale (ReportSeries).
      *
      * @return array{opens: array<string, int>, adds: array<string, int>}
      */

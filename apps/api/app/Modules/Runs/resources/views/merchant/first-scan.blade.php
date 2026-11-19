@@ -15,7 +15,7 @@
                             <span class="la-badge" data-tone="warn"><i></i>{{ __('runs::first_scan.badge_new') }}</span>
                         @endif
                         <h2 style="margin: 0; font-size: 18px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px">
-                            {{-- the Lets mark, turning over like an hourglass while the store is read --}}
+                            {{-- the Let’s mark, turning over like an hourglass while the store is read --}}
                             @if ($running)
                                 <span class="lp-onb-mark is-think" aria-hidden="true" style="--s: 20px; color: var(--la-ink)" data-scan-thinking><i></i><i></i></span>
                             @endif

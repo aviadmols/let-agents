@@ -68,8 +68,8 @@ final class DemoFlowTest extends TestCase
 
     public function test_the_address_and_the_email_send_a_code_and_nothing_is_built_before_it(): void
     {
-        $this->get('/demo')->assertOk()->assertSee('data-demo-start', false)->assertSee('See Lets on your store');
-        $this->get('/demo?lang=he')->assertOk()->assertSee('See Lets on your store')->assertDontSee('ראו את Lets', false);
+        $this->get('/demo')->assertOk()->assertSee('data-demo-start', false)->assertSee('See Let’s on your store');
+        $this->get('/demo?lang=he')->assertOk()->assertSee('See Let’s on your store')->assertDontSee('ראו את Let’s', false);
 
         $this->start()->assertRedirect();
 
@@ -363,7 +363,7 @@ final class DemoFlowTest extends TestCase
         $site = $this->verified();
         $site->forceFill(['status' => DemoSite::READY, 'expires_at' => now()->addDays(7), 'products' => 300, 'store_products' => 1240, 'pictures' => 0])->save();
 
-        // plainly on the phone's screen, instead of a picture of the store, in the demo's language and Lets' fonts
+        // plainly on the phone's screen, instead of a picture of the store, in the demo's language and Let’s' fonts
         $this->get('/demo/'.$site->token.'/phone')->assertOk()->assertSee('data-intro', false)->assertDontSee('<img class="site"', false)
             ->assertSee('This is only a demo, so results may be partial.')->assertSee('It read 300 of the store&#039;s 1,240 products.', false)
             ->assertSee('family=Google+Sans', false);

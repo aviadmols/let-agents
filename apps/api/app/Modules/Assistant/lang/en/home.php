@@ -15,7 +15,7 @@ return [
     ],
     'step' => [
         'title' => 'Answer the first question',
-        'body' => '":question" was asked :times times. Lets can already write a draft.',
+        'body' => '":question" was asked :times times. Let’s can already write a draft.',
         'body_none' => 'When a shopper asks something the site has no answer to, it shows up here. One answer of yours, and every shopper gets it.',
         'button' => 'Show me',
     ],

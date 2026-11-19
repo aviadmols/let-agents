@@ -15,17 +15,17 @@ use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
 /**
- * Settings · The search window, as the designer's panel lays it out: whether Lets search runs on the
+ * Settings · The search window, as the designer's panel lays it out: whether Let’s search runs on the
  * site at all (the card's switch), whether it takes over the theme's own search box, whether a new shopper is
  * invited to try it once, the round button at the bottom of the screen (shown or not, its side and height), and what the drawer offers: photos, questions, similar items, prices, the cart, the wishlist and compare, "Helpful?" under
- * an answer, the product page's row when a product or a size is sold out, and whether the posts Lets wrote
+ * an answer, the product page's row when a product or a size is sold out, and whether the posts Let’s wrote
  * are search results. Each is a feature or a setting the drawer reads (SearchIndexController).
  */
 class SearchWindowSettings extends Page
 {
     use EditsShopSettings;
 
-    /** The posts Lets wrote went in or out of the results on this save: the search index is built again (not a Livewire property). */
+    /** The posts Let’s wrote went in or out of the results on this save: the search index is built again (not a Livewire property). */
     private bool $postsChanged = false;
 
     public static string $sideGroup = 'shoppers';

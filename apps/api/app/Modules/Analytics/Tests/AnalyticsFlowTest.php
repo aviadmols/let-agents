@@ -133,7 +133,7 @@ final class AnalyticsFlowTest extends TestCase
 
     public function test_an_add_from_the_stores_own_page_makes_no_order_assisted(): void
     {
-        // Sela Meir, 29.10: seven orders counted "with Lets", each after an add from the product page's own button,
+        // Sela Meir, 29.10: seven orders counted "with Let’s", each after an add from the product page's own button,
         // with the drawer never opened.
         $this->sendBeacon($this->beacon([
             $this->event('page_view'),
@@ -148,7 +148,7 @@ final class AnalyticsFlowTest extends TestCase
 
     public function test_a_product_opened_from_the_search_and_added_from_its_own_page_is_the_searchs(): void
     {
-        // Aviad, 29.10: a product clicked in Lets' search, reached on its page from there, and added there is Lets' product.
+        // Aviad, 29.10: a product clicked in Let’s' search, reached on its page from there, and added there is Let’s' product.
         app(TenantContext::class)->run($this->shop->id, fn () => AnalyticsEvent::query()->create([
             'shop_id' => $this->shop->id, 'event_id' => 'click-1', 'type' => 'click', 'page_type' => 'search', 'page_path' => '/',
             'item_external_id' => '55', 'source' => AnalyticsEvent::SOURCE_SEARCH, 'visitor_hash' => AnalyticsEvent::visitorHash($this->shop->id, self::VID),

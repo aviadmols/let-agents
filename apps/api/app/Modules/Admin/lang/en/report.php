@@ -6,7 +6,7 @@ return [
 
     'settings' => [
         'title' => 'What your shoppers searched, asked and couldn’t find',
-        'lede' => 'And what Lets did for you. One email, no need to open the panel.',
+        'lede' => 'And what Let’s did for you. One email, no need to open the panel.',
         'example' => 'See a sample report',
         'how_often' => 'How often',
         'options' => ['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'off' => 'Off'],
@@ -44,7 +44,7 @@ return [
         ],
         'searched' => 'shoppers searched your store.',
         'asked' => 'asked a question.',
-        'lede' => 'Here’s what they looked for, what Lets showed them, and what they did next.',
+        'lede' => 'Here’s what they looked for, what Let’s showed them, and what they did next.',
         'stat' => ['searches' => 'searches', 'questions' => 'questions', 'found' => 'found what they looked for'],
         'pts' => ':n pts',
         'top' => 'What they searched',
@@ -63,8 +63,8 @@ return [
         'missing' => 'What they couldn’t find',
         'poor' => 'Answers that didn’t help',
         'poor_downs' => '{1} 1 shopper said it didn’t help|[2,*] :n shoppers said it didn’t help',
-        'poor_said' => 'Lets answered:',
-        'poor_advice' => 'Write a better answer yourself, or add what’s missing about your store, and Lets will use it from now on.',
+        'poor_said' => 'Let’s answered:',
+        'poor_advice' => 'Write a better answer yourself, or add what’s missing about your store, and Let’s will use it from now on.',
         'poor_edit' => 'Edit the answers',
         'poor_add' => 'Add store information',
         'sold' => 'Found most through search',

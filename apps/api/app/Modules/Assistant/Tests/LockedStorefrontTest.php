@@ -78,7 +78,7 @@ final class LockedStorefrontTest extends TestCase
     {
         // What an earlier scan kept from the password page, before locks were told apart.
         $this->inShop(function (): void {
-            CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => ReadSitePages::PREFIX.'old-lock', 'title' => 'Lets Shop', 'url' => 'https://lets-shop.test/policies/legal-notice', 'body' => "This store is password protected. Use the password to enter the store.\nEnter store password", 'hash' => 'x']);
+            CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => ReadSitePages::PREFIX.'old-lock', 'title' => 'Let’s Shop', 'url' => 'https://lets-shop.test/policies/legal-notice', 'body' => "This store is password protected. Use the password to enter the store.\nEnter store password", 'hash' => 'x']);
             CatalogContent::query()->create(['type' => CatalogContent::PAGE, 'external_id' => ReadSitePages::PREFIX.'shipping', 'title' => 'Shipping', 'url' => 'https://lets-shop.test/pages/shipping', 'body' => 'Orders leave the studio within three working days, by courier to the door.', 'hash' => 'y']);
             CatalogContent::query()->create(['type' => CatalogContent::KNOWLEDGE, 'external_id' => BuildShopKnowledge::REPEATED, 'title' => 'x', 'body' => "- This store is password protected.\n- Use the password to enter the store.\n- Enter store password", 'terms' => ['hidden' => ['made up'], 'counts' => [], 'pages' => 12, 'products' => 39], 'hash' => 'z']);
             CatalogProductChoice::query()->create(['product_id' => CatalogProduct::query()->where('external_id', '1')->value('id'), 'fields' => [], 'checked_at' => now(), 'product_hash' => 'h1', 'failures' => 0]);

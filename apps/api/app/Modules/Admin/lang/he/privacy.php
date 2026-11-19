@@ -18,7 +18,7 @@ return [
             ."בקובץ יש פרטים אישיים של קונים (טלפון, מייל, שם). שמרו אותו במקום בטוח, ומחקו אותו כשלא צריך אותו יותר.\n"
             ."לא נכללים: סיסמאות ומפתחות גישה, העותק של אינדקס החיפוש (נבנה מחדש מהקטלוג) ורצף אירועי הדף הגולמי.\n\n"
             ."----\n\n"
-            ."The data of :shop at Lets, as of :date.\n\n"
+            ."The data of :shop at Let’s, as of :date.\n\n"
             ."shop.csv: the shop. team.csv: its people and roles. settings.csv: the settings chosen for it.\n"
             ."In the folders: a table for each kind of data, by area (Catalog, Leads, Shortlist: saved lists, Search, Assistant: questions and answers, Analytics: visits and orders, and more).\n\n"
             ."It holds shoppers' personal details (phone, email, name). Keep it somewhere safe, and delete it when no longer needed.\n"
@@ -64,7 +64,7 @@ return [
         'confirm_button' => 'למחוק את המשתמש שלי',
         'phrase_wrong' => 'יש להקליד בדיוק :phrase, באותיות גדולות.',
         'alone' => 'אתם הבעלים היחידים של :shops. קודם הפכו מישהו אחר לבעלים בעמוד המשתמשים, או מחקו את החנות.',
-        'operator' => 'משתמש של צוות Lets לא נמחק מכאן.',
+        'operator' => 'משתמש של צוות Let’s לא נמחק מכאן.',
     ],
 
     'mail' => [

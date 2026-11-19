@@ -5,7 +5,7 @@ namespace App\Modules\Admin\Contracts;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
- * What Lets understood about the store's products, for the Store knowledge screen (the designer's redesign, 11.2026):
+ * What Let’s understood about the store's products, for the Store knowledge screen (the designer's redesign, 11.2026):
  * the counts, a row of products to pick from (a dot on one that misses a detail), and one product with what was
  * understood of it and where from. One module answers it (Enrichment). Plain arrays; no model.
  */

@@ -7,13 +7,13 @@ defined( 'ABSPATH' ) || exit;
 /**
  * `[let_agents_wishlist]`: a way in to the wishlist wherever the shop wants it, a header or a menu.
  *
- * A heart linking to #wishlist, marked data-let-agents-wishlist: Lets Search opens its saved tab on
- * a click on either, and on a page opened with #wishlist. Nothing shows while Lets Search does not
+ * A heart linking to #wishlist, marked data-let-agents-wishlist: Let’s Search opens its saved tab on
+ * a click on either, and on a page opened with #wishlist. Nothing shows while Let’s Search does not
  * load for this visitor, so a shortcode left in a theme does no harm.
  */
 final class WishlistHeart {
 
-	/** The attribute Lets Search looks for. */
+	/** The attribute Let’s Search looks for. */
 	public const SLOT = 'data-let-agents-wishlist';
 
 	public static function register(): void {

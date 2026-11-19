@@ -5,7 +5,7 @@
 @section('body')
     <section class="hero">
         <span class="hero__glow" aria-hidden="true"></span>
-        <a class="brand" href="https://lets.co.il{{ $locale === 'he' ? '/he/' : '/' }}"><i aria-hidden="true"></i>Lets</a>
+        <a class="brand" href="https://lets.co.il{{ $locale === 'he' ? '/he/' : '/' }}"><i aria-hidden="true"></i>Let’s</a>
         <h1>{{ $t('start.title') }}<br><em>{{ $t('start.title_em') }}</em></h1>
         <p class="lede">{{ $t('start.lede') }}</p>
     </section>
@@ -58,5 +58,5 @@
         <button class="btn btn--block" type="submit">{{ $t('start.go') }}</button>
         <p class="note">{{ ((int) \App\Core\Facades\Settings::get('demo.keep_days')) > 0 ? $t('start.privacy', ['days' => \App\Core\Facades\Settings::get('demo.keep_days')]) : $t('start.privacy_kept') }}</p>
     </form>
-    <p class="foot">© Lets · <a href="https://lets.co.il{{ $locale === 'he' ? '/he/' : '/' }}">lets.co.il</a></p>
+    <p class="foot">© Let’s · <a href="https://lets.co.il{{ $locale === 'he' ? '/he/' : '/' }}">lets.co.il</a></p>
 @endsection

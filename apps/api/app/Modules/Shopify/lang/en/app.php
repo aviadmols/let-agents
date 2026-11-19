@@ -5,7 +5,7 @@ return [
     'unreachable' => 'Shopify did not answer. Try again in a moment.',
     'plan_by_team' => 'This store\'s plan is changed by our team, not through Shopify billing. Ask for the plan on the Connection and plan screen and we will switch it.',
     'declined_title' => 'The plan was not approved',
-    'declined_text' => 'Lets needs the monthly plan approved. You can approve it any time, from the app in the Shopify admin.',
+    'declined_text' => 'Let’s needs the monthly plan approved. You can approve it any time, from the app in the Shopify admin.',
     'declined_again' => 'Approve the plan',
     'plans_title' => 'Choose a plan',
     'plans_sub' => 'Billed monthly on your Shopify invoice. You can change plans at any time.',

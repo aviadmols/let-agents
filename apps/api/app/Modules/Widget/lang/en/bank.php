@@ -186,7 +186,7 @@ return [
         'view_list' => 'List view',
         'view_prev' => 'Previous',
         'view_next' => 'Next',
-        'chat_who' => 'Lets AI',
+        'chat_who' => 'Let’s AI',
         'chat_aside' => 'Answers from the store\'s information',
         'lead_ask_field' => 'What is your :field?',
         'lead_next' => 'Next',

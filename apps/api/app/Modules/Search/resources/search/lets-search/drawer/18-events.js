@@ -276,7 +276,7 @@
     if (d.similar) { e.preventDefault(); similarTurn(d.similar, null, null, false, null, turnOf(el)); return; }
     if (d.more) {
       // the next few results, right under the ones seen, once they arrived: never the whole list at once,
-      // and the Lets mark turns in the button while they come; nothing moves, nothing jumps to the top
+      // and the Let’s mark turns in the button while they come; nothing moves, nothing jumps to the top
       var mt = turnById(d.more);
       if (!mt || !busy(el)) { return; }
       var rest = filtered(mt).map(function (r) { return r.id; }), from = gridN(mt), upto = Math.min(rest.length, from + STEP);
@@ -294,7 +294,7 @@
     }
     if (d.narrow !== undefined) { narrow(); render(); return; }
     if (d.loadmore) {
-      // the Lets mark turns over in the button until the next products arrive; a second press waits
+      // the Let’s mark turns over in the button until the next products arrive; a second press waits
       if (el.getAttribute('aria-busy') === 'true') { return; }
       var lt = turnById(d.loadmore); lt.limit = (lt.limit || STEP) + STEP;
       busy(el);

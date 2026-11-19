@@ -5,7 +5,7 @@
 @section('body')
     <section class="hero">
         <span class="hero__glow" aria-hidden="true"></span>
-        <span class="brand"><i aria-hidden="true"></i>Lets</span>
+        <span class="brand"><i aria-hidden="true"></i>Let’s</span>
         <h1>{{ $site->status === \App\Modules\Demo\Models\DemoSite::FAILED ? $t('ended.failed_title') : $t('ended.title') }}</h1>
         <p class="lede">{{ $site->status === \App\Modules\Demo\Models\DemoSite::FAILED ? $t('ended.failed.'.($site->error ?? 'other')) : $t('ended.lede', ['site' => $site->title ?? $site->host]) }}</p>
     </section>

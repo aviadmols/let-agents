@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  *   /.well-known/mcp.json              the same, where an agent looks for it under the older proposal
  *
  * and two links in every page's head. Served from Let Agents and kept here for six hours, so an agent
- * never waits on it twice. Only while Lets Search is live. A file of the store's own (an llms.txt an SEO
+ * never waits on it twice. Only while Let’s Search is live. A file of the store's own (an llms.txt an SEO
  * plugin wrote) is served by the web server before WordPress, so it is never replaced. Read-only.
  */
 final class AgentDiscovery {

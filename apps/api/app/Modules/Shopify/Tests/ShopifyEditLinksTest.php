@@ -25,7 +25,7 @@ final class ShopifyEditLinksTest extends TestCase
         $this->assertSame('https://admin.shopify.com/store/rocks/content/pages/123', $links->editUrl($connection, 'page', '123'));
         $this->assertSame('https://admin.shopify.com/store/rocks/content/articles/456', $links->editUrl($connection, 'post', '456'));
         $this->assertSame('https://admin.shopify.com/store/rocks/settings/legal', $links->editUrl($connection, 'policy', 'policy-789'));
-        $this->assertNull($links->editUrl($connection, 'page', 'la:knowledge-own'), 'what Lets keeps is edited in Lets');
+        $this->assertNull($links->editUrl($connection, 'page', 'la:knowledge-own'), 'what Let’s keeps is edited in Let’s');
     }
 
     public function test_a_wordpress_post_opens_in_its_editor(): void

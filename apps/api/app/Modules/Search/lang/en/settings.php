@@ -7,11 +7,11 @@ return [
     ],
     'nudge_at' => [
         'label' => 'The search invitation points at',
-        'description' => 'The class (or CSS selector) of the site\'s own search icon that the "Try our new search" invitation sits beside. Empty: automatic, the Lets button in the header, then the theme\'s search icon, then the floating button and the search box.',
+        'description' => 'The class (or CSS selector) of the site\'s own search icon that the "Try our new search" invitation sits beside. Empty: automatic, the Let’s button in the header, then the theme\'s search icon, then the floating button and the search box.',
     ],
     'float_button' => [
         'label' => 'Floating search button',
-        'description' => 'The round Lets button at the bottom of the screen, on pages where Lets did not place its button in the header. Off: shoppers open the search from the site\'s own search icon or box; on a page with neither, the button still shows, so the search can always be opened.',
+        'description' => 'The round Let’s button at the bottom of the screen, on pages where Let’s did not place its button in the header. Off: shoppers open the search from the site\'s own search icon or box; on a page with neither, the button still shows, so the search can always be opened.',
     ],
     'header_heart' => [
         'label' => 'Heart beside the site search',
@@ -32,7 +32,7 @@ return [
     ],
     'input_selector' => [
         'label' => 'Search boxes on the site',
-        'description' => 'CSS selector of the search fields Lets search attaches to. Several, separated by commas.',
+        'description' => 'CSS selector of the search fields Let’s search attaches to. Several, separated by commas.',
     ],
     'field_filter_min_percent' => [
         'label' => 'A field is a filter from this share of products',
@@ -493,8 +493,8 @@ return [
     ],
     'theme' => [
         'label' => 'Fonts and colours',
-        'description' => 'Lets: black on white, Google Sans, the same in every store. The site\'s: the theme\'s font, main colour and corners, with a contrast check.',
-        'options' => ['lets' => 'Lets', 'store' => 'The site\'s'],
+        'description' => 'Let’s: black on white, Google Sans, the same in every store. The site\'s: the theme\'s font, main colour and corners, with a contrast check.',
+        'options' => ['lets' => 'Let’s', 'store' => 'The site\'s'],
     ],
     'assistant_name' => [
         'label' => 'Assistant name',

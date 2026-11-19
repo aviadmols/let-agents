@@ -420,7 +420,7 @@ final class ShareSearchTest extends TestCase
         $tool = fn (string $name, array $arguments = []) => $rpc('tools/call', ['name' => $name, 'arguments' => $arguments])->assertOk()->json('result');
 
         $hello = $rpc('initialize', ['protocolVersion' => '2025-06-18', 'capabilities' => (object) [], 'clientInfo' => ['name' => 'chatgpt', 'version' => '1']])->assertOk()->json('result');
-        $this->assertSame('Lets Search', $hello['serverInfo']['title']);
+        $this->assertSame('Let’s Search', $hello['serverInfo']['title']);
         $this->assertArrayHasKey('resources', $hello['capabilities']);
         // What matters most, inside the first 512 characters: the shopper's language, and the one link that buys.
         $this->assertStringContainsString('language they started the conversation in', mb_substr($hello['instructions'], 0, 512));

@@ -186,7 +186,7 @@ return [
         'view_list' => 'תצוגת רשימה',
         'view_prev' => 'הקודמים',
         'view_next' => 'הבאים',
-        'chat_who' => 'Lets AI',
+        'chat_who' => 'Let’s AI',
         'chat_aside' => 'עונה מהמידע בחנות',
         'lead_ask_field' => 'מה :field שלכם?',
         'lead_next' => 'הבא',

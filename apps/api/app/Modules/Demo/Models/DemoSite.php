@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A store someone asked to see Lets on (see the demo_sites migration). Not a shop's own row: it is the platform's,
+ * A store someone asked to see Let’s on (see the demo_sites migration). Not a shop's own row: it is the platform's,
  * and its demo store is a shop of its own while it lasts.
  *
  * @property string $id

@@ -1,7 +1,7 @@
   // ---------------------------------------------------------------- words
   var WORDS = {
     he: {
-      open: 'חיפוש חכם', close: 'סגירה', nudgeTitle: 'נסו את החיפוש החדש שלנו', nudgeClose: 'לא עכשיו', nudgeLabel: 'הזמנה לחיפוש החכם', saved:'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Lets', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
+      open: 'חיפוש חכם', close: 'סגירה', nudgeTitle: 'נסו את החיפוש החדש שלנו', nudgeClose: 'לא עכשיו', nudgeLabel: 'הזמנה לחיפוש החכם', saved:'שמורים', saveBtn: 'שמירה', savedBtn: 'נשמר', saveHint: 'נשמר בשמורים של Let’s', saveView: 'לצפייה', launcherSaved: 'חיפוש חכם · :n שמורים', more: 'עוד אפשרויות', newChat: 'שיחה חדשה', chatCleared: 'התחלנו שיחה חדשה', undo: 'ביטול',
       placeholder: 'חפשו מוצר, או שאלו כל דבר', placeholderProduct: 'שאלו על המוצר הזה, או חפשו כל דבר', clear: 'ניקוי', photo: 'חיפוש לפי תמונה', send: 'שליחה',
       welcomeTitle: 'מה מחפשים היום?', welcomeSub: 'חפשו מוצר, שאלו שאלה, או צלמו משהו ונמצא דומה.', welcomeSubNoPhoto: 'חפשו מוצר או שאלו שאלה.', welcomeSubNoAsk: 'חפשו מוצר, או צלמו משהו ונמצא דומה.', welcomeSubSearch: 'חפשו מוצר בחנות.',
       recent: 'חיפושים אחרונים', popular: 'פופולרי בחנות', popAll: 'הצגת הכול', popLess: 'פחות', tryAsk: 'מה אנשים שואלים כאן:', removeRecent: 'הסרה',
@@ -34,7 +34,7 @@
       shareWa: 'שליחה בוואטסאפ', copyLink: 'העתקת קישור', copied: 'הקישור הועתק', savedToast: 'נשמר לשמורים', removedToast: 'הוסר מהשמורים',
       compare: 'השוואה', compareN: 'להשוות (:n)', compareNeed: 'בחרו עוד מוצר אחד לפחות', compareMax: 'אפשר להשוות עד :n מוצרים', compareTitle: 'השוואת מוצרים', onlyDiff: 'רק מה ששונה', price: 'מחיר', stock: 'מלאי', diffAsk: 'מה ההבדל ביניהם?', pickToCompare: 'בחירה להשוואה', remove: 'הסרה',
       choose: 'בחרו :a', chooseTitle: 'בחירת אפשרויות', size: 'מידה', unavailable: 'לא זמין',
-      powered: 'Powered by Lets', preview: 'תצוגה מקדימה: רק צוות החנות רואה את זה',
+      powered: 'Powered by Let’s', preview: 'תצוגה מקדימה: רק צוות החנות רואה את זה',
       announceSearching: 'מחפש', announceReady: 'התשובה מוכנה', announceResults: ':n תוצאות', announceAdded: 'נוסף לסל', announceQuestion: 'זוהתה שאלה. Enter שולח אותה',
       days: ['ביום א׳', 'ביום ב׳', 'ביום ג׳', 'ביום ד׳', 'ביום ה׳', 'ביום ו׳', 'בשבת'], today: 'היום', tomorrow: 'מחר', at: 'ב־',
       orderTitle: 'ההזמנה שלך', orderLoading: 'מכינים את ההזמנה…', orderChoose: 'בחרו :field', orderOption: 'אפשרות', orderAdd: 'הוספה לסל', orderAdded: 'נוסף לסל', orderFailed: 'לא נוסף. אפשר להוסיף מעמוד המוצר.', orderOut: 'אזל מהמלאי', orderUnknown: 'לא נמצא בחנות', orderReduced: 'יש במלאי רק :n',
@@ -63,7 +63,7 @@
       subErrEmail: 'הכתובת לא נראית תקינה', subErrMany: 'הגעתם למספר החיפושים המרבי לכתובת הזו', subErrQuery: 'אי אפשר להירשם לחיפוש הזה', subErrLater: 'משהו השתבש. נסו שוב בעוד רגע.',
     },
     en: {
-      open: 'Smart search', close: 'Close', nudgeTitle: 'Try our new search', nudgeClose: 'Not now', nudgeLabel: 'Smart search invitation', saved:'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Lets', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
+      open: 'Smart search', close: 'Close', nudgeTitle: 'Try our new search', nudgeClose: 'Not now', nudgeLabel: 'Smart search invitation', saved:'Saved', saveBtn: 'Save', savedBtn: 'Saved', saveHint: 'Saved to Let’s', saveView: 'View', launcherSaved: 'Smart search · :n saved', more: 'More options', newChat: 'New chat', chatCleared: 'Started a new chat', undo: 'Undo',
       placeholder: 'Search for a product, or ask anything', placeholderProduct: 'Ask about this product, or search anything', clear: 'Clear', photo: 'Search by photo', send: 'Send',
       welcomeTitle: 'What are you looking for?', welcomeSub: 'Search, ask a question, or snap a photo and we\'ll find something like it.', welcomeSubNoPhoto: 'Search, or ask a question.', welcomeSubNoAsk: 'Search, or snap a photo and we\'ll find something like it.', welcomeSubSearch: 'Search the store.',
       recent: 'Recent searches', popular: 'Popular in the store', popAll: 'Show all', popLess: 'Less', tryAsk: 'What people ask here:', removeRecent: 'Remove',
@@ -96,7 +96,7 @@
       shareWa: 'Share on WhatsApp', copyLink: 'Copy link', copied: 'Link copied', savedToast: 'Saved', removedToast: 'Removed',
       compare: 'Compare', compareN: 'Compare (:n)', compareNeed: 'Pick at least one more', compareMax: 'Up to :n products', compareTitle: 'Compare products', onlyDiff: 'Only differences', price: 'Price', stock: 'Stock', diffAsk: 'What\'s the difference?', pickToCompare: 'Pick to compare', remove: 'Remove',
       choose: 'Choose :a', chooseTitle: 'Choose options', size: 'Size', unavailable: 'Unavailable',
-      powered: 'Powered by Lets', preview: 'Preview: only the store team sees this',
+      powered: 'Powered by Let’s', preview: 'Preview: only the store team sees this',
       announceSearching: 'Searching', announceReady: 'Answer ready', announceResults: ':n results', announceAdded: 'Added to cart', announceQuestion: 'Question detected. Enter sends it',
       days: ['on Sunday', 'on Monday', 'on Tuesday', 'on Wednesday', 'on Thursday', 'on Friday', 'on Saturday'], today: 'today', tomorrow: 'tomorrow', at: 'at ',
       orderTitle: 'Your order', orderLoading: 'Preparing your order…', orderChoose: 'Choose :field', orderOption: 'an option', orderAdd: 'Add to cart', orderAdded: 'Added to the cart', orderFailed: 'Not added. You can add it from the product page.', orderOut: 'Out of stock', orderUnknown: 'Not in the store', orderReduced: 'Only :n in stock',

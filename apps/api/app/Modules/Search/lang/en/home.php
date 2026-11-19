@@ -21,9 +21,9 @@ return [
     ],
     'step' => [
         'on' => [
-            'title' => 'Turn Lets on in the store',
+            'title' => 'Turn Let’s on in the store',
             'body_woocommerce' => 'In WordPress: Let Agents plugin settings → Mode → Live. Until then only you see the new search.',
-            'body_shopify' => 'The button opens your Shopify theme editor with Lets switched on: just press Save. Until then only you see the new search.',
+            'body_shopify' => 'The button opens your Shopify theme editor with Let’s switched on: just press Save. Until then only you see the new search.',
             'button_shopify' => 'Turn on in your theme',
             'button' => 'How to turn it on',
         ],

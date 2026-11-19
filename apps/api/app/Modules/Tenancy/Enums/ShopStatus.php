@@ -14,7 +14,7 @@ enum ShopStatus: string
     case Disabled = 'disabled';
 
     /**
-     * A store someone asked to see Lets on (the Demo module): its storefront answers on the demo page, and no
+     * A store someone asked to see Let’s on (the Demo module): its storefront answers on the demo page, and no
      * scheduled work touches it (every schedule takes active shops). Deleted, with all it holds, when the demo ends.
      */
     case Demo = 'demo';

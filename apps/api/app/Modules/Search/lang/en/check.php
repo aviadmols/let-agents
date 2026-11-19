@@ -54,7 +54,7 @@ return [
         'words_store_tag' => ':words in the store\'s tag ":where".',
         'words_brand' => ':words in the brand ":where".',
         'words_attribute' => ':words in the product\'s detail ":where".',
-        'words_lets' => ':words in what Lets learned of the product (from its picture, its description or a synonym).',
+        'words_lets' => ':words in what Let’s learned of the product (from its picture, its description or a synonym).',
         'words_close' => ':words in a close spelling, not exactly as typed.',
         'some_words' => 'Holds only some of the words.',
         'meaning' => 'Close in meaning to what was typed, even without the same words.',

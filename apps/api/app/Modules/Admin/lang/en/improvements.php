@@ -11,7 +11,7 @@ return [
         'found' => 'searches that now find something',
         'sales' => 'in sales from fixed searches',
     ],
-    'tabs' => ['waiting' => 'Waiting for you', 'auto' => 'Fixed by Lets', 'done' => 'Approved'],
+    'tabs' => ['waiting' => 'Waiting for you', 'auto' => 'Fixed by Let’s', 'done' => 'Approved'],
     'kinds' => [
         'label' => 'Kind',
         'all' => 'All',
@@ -76,6 +76,6 @@ return [
     ],
     'tip' => [
         'title' => 'How this works',
-        'body' => 'What’s clear, like typos, Lets fixes on its own and shows you under “Fixed by Lets”. What needs your call waits here. Every fix can be undone.',
+        'body' => 'What’s clear, like typos, Let’s fixes on its own and shows you under “Fixed by Let’s”. What needs your call waits here. Every fix can be undone.',
     ],
 ];

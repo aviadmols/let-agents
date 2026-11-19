@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Cache;
  * site's own: the search offers it and the assistant gives it, with no model in between.
  * Approving a missing topic publishes the post a model drafted and the team edited, with the products
  * they chose, where they chose: on the store's own site, sent to its blog as a draft
- * (improvement.post_to_store, a connected store), or on Lets, as a guide of the store's own.
+ * (improvement.post_to_store, a connected store), or on Let’s, as a guide of the store's own.
  * Rejecting keeps the proposal, so the review never proposes it again, and
  * takes back what an earlier approval put out. Callers are inside the shop's tenant.
  */

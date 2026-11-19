@@ -3,7 +3,7 @@
 // The first-run screens of a new shop (Onboarding), as the designer's panel words them.
 return [
     'title' => 'New account',
-    'subheading' => 'Connect the store, and Lets does the rest. About three minutes.',
+    'subheading' => 'Connect the store, and Let’s does the rest. About three minutes.',
     'viewer' => 'You have view access: you can go through these screens, and the account owners complete them.',
 
     'tabs' => [
@@ -17,7 +17,7 @@ return [
         'connect_sub' => 'Shopify or WooCommerce',
         'connected_sub' => ':platform · connected',
         'check' => 'Is this right?',
-        'check_sub' => 'What Lets found on its own',
+        'check_sub' => 'What Let’s found on its own',
         'scan' => 'The scan',
         'scan_sub' => 'And you can try it as it runs',
         'steps' => ':count first steps',
@@ -28,14 +28,14 @@ return [
 
     'connect' => [
         'title' => 'Nice to meet you. Where is your store?',
-        'lead' => 'You connect once. Lets reads the name, the language and what you sell from the store itself.',
+        'lead' => 'You connect once. Let’s reads the name, the language and what you sell from the store itself.',
         'shopify' => 'Install the app from the app store, approve once, and that is it.',
         'woocommerce' => 'Download a small plugin, paste a key. Two minutes.',
         'content_title' => 'Content site',
         'content' => 'WordPress with no store: tours, courses, articles. The same plugin and key.',
-        'shopify_note' => 'A Shopify store connects by installing the Lets app from the Shopify App Store, with no plugin and no key. This store is set up with us as WooCommerce; if that is wrong, write to us.',
+        'shopify_note' => 'A Shopify store connects by installing the Let’s app from the Shopify App Store, with no plugin and no key. This store is set up with us as WooCommerce; if that is wrong, write to us.',
         'address' => 'Store address',
-        'read_only' => 'Lets only reads from the store. It never changes anything in it.',
+        'read_only' => 'Let’s only reads from the store. It never changes anything in it.',
         'connected' => 'Connected',
         'not_connected' => 'Not connected yet',
         'plugin' => 'The plugin and the key',
@@ -91,8 +91,8 @@ return [
     ],
 
     'scan' => [
-        'title' => 'Lets is getting to know the store',
-        'title_done' => 'Lets knows the store. You can go on',
+        'title' => 'Let’s is getting to know the store',
+        'title_done' => 'Let’s knows the store. You can go on',
         'lead' => 'Stay and try it, or go on: the scan carries on in the background.',
         'rows' => [
             'products' => ['title' => 'Reading the products', 'sub' => 'Name, price, stock, variants, categories', 'unit' => 'products'],
@@ -122,8 +122,8 @@ return [
         'knows' => '{0} Knows no products yet|{1} Knows one product|[2,*] Knows :count products',
         'help' => 'This is the real search shoppers will get, on the products already scanned. Type anything: the store opens in a new tab, in a preview only you can see.',
         'help_shopify' => 'This is the real search shoppers will get, on the products already scanned. Type anything: the store opens with it in a new tab.',
-        'embed' => 'Lets appears in your store once it is on in your theme. Not on yet? The button opens your Shopify theme editor with Lets switched on: just press Save.',
-        'embed_title' => 'Turn Lets on in your store',
+        'embed' => 'Let’s appears in your store once it is on in your theme. Not on yet? The button opens your Shopify theme editor with Let’s switched on: just press Save.',
+        'embed_title' => 'Turn Let’s on in your store',
         'embed_button' => 'Turn on in your theme',
         'help_live' => 'This is the search shoppers already get in the store. Type anything, and the store opens with it in a new tab.',
         'placeholder' => 'Search for a product, or ask anything',
@@ -131,8 +131,8 @@ return [
     ],
 
     'steps' => [
-        'title' => 'All set. Lets knows :shop.',
-        'title_running' => 'Lets already knows :shop, and the scan carries on in the background.',
+        'title' => 'All set. Let’s knows :shop.',
+        'title_running' => 'Let’s already knows :shop, and the scan carries on in the background.',
         'counts' => ':list.',
         'products' => '{1} one product|[2,*] :count products',
         'pages' => '{1} one page or post|[2,*] :count pages and posts',

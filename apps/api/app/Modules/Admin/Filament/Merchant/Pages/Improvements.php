@@ -26,7 +26,7 @@ use UnitEnum;
  * module that brings them (TodayImprovements: the review's proposals, word families, details read from photos, the
  * questions without an answer), each one card with what shoppers ran into, why, how many it touches, the suggestion
  * itself (the rule and the products shoppers will see, the drafted answer to edit, what each photo showed), the one tap
- * that approves it, the other way to fix it, "Not relevant", and what exactly shoppers typed. Then what Lets fixed on its
+ * that approves it, the other way to fix it, "Not relevant", and what exactly shoppers typed. Then what Let’s fixed on its
  * own, with undo (AutoFixes), and what the owner approved with what it did since. On the side, how many searches find
  * something against the goal. Nothing here knows a module. No model, cost or mechanism.
  */
@@ -190,7 +190,7 @@ final class Improvements extends Page
         $this->panel = $this->panel === $key ? null : $this->panel;
     }
 
-    /** Undo a fix Lets made on its own. */
+    /** Undo a fix Let’s made on its own. */
     public function undo(string $key): void
     {
         foreach (app()->tagged(AutoFixes::TAG) as $source) {
@@ -209,7 +209,7 @@ final class Improvements extends Page
         }
     }
 
-    /** @return array{rows: list<array<string, mixed>>, total: int} what Lets fixed on its own */
+    /** @return array{rows: list<array<string, mixed>>, total: int} what Let’s fixed on its own */
     public function auto(): array
     {
         $rows = [];

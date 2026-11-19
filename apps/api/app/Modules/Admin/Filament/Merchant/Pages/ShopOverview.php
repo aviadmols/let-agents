@@ -40,7 +40,7 @@ use UnitEnum;
  * money through search on ink with its line, the adds and orders beside it, and how many searches found something;
  * the three fixes waiting, each one tap or one link; the searches as they happen (TodayFeed, its own component, so
  * only it refreshes); the words searched most and what they found; a fix approved and what it did since; and what
- * went to the cart through search. A store with no search yet sees its first day instead: what is done, what Lets
+ * went to the cart through search. A store with no search yet sees its first day instead: what is done, what Let’s
  * already knows, and how to make the first search. Every part comes from the modules (Today, Home, HomeNumbers);
  * nothing here knows a module. No model, cost or mechanism.
  */

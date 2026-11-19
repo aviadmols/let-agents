@@ -349,12 +349,12 @@
     var unknown = localUnknown(q);
     return unknown.length === 1;
   }
-  // a quieter way to ask, under results that may not be it: "Not it? Ask Lets · Search the site for me"
+  // a quieter way to ask, under results that may not be it: "Not it? Ask Let’s · Search the site for me"
   function askSmall(act) {
     return '<div style="padding:4px 0"><button class="ls-row ls-row--ask" data-opt ' + act + '><span class="ls-mark" style="--s:14px;color:var(--ls-fg)"><i></i><i></i></span>' +
       '<span class="ls-row__text">' + esc(t('askOther', { name: CFG.assistant })) + '</span><span class="ls-row__go">' + esc(t('askBtn')) + '</span></button></div>';
   }
-  // the Lets mark in a small white circle, at the start of a list row
+  // the Let’s mark in a small white circle, at the start of a list row
   function markDot() { return '<span class="ls-markdot" aria-hidden="true">' + mark() + '</span>'; }
   // the live view is the results turn itself, as Enter will keep it, with the words still being typed
   // the words a question of how, why or when opens with, in the drawer's languages: a question for an answer, not a search

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Lets · סיכום יומי · :shop · :date',
+    'title' => 'Let’s · סיכום יומי · :shop · :date',
     'searches' => 'אתמול: :searches {searches:חיפוש/חיפושים}, :empty בלי תוצאות, :clicks {clicks:לחיצה/לחיצות} על תוצאות.',
     'new_products' => 'מוצרים חדשים שנכנסו למערכת ביממה האחרונה: :count (מהם :read כבר נקראו ותוארו). סך הכול בקטלוג: :total.',
     'evidence' => 'נבדקו: :empty {empty:חיפוש שלא מצא/חיפושים שלא מצאו} כלום, :unclicked {unclicked:חיפוש שאף אחד לא לחץ עליו/חיפושים שאף אחד לא לחץ עליהם}, :questions {questions:שאלה/שאלות} בלי תשובה באתר.',

@@ -3,11 +3,11 @@
 // The shop's analytics screen (Analytics\Filament\Merchant\Pages\ShopAnalytics).
 return [
     'title' => 'אנליטיקס',
-    'subheading' => 'מה הגולשים עושים עם Lets. הכל במקום אחד.',
+    'subheading' => 'מה הגולשים עושים עם Let’s. הכל במקום אחד.',
     'store' => [
         'title' => 'מידע על החנות',
         'views' => 'צפיות בעמודים',
-        'opens' => 'פתיחות של Lets',
+        'opens' => 'פתיחות של Let’s',
         'of_views' => ':n% מהצפיות',
         'searches' => 'חיפושים',
         'by_photo' => ':n לפי תמונה',
@@ -15,11 +15,11 @@ return [
         'questions_split' => ':answered נענו · :unanswered בלי תשובה · :off לא על החנות',
         'adds' => 'הוספות לסל',
         'adds_split' => 'מחיפוש :search · מהרכיב :widget · מהעמוד :page',
-        'orders' => 'הזמנות בסיוע Lets',
+        'orders' => 'הזמנות בסיוע Let’s',
         'chart' => [
             'choose' => 'מה להציג בגרף',
             'searches' => 'חיפושים לאורך התקופה',
-            'opens' => 'פתיחות של Lets לאורך התקופה',
+            'opens' => 'פתיחות של Let’s לאורך התקופה',
             'questions' => 'שאלות לאורך התקופה',
             'adds' => 'הוספות לסל לאורך התקופה',
             'tabs' => ['searches' => 'חיפושים', 'opens' => 'פתיחות', 'questions' => 'שאלות', 'adds' => 'הוספות לסל'],

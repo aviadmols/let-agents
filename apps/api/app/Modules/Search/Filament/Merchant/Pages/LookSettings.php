@@ -13,7 +13,7 @@ use UnitEnum;
 
 /**
  * Settings · How it looks, as the designer's panel lays it out: the drawer, the product page row and
- * the wishlist in Lets' own look or the site's (font, main colour, corners, checked for contrast in the
+ * the wishlist in Let’s' own look or the site's (font, main colour, corners, checked for contrast in the
  * browser), how product pictures sit in their square, the assistant's name and the widget's language.
  * The storefront reads them from /search/{site}/look and the index config.
  */

@@ -17,9 +17,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Someone asks to see Lets on a store: its address, their email, what the site is and what matters in its search.
+ * Someone asks to see Let’s on a store: its address, their email, what the site is and what matters in its search.
  * Before anything is read or paid for: the address is a public site that answers, it is not a store already on
- * Lets, and the day's demos (demo.per_day) and this email's (demo.per_email_per_day) are not used up. Then a code
+ * Let’s, and the day's demos (demo.per_day) and this email's (demo.per_email_per_day) are not used up. Then a code
  * goes to the email; nothing is built until it comes back (VerifyDemo).
  */
 final class StartDemo
@@ -80,8 +80,8 @@ final class StartDemo
 
     /**
      * What stops a demo of this site, before anything is read or paid for: no public address, a store already on
-     * Lets, the day's demos used up, this email's (when it asks for a new demo, not again for the same one), a site
-     * that does not answer, a site on neither Shopify nor WordPress (Lets could never connect it). Null when nothing does.
+     * Let’s, the day's demos used up, this email's (when it asks for a new demo, not again for the same one), a site
+     * that does not answer, a site on neither Shopify nor WordPress (Let’s could never connect it). Null when nothing does.
      */
     public static function siteProblem(string $host, ?string $email): ?string
     {

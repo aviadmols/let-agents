@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * When the shop's manager went through the first-run screens (connection, what Lets found, the scan, the
+ * When the shop's manager went through the first-run screens (connection, what Let’s found, the scan, the
  * first steps). Until then a new shop's panel opens on them; after, never again. Shops that existed
  * before these screens were set up long ago: they are marked so now, and keep opening on their home.
  */

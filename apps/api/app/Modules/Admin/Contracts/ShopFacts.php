@@ -12,8 +12,8 @@ use App\Modules\Tenancy\Models\Shop;
  * Keys (each optional):
  *   products       int    products the store publishes
  *   pages          int    the store's pages and posts
- *   pictures_read  int    products whose main picture Lets has looked at
- *   pages_read     int    pages and posts Lets has read
+ *   pictures_read  int    products whose main picture Let’s has looked at
+ *   pages_read     int    pages and posts Let’s has read
  *   tags           int    details and tags learned about the products
  *   answers        int    answers ready for what shoppers ask
  *   searchable     int    products the store's search holds now

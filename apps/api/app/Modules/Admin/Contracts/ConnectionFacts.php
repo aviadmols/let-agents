@@ -14,13 +14,13 @@ use App\Modules\Tenancy\Models\Shop;
  *   plugin_version  string       the store plugin's version, from its last answer
  *   app_installed   bool         a Shopify store: the app is installed
  *   last_sync       CarbonInterface  the catalogue was last read from the store
- *   last_call       CarbonInterface  the store last called Lets (the plugin) or was checked
+ *   last_call       CarbonInterface  the store last called Let’s (the plugin) or was checked
  *   has_token       bool         a connection token exists for the store's plugin
  *   plan            string       the plan's name, in the shop manager's words
  *   renews          CarbonInterface  when the plan renews
  *   trial_ends      CarbonInterface  when the trial ends, while in one
  *   plans_url       string       where the merchant changes plan themselves (Shopify's billing), when they can
- *   embed_url       string       where the merchant switches Lets on in the store's theme (Shopify's theme editor, the app embed on)
+ *   embed_url       string       where the merchant switches Let’s on in the store's theme (Shopify's theme editor, the app embed on)
  *   plan_urls       array<string, string>  plan code => where the merchant approves that plan themselves (Shopify's billing)
  */
 interface ConnectionFacts

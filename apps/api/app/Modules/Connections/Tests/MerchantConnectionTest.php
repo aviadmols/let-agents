@@ -72,7 +72,7 @@ final class MerchantConnectionTest extends TestCase
             ->assertSee('ליצור טוקן חיבור')
             ->assertDontSee('הטוקן החדש. מעתיקים אותו עכשיו');
         // the plan and the month's use: Plan and billing (the redesign, 11.2026)
-        Livewire::test(PlanSettings::class)->assertSee('Lets Pro')->assertSee('ניצול AI החודש');
+        Livewire::test(PlanSettings::class)->assertSee('Let’s Pro')->assertSee('ניצול AI החודש');
     }
 
     public function test_the_plugin_zip_downloads_from_the_merchant_panel(): void
@@ -135,7 +135,7 @@ final class MerchantConnectionTest extends TestCase
 
         Http::fake(['rocks.example.com/*' => Http::response(['data' => ['plugin' => ['version' => '0.13.0'], 'counts' => ['products' => ['publish' => 3]]]])]);
 
-        Livewire::test(ConnectionSettings::class)->call('checkConnection')->assertNotified('מחובר. Lets קורא את החנות.');
+        Livewire::test(ConnectionSettings::class)->call('checkConnection')->assertNotified('מחובר. Let’s קורא את החנות.');
         Http::assertSent(fn ($request): bool => str_starts_with((string) $request->url(), 'https://rocks.example.com/'));
     }
 }

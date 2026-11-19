@@ -9,8 +9,8 @@ use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Headers;
 
 /**
- * What every email of Search Subscriptions shares: Lets sends it in the store's name (the From name is the store's, the
- * address Lets' own), replies go to the store's address when it gave one, and, where it stops something, the headers
+ * What every email of Search Subscriptions shares: Let’s sends it in the store's name (the From name is the store's, the
+ * address Let’s' own), replies go to the store's address when it gave one, and, where it stops something, the headers
  * Gmail and Outlook show their own unsubscribe button for (List-Unsubscribe, List-Unsubscribe-Post). Always in English.
  */
 abstract class SubscriptionMail extends Mailable

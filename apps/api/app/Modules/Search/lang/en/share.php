@@ -91,5 +91,5 @@ return [
     'none' => 'No products were found for this search.',
     'gone' => 'This link has expired or does not exist.',
     'gone_help' => 'Search again on the store\'s site and send a new link.',
-    'by' => 'Prepared by Lets Search',
+    'by' => 'Prepared by Let’s Search',
 ];

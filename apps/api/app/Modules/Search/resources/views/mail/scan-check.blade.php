@@ -7,7 +7,7 @@
 <body style="margin:0;padding:24px;background:#f6f6f7;font-family:'Google Sans',Heebo,Arial,sans-serif;color:#0b0b0c">
     <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:24px;overflow:hidden">
         <div style="background:#0b0b0c;color:#fff;padding:22px 28px">
-            <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">Lets</p>
+            <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">Let’s</p>
         </div>
         <div style="padding:28px;font-size:14px;line-height:1.6;color:#3a3a40">
             <h1 style="margin:0 0 6px;font-size:22px;font-weight:500;letter-spacing:-.02em;color:#0b0b0c">{{ $t('title', ['store' => $store]) }}</h1>

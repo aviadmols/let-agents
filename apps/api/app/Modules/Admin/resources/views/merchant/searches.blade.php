@@ -17,7 +17,7 @@
     })
 
     <div class="lp-page lp-d" data-searches>
-        {{-- searches tried in the theme's preview are not these numbers: a merchant trying Lets there saw 0 and read it as
+        {{-- searches tried in the theme's preview are not these numbers: a merchant trying Let’s there saw 0 and read it as
         broken (Shopify review, 18.11) --}}
         <p class="lp-d-sub" data-preview-note style="margin:0 0 12px">{{ $t('preview_note') }}</p>
         <div class="lp-d-grid">

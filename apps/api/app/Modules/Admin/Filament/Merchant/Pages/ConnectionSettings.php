@@ -156,7 +156,7 @@ class ConnectionSettings extends Page
         return $user instanceof User && $user->canEditShop($this->shop());
     }
 
-    /** Only an owner (or an operator) makes a token: it decides which store Lets reads. */
+    /** Only an owner (or an operator) makes a token: it decides which store Let’s reads. */
     public function canConnect(): bool
     {
         $user = Auth::user();

@@ -1,4 +1,4 @@
-{{-- The Lets email frame (Search Subscriptions, 18.11): a 560px column on #f6f6f7, the ink head with the store's name
+{{-- The Let’s email frame (Search Subscriptions, 18.11): a 560px column on #f6f6f7, the ink head with the store's name
      (or its logo) and one lime word, the white body, the ink foot. Tables and inline styles only: no SVG, no background
      image. Always left to right, whatever the store's language: a Hebrew search sits inside it, aligned left. --}}
 <!DOCTYPE html>

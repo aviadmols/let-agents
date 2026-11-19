@@ -7,7 +7,7 @@ use Illuminate\Http\Response;
 
 /**
  * GET /api/v1/widget/let-agents.js — the address stores on the older plugin still print. It now
- * serves the Lets Search drawer (Search's built resources/search/lets-search.js), which reads the
+ * serves the Let’s Search drawer (Search's built resources/search/lets-search.js), which reads the
  * old window.LetAgentsContext as its config and refuses to load twice, so a page that prints both
  * addresses gets one drawer. Served by the app so every store runs the newest file minutes after
  * a deploy, without a plugin update.

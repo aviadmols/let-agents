@@ -1,11 +1,11 @@
-{{-- The demo's pages in Lets' own look (lets.co.il, site.css): ink 60%, white 30%, lime 10%, lime only on ink; Google Sans. --}}
+{{-- The demo's pages in Let’s' own look (lets.co.il, site.css): ink 60%, white 30%, lime 10%, lime only on ink; Google Sans. --}}
 <!doctype html>
 <html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'he' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <title>@yield('title') · Lets</title>
+    <title>@yield('title') · Let’s</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&family=Heebo:wght@400;500;600&display=swap">
     <style>

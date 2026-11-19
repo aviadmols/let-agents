@@ -39,7 +39,7 @@
     var b = turn.bank || {};
     head += (b.popularity && b.popularity.popular ? '<span class="ls-pop" title="' + esc(b.popularity.text || '') + '">' + icon('trend', 'ls-icon--sm') + esc(b.popularity.badge || t('popular30')) + '</span>' : '') + '</div></div>';
     var html = head;
-    // under the product, as Aviad asked (2026-10-18): its key specs, then what Lets offers to ask, then the
+    // under the product, as Aviad asked (2026-10-18): its key specs, then what Let’s offers to ask, then the
     // products this visitor looked at, then the rest (what the store promises, the product's other sections).
     // The product's tags are not shown here: the specs say the same.
     var sections = b.sections || [];

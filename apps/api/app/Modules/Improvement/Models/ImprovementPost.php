@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $published_at
  * @property array{seo_title?: string, meta_description?: string, focus_keyword?: string, excerpt?: string, tags?: list<string>, faq?: list<array{q: string, a: string}>}|null $seo
  * @property array{platform?: string, id?: string, url?: string, admin_url?: string, status?: string, error?: string, at?: string}|null $remote where it went on the store's own site
- * @property string|null $destination store (the store's blog) or lets (a page on Lets); null: published before the choice, both
+ * @property string|null $destination store (the store's blog) or lets (a page on Let’s); null: published before the choice, both
  */
 class ImprovementPost extends Model
 {
@@ -44,7 +44,7 @@ class ImprovementPost extends Model
     /** Lives on the store's own site: sent to its blog as a draft, published from there. */
     public const STORE = 'store';
 
-    /** Lives on Lets: a page at its own address, among the store's content for the search and the assistant. */
+    /** Lives on Let’s: a page at its own address, among the store's content for the search and the assistant. */
     public const LETS = 'lets';
 
     /** The most products a post shows and links. */
@@ -52,7 +52,7 @@ class ImprovementPost extends Model
 
     protected $guarded = ['id'];
 
-    /** Served at its own address on Lets (a post from before the choice was both). */
+    /** Served at its own address on Let’s (a post from before the choice was both). */
     public function hosted(): bool
     {
         return $this->destination !== self::STORE;

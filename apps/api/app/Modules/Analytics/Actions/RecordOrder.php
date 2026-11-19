@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Validator;
  *   assisted     the visitor opened or used the widget before ordering
  *
  * A product the visitor opened from the widget or the search and then added from its own page is added from
- * the one it was opened from (Aviad, 29.10): the store's own button finished what Lets began.
+ * the one it was opened from (Aviad, 29.10): the store's own button finished what Let’s began.
  *
  * All within the shop's attribution window. The order carries no customer data: a hashed
  * order number, totals, product IDs and quantities, and the anonymous visitor ID.
@@ -79,14 +79,14 @@ final class RecordOrder
                     ->get(['type', 'source', 'result', 'item_external_id']);
 
                 // The widget's: what the search did is counted on its own, below, and an add from the store's own
-                // page and button is the store's (Sela Meir, 29.10: seven orders "with Lets" that Lets never touched).
+                // page and button is the store's (Sela Meir, 29.10: seven orders "with Let’s" that Let’s never touched).
                 $assisted = $events->whereNotIn('source', [AnalyticsEvent::SOURCE_SEARCH, AnalyticsEvent::SOURCE_PAGE])->isNotEmpty();
                 $added = fn (string $source): array => $events
                     ->where('type', 'add_to_cart')->where('source', $source)->where('result', 'added')
                     ->pluck('item_external_id')->filter()->map(fn ($id): string => (string) $id)->unique()->all();
                 $addedFromWidget = $added('widget');
                 $addedFromSearch = $added(AnalyticsEvent::SOURCE_SEARCH);
-                // opened from Lets, added from its own page: the search's, or the widget's, as it was opened
+                // opened from Let’s, added from its own page: the search's, or the widget's, as it was opened
                 $opened = fn (bool $search): array => $events->where('type', 'click')
                     ->filter(fn (AnalyticsEvent $e): bool => $e->item_external_id !== null && ($e->source === AnalyticsEvent::SOURCE_SEARCH) === $search && $e->source !== AnalyticsEvent::SOURCE_PAGE)
                     ->pluck('item_external_id')->map(fn ($id): string => (string) $id)->unique()->all();

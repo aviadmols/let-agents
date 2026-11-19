@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'subject_one' => 'Lets: :title',
-    'subject_many' => 'Lets: :count בעיות במערכת',
+    'subject_one' => 'Let’s: :title',
+    'subject_many' => 'Let’s: :count בעיות במערכת',
     'urgent' => 'דחוף:',
     'urgent_badge' => 'דחוף',
     'lead' => 'בדיקת המערכת, :at',

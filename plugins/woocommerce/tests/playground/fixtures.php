@@ -177,7 +177,7 @@ $wishlist_id = wp_insert_post(
 );
 
 // A store from before 0.9.0: the widget in preview, its search off, an offer after paragraph 2.
-// The next request migrates it to one mode, preview, so the team still gets Lets Search, and the
+// The next request migrates it to one mode, preview, so the team still gets Let’s Search, and the
 // offer is gone.
 update_option(
 	'let_agents_settings',

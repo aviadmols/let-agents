@@ -69,7 +69,7 @@
     @php($failed = $site->status === \App\Modules\Demo\Models\DemoSite::FAILED)
     <section class="hero" style="padding-bottom: 130px">
         <span class="hero__glow" aria-hidden="true"></span>
-        <span class="brand"><i aria-hidden="true"></i>Lets</span>
+        <span class="brand"><i aria-hidden="true"></i>Let’s</span>
         <h1>{{ $failed ? $t('ended.failed_title') : $t('scan.hero', ['site' => $site->title ?? $site->host]) }}</h1>
         @unless ($failed)
             <p class="lede">{{ $t('scan.lede') }}</p>

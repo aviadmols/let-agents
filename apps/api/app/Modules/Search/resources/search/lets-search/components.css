@@ -1,5 +1,5 @@
 /*
- * Lets Search — components.
+ * Let’s Search — components.
  * Reads only the semantic layer (--ls-*). Logical properties throughout, so RTL and LTR both work.
  */
 
@@ -493,7 +493,7 @@ a.ls-pick__media { display: block; }
 .ls-row--ask .ls-row__go { margin-inline-start: auto; font-size: var(--lsp-text-sm); font-weight: 600; color: var(--ls-fg); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .ls-askcard__btn { transition: none; } }
 
-/* the Lets mark in a small white circle, at the start of a list row */
+/* the Let’s mark in a small white circle, at the start of a list row */
 .ls-markdot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--ls-bg); color: var(--ls-fg); box-shadow: inset 0 0 0 1px var(--ls-line-strong); }
 .ls-markdot .ls-mark { --s: 11px; }
 

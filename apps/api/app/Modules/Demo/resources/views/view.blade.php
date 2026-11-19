@@ -1,4 +1,4 @@
-{{-- The demo: a phone with Lets' floating search in it, the real drawer on the demo store, and what the demo is.
+{{-- The demo: a phone with Let’s' floating search in it, the real drawer on the demo store, and what the demo is.
      The phone is a frame of its own page (DemoController::phone), so the search opens in it as it would on a phone:
      on a computer a phone stands in the middle of the page; on a phone it is the whole screen. A thin bar says it is
      a demo, until when, and how to connect. --}}
