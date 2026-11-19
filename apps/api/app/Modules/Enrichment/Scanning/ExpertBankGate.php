@@ -40,6 +40,42 @@ final class ExpertBankGate
     public const MAX_OVERLAP = 0.2;
 
     /**
+     * Words that say a value is not known, not given or does not apply. A store's field often holds them ("Kosher: not
+     * confirmed", "Material: N/A"), so they are repeated words of the catalogue and an expert may copy them as a value;
+     * but a shopper never picks "unknown": it is the absence of a choice, not a choice. Kept small and of no trade: only
+     * what says uncertainty or absence, in the two languages the stores write in. Matched as whole words, like any word.
+     */
+    public const NOT_A_CHOICE = [
+        'unknown', 'not known', 'not confirmed', 'unconfirmed', 'not specified', 'unspecified', 'not stated', 'n/a', 'tbd', 'tba',
+        'לא ידוע', 'לא ידועה', 'לא מאושר', 'לא מאושרת', 'לא צוין', 'לא מוגדר', 'לא רלוונטי',
+    ];
+
+    /**
+     * A value whose label or words say uncertainty or absence (NOT_A_CHOICE) is no choice, and is taken out, whatever
+     * the products say.
+     *
+     * @return array{0: array{types: list<array<string, mixed>>, attributes: list<array<string, mixed>>}, 1: list<array<string, mixed>>}
+     */
+    public static function notChoices(array $bank, string $step): array
+    {
+        $patterns = array_map(ExpertBankShape::pattern(...), self::NOT_A_CHOICE);
+
+        return self::sift($bank, $step, function (string $kind, array $item) use ($patterns): array {
+            if ($kind !== 'value') {
+                return [$item['words'], null, ''];
+            }
+            foreach ([(string) $item['label'], ...$item['words']] as $said) {
+                $match = PatternMatch::first(TextNormalizer::forMatching($said), $patterns);
+                if ($match !== null) {
+                    return [$item['words'], 'not_a_choice', mb_substr($said, 0, 120)];
+                }
+            }
+
+            return [$item['words'], null, ''];
+        });
+    }
+
+    /**
      * What reads no product, taken out: each word alone, then the value or the type left with none, then the attribute
      * left with no value or with no type of those it named.
      *
@@ -66,16 +102,27 @@ final class ExpertBankGate
      * @param  array<string, mixed>  $measured  BankEvidence::measure() of this same bank
      * @param  int  $minProducts  a value or a type is a filter when at least this many products hold it
      * @param  float  $minShare  an attribute is a filter when it reaches at least this share of the products of its types
+     * @param  float  $maxValueShare  a value held by at least this share of its attribute's products separates nothing
      * @return array{0: array{types: list<array<string, mixed>>, attributes: list<array<string, mixed>>}, 1: list<array<string, mixed>>}
      */
-    public static function thin(array $bank, array $measured, int $minProducts, float $minShare, string $step = 'gate'): array
+    public static function thin(array $bank, array $measured, int $minProducts, float $minShare, float $maxValueShare = 1.0, string $step = 'gate'): array
     {
-        [$bank, $removed] = self::sift($bank, $step, function (string $kind, array $item, ?array $attribute) use ($measured, $minProducts): array {
+        [$bank, $removed] = self::sift($bank, $step, function (string $kind, array $item, ?array $attribute) use ($measured, $minProducts, $maxValueShare): array {
             $products = (int) ($kind === 'type'
                 ? ($measured['types'][$item['key']]['products'] ?? 0)
                 : ($measured['attributes'][$attribute['key']]['values'][$item['key']]['products'] ?? 0));
+            if ($products < $minProducts) {
+                return [$item['words'], $products === 0 ? 'no_evidence' : 'too_rare', (string) $products];
+            }
+            // A value nearly every product of its attribute holds narrows nothing: picking it returns what was there. The
+            // checker is asked about it (nearly_universal) and may keep it; code does not (a "suitable for" held by 97 of 98).
+            // (an attribute of one value is no filter whatever its share: it goes below as too few values)
+            $of = (int) ($kind === 'value' && count($attribute['values']) >= self::MIN_VALUES ? ($measured['attributes'][$attribute['key']]['products'] ?? 0) : 0);
+            if ($of > 0 && $products / $of >= $maxValueShare) {
+                return [$item['words'], 'separates_nothing', $products.' of '.$of];
+            }
 
-            return [$item['words'], $products < $minProducts ? ($products === 0 ? 'no_evidence' : 'too_rare') : null, (string) $products];
+            return [$item['words'], null, (string) $products];
         });
 
         $kept = [];

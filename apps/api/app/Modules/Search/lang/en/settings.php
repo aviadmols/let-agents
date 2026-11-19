@@ -389,6 +389,10 @@ return [
         'label' => 'Categories in the filter',
         'description' => 'How many of the store\'s categories the category filter offers, the most used first. A content site with many destinations or subjects shows more.',
     ],
+    'category_filter_min_beside_bank' => [
+        'label' => 'Categories left beside an expert bank',
+        'description' => 'Where the store\'s vocabulary is its expert bank, the categories whose names the bank already says are not offered in the category filter. The filter stays only when at least this many categories are left.',
+    ],
     'store_tag_filter' => [
         'label' => 'The store\'s tags as a filter',
         'description' => 'The tags the store gives its products, a filter of their own: those not already a category, each on two products or more.',

@@ -66,8 +66,10 @@ final class BankEvidence
             $values = [];
             $sets = [];
             $tagged = [];
+            // within one attribute the longest phrase wins: a span a longer phrase of one value took is no other value's
+            $read = $this->readAttribute($attribute['values'], $scope);
             foreach ($attribute['values'] as $value) {
-                [$set, $words, $elsewhere] = $this->read($value['words'], 'full', $scope);
+                [$set, $words, $elsewhere] = $read[$value['key']];
                 $sets[$value['key']] = $set;
                 $tagged += $set;
                 $values[$value['key']] = ['id' => $value['id'], 'products' => count($set), 'words' => $words] + ($elsewhere === [] ? [] : ['elsewhere' => $elsewhere]);
@@ -138,17 +140,75 @@ final class BankEvidence
         return [$set, $counts, $elsewhere];
     }
 
+    /**
+     * The values of one attribute read on the products of its scope, the longest phrase first (LongestPhrase): a span a
+     * longer phrase of one value took is not read again by a shorter word of another. Each value's products and each
+     * word's count are of what stands; a word's reading outside the scope is counted as it is found.
+     *
+     * @param  list<array<string, mixed>>  $values
+     * @param  array<int, true>  $scope
+     * @return array<string, array{0: array<int, true>, 1: array<string, int>, 2: array<string, int>}> by value key
+     */
+    private function readAttribute(array $values, array $scope): array
+    {
+        $whole = count($scope) === count($this->texts);
+        $order = array_map(fn (array $value): string => (string) $value['key'], $values);
+        $spans = [];
+        $out = [];
+
+        foreach ($values as $value) {
+            $key = (string) $value['key'];
+            $out[$key] = [[], array_fill_keys($value['words'], 0), []];
+            foreach ($value['words'] as $word) {
+                $found = $this->spans($word, 'full');
+                $inside = $whole ? $found : array_intersect_key($found, $scope);
+                if (! $whole && count($found) - count($inside) > count($inside)) {
+                    $out[$key][2][$word] = count($found) - count($inside);
+                }
+                foreach ($inside as $index => $list) {
+                    foreach ($list as [$offset, $length]) {
+                        $spans[$index][] = ['value' => $key, 'word' => $word, 'offset' => $offset, 'length' => $length];
+                    }
+                }
+            }
+        }
+
+        ksort($spans);
+        foreach ($spans as $index => $list) {
+            $counted = [];
+            foreach (LongestPhrase::resolve($list, $order) as $span) {
+                $out[$span['value']][0][$index] = true;
+                if (! isset($counted[$span['value'].'|'.$span['word']])) {
+                    $counted[$span['value'].'|'.$span['word']] = true;
+                    $out[$span['value']][1][$span['word']]++;
+                }
+            }
+        }
+        foreach ($out as &$read) {
+            ksort($read[0]);
+        }
+        unset($read);
+
+        return $out;
+    }
+
     /** @return array<int, true> the products whose text holds the word as a whole word */
     private function found(string $word, string $where): array
     {
+        return array_map(fn (): bool => true, $this->spans($word, $where));
+    }
+
+    /** @return array<int, list<array{0: int, 1: int}>> every whole-word match of the word, by product */
+    private function spans(string $word, string $where): array
+    {
         return $this->memo[$where.'|'.$word] ??= (function () use ($word, $where): array {
-            $pattern = [ExpertBankShape::pattern($word)];
+            $pattern = ExpertBankShape::pattern($word);
             // The word's first letters, to pass quickly over the products that cannot hold it.
             $start = mb_substr((string) (preg_split('/[\s\-]+/u', $word, -1, PREG_SPLIT_NO_EMPTY)[0] ?? ''), 0, -1);
             $found = [];
             foreach ($this->texts as $index => $text) {
-                if (($start === '' || str_contains($text[$where], $start)) && PatternMatch::any($text[$where], $pattern)) {
-                    $found[$index] = true;
+                if (($start === '' || str_contains($text[$where], $start)) && ($all = PatternMatch::all($text[$where], $pattern)) !== []) {
+                    $found[$index] = $all;
                 }
             }
 

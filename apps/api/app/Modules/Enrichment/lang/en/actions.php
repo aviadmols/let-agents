@@ -18,4 +18,6 @@ return [
     'compare_readers' => 'Two reading models compared',
     'collect_batches' => 'Collecting batch answers from the provider',
     'build_expert_bank' => 'Writing an attribute bank for the store itself (experiment)',
+    'activate_expert_bank' => 'Making an attribute bank the store\'s vocabulary',
+    'deactivate_expert_bank' => 'Undoing an activated attribute bank',
 ];

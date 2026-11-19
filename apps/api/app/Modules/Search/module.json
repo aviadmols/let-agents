@@ -904,6 +904,14 @@
             "scope": "shop"
         },
         {
+            "name": "category_filter_min_beside_bank",
+            "type": "int",
+            "default": 3,
+            "min": 2,
+            "max": 20,
+            "scope": "shop"
+        },
+        {
             "name": "store_tag_filter",
             "type": "bool",
             "default": false,

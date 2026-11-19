@@ -60,6 +60,27 @@ final class PatternMatch
         return null;
     }
 
+    /**
+     * Every whole-word match of one pattern: [offset, length] in bytes, in the order of the text.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public static function all(string $text, string $pattern): array
+    {
+        if ($text === '' || @preg_match_all('~'.$pattern.'~imu', $text, $matches, PREG_OFFSET_CAPTURE) < 1) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($matches[0] as [$found, $offset]) {
+            if ($found !== '' && self::whole($text, (int) $offset, strlen($found)) && ! self::otherMeaning($text, (int) $offset, $found)) {
+                $out[] = [(int) $offset, strlen($found)];
+            }
+        }
+
+        return $out;
+    }
+
     /** @param list<string> $patterns */
     public static function any(string $text, array $patterns): bool
     {

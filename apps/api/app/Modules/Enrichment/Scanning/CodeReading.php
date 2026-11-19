@@ -180,6 +180,9 @@ final class CodeReading
             // description each name, together, every value with the source it came from: "קורל, אוניקס ופנינים" in a
             // title and "ספיר" in its description are four stones, not the title's three (Aviad, 18.11: the name and the
             // description both go into the tags). The picture is read only when none of them names one.
+            // An expert bank's choice is read the longest phrase first, as it was measured (LongestPhrase).
+            $longest = $vocabulary->longestPhrase($key);
+            $values = (array) ($attribute['values'] ?? []);
             if ($vocabulary->isMultiple($key)) {
                 $union = [];
                 $by = [];
@@ -187,14 +190,9 @@ final class CodeReading
                     if ($source === 'image' && $union !== []) {
                         break;
                     }
-                    $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
-                    foreach ((array) ($attribute['values'] ?? []) as $value) {
-                        $valueKey = (string) $value['key'];
+                    $read = $source === 'field' ? self::withoutGroups($text, $values, $longest) : $text[$source];
+                    foreach (self::findValues($read, $values, $longest) as $valueKey => $quote) {
                         if (isset($union[$valueKey])) {
-                            continue;
-                        }
-                        $quote = self::find($read, (array) ($value['patterns'] ?? []));
-                        if ($quote === null) {
                             continue;
                         }
                         if (($text['colours'] ?? null) !== null && $source !== 'field' && in_array($key, self::VARIANT_COLOUR_KEYS, true)
@@ -220,14 +218,8 @@ final class CodeReading
             }
 
             foreach (self::sources($vocabulary, $key) as $source) {
-                $read = $source === 'field' ? self::withoutGroups($text, (array) ($attribute['values'] ?? [])) : $text[$source];
-                $found = [];
-                foreach ((array) ($attribute['values'] ?? []) as $value) {
-                    $quote = self::find($read, (array) ($value['patterns'] ?? []));
-                    if ($quote !== null) {
-                        $found[(string) $value['key']] = $quote;
-                    }
-                }
+                $read = $source === 'field' ? self::withoutGroups($text, $values, $longest) : $text[$source];
+                $found = self::findValues($read, $values, $longest);
                 // The store's own colour attribute is the whole list: a colour the title, the description or the
                 // picture names that it does not is not read ("מגיע בצבעים: חום, ירוק, אדום ושחור" on a board sold
                 // in brown and green, as Gueta's MDF taught, 2026-10-18).
@@ -276,11 +268,11 @@ final class CodeReading
             $found = [];
             foreach ($variants as $variant) {
                 $label = (string) $variant->color_label;
-                $named = array_values(array_filter((array) ($attribute['values'] ?? []), fn (array $v): bool => $label !== '' && self::find($label, (array) ($v['patterns'] ?? [])) !== null));
+                $named = $label === '' ? [] : array_keys(self::findValues($label, (array) ($attribute['values'] ?? []), $vocabulary->longestPhrase($key)));
                 $keyed = $pattern
                     ? array_values(array_intersect(array_filter([$variant->pattern]), $values))
                     : (array_values(array_intersect((array) $variant->color_shades, $values)) ?: array_values(array_intersect((array) $variant->color_families, $values)));
-                foreach ($named !== [] ? array_map(fn (array $v): string => (string) $v['key'], $named) : $keyed as $value) {
+                foreach ($named !== [] ? array_map('strval', $named) : $keyed as $value) {
                     $found[$value] ??= $label !== '' ? $label : $value;
                 }
             }
@@ -302,20 +294,13 @@ final class CodeReading
      * @param  array{names?: list<string>, attributes?: list<string>, field: string}  $text
      * @param  list<array<string, mixed>>  $values
      */
-    private static function withoutGroups(array $text, array $values): string
+    private static function withoutGroups(array $text, array $values, bool $longest = false): string
     {
         if (! isset($text['names'])) {
             return $text['field'];
         }
 
-        $names = array_filter($text['names'], function (string $name) use ($values): bool {
-            $named = 0;
-            foreach ($values as $value) {
-                $named += self::find($name, (array) ($value['patterns'] ?? [])) !== null ? 1 : 0;
-            }
-
-            return $named < 2;
-        });
+        $names = array_filter($text['names'], fn (string $name): bool => count(self::findValues($name, $values, $longest)) < 2);
 
         return implode('
 ', [...$names, ...($text['attributes'] ?? [])]);
@@ -382,6 +367,40 @@ final class CodeReading
     private static function categoryNamesAnotherType(VocabularyDefinition $vocabulary, array $categories): bool
     {
         return $categories !== [] && $vocabulary->typeForCategories($categories) !== null;
+    }
+
+    /**
+     * The values of one choice a text names, each with the words around it, in the choice's order. Read the longest phrase
+     * first where the vocabulary asks it (LongestPhrase): a span a longer phrase of one value took names no other value.
+     *
+     * @param  list<array<string, mixed>>  $values
+     * @return array<string, string> the words around each, by value key
+     */
+    private static function findValues(string $text, array $values, bool $longest = false): array
+    {
+        $found = [];
+        if ($text === '') {
+            return $found;
+        }
+        if ($longest) {
+            $patterns = [];
+            foreach ($values as $value) {
+                $patterns[(string) $value['key']] = array_values(array_map('strval', (array) ($value['patterns'] ?? [])));
+            }
+            foreach (LongestPhrase::claims($text, $patterns) as $key => [$offset, $length]) {
+                $found[(string) $key] = Snippet::around($text, $offset, $length);
+            }
+
+            return $found;
+        }
+        foreach ($values as $value) {
+            $quote = self::find($text, (array) ($value['patterns'] ?? []));
+            if ($quote !== null) {
+                $found[(string) $value['key']] = $quote;
+            }
+        }
+
+        return $found;
     }
 
     /**
