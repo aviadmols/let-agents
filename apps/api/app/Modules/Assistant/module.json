@@ -64,6 +64,10 @@
         {
             "name": "team_drafts",
             "default": true
+        },
+        {
+            "name": "goes_with",
+            "default": false
         }
     ],
     "settings": [
@@ -74,6 +78,44 @@
             "min": 1,
             "max": 20,
             "scope": "shop"
+        },
+        {
+            "name": "goes_with_products",
+            "type": "int",
+            "default": 8,
+            "min": 1,
+            "max": 12,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "goes_with_max_picks",
+            "type": "int",
+            "default": 3,
+            "min": 1,
+            "max": 3,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "goes_with_use_relations",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "goes_with_use_look",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "goes_with_rules_max",
+            "type": "int",
+            "default": 40,
+            "min": 1,
+            "max": 200,
+            "scope": "global"
         },
         {
             "name": "prepared_per_sync",

@@ -16,6 +16,7 @@ use App\Modules\Enrichment\Actions\RereadPage;
 use App\Modules\Enrichment\Console\CompleteLooksCommand;
 use App\Modules\Enrichment\Console\EnrichmentCommand;
 use App\Modules\Enrichment\Contracts\ExpertBankNames;
+use App\Modules\Enrichment\Contracts\GoesWithPartners;
 use App\Modules\Enrichment\Contracts\ProductTypes;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
@@ -29,6 +30,7 @@ use App\Modules\Enrichment\Support\FactNotes;
 use App\Modules\Enrichment\Support\KnowledgeOfProducts;
 use App\Modules\Enrichment\Support\StoredCards;
 use App\Modules\Enrichment\Support\StoredExpertBankNames;
+use App\Modules\Enrichment\Support\StoredGoesWithPartners;
 use App\Modules\Enrichment\Support\StoredProductTypes;
 use App\Modules\Enrichment\Support\WrittenSectionQuestions;
 use App\Modules\Retrieval\Contracts\DocumentNotes;
@@ -61,6 +63,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->bind(ReadsCards::class, StoredCards::class);
         // The category names a store's expert bank already sorts into its own attributes: no second filter of them.
         $this->app->bind(ExpertBankNames::class, StoredExpertBankNames::class);
+        // the products the store itself pairs with a product (its complement relations): read at answer time, never a model
+        $this->app->bind(GoesWithPartners::class, StoredGoesWithPartners::class);
         // Each product's approved type and the type each store name says: the search index follows the audited type.
         $this->app->bind(ProductTypes::class, StoredProductTypes::class);
     }

@@ -17,11 +17,13 @@ use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Contracts\PriceRange;
 use App\Modules\Assistant\Contracts\ProductsDescribed;
 use App\Modules\Assistant\Contracts\ProductSets;
+use App\Modules\Assistant\Contracts\ProductsGoingWith;
 use App\Modules\Assistant\Contracts\ProductsNamed;
 use App\Modules\Assistant\Contracts\ProductsNear;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantGoesWithRules;
 use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
@@ -48,6 +50,7 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
+use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\Passages;
@@ -241,6 +244,14 @@ final class AnswerSiteQuestion implements TriesQuestions
     // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
     public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
 
+    /**
+     * The writer of a question routed to the goes-with mechanism (a product of another kind to go with the one on the
+     * page: goesWith()): its own prompt, answer_site v45 and `analysis.goes_with` read by name, in its own versioned file
+     * (goes_with_answer.v1). The released answer_site prompt is never changed for it; every other question goes through
+     * it untouched. The same output schema, so code's gate and the checker read the reply as any answer's.
+     */
+    public const GOES_WITH_PROMPT = 'goes_with_answer';
+
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
 
@@ -386,6 +397,20 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** How many products near the one asked about are given to choose from, when the screen shows only it. */
     private const NEAREST_TO = 8;
+
+    /**
+     * Asks for something to go with a product: "מתאים/ה ל", "שמתאים", "ללכת עם", "סט", "תואם", "להשלים", "משלים", "match",
+     * "goes with", "set", "complete the look". A sign only: what is asked for is the kind the question names (goesWith()).
+     */
+    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
+
+    /**
+     * What the code found to go with the product asked about (goesWith()): the kind asked, the product, and by id what each
+     * shares with it. Null when the question asks for none.
+     *
+     * @var array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}|null
+     */
+    private ?array $goesWith = null;
 
     /** @var list<string> a wish with a price that names no product: the store's range inside it, of every kind (wishedWithin()) */
     private array $wish = [];
@@ -899,6 +924,83 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @return list<string> external ids, best first
      */
     private function namedProducts(string $question): array
+    {
+        // a product's own code, as the store writes it, names that product whole, before any title's words (bySku())
+        $bySku = $this->bySku($question);
+
+        return array_slice(array_values(array_unique([...$bySku, ...$this->namedByTitle($question)])), 0, max(self::NAMED_PRODUCTS, count($bySku)));
+    }
+
+    /** A number of at least this many digits may be a product's code by itself; a shorter one only after "מק"ט", "SKU". */
+    private const SKU_DIGITS = 4;
+
+    /** The words a code is said after: "מק"ט", "מקט", "SKU", "דגם", "קוד", "model", "ref", "#". */
+    private const SKU_WORD = '/(?:מק["״\']?ט|sku|דגם|קוד|code|model|ref|art|#)\s*[:.\-]?\s*$/iu';
+
+    /** A measure, a price or a karat after a number: "400 מ"ל", "14 קראט", "200 ש"ח" are never a code. */
+    private const AFTER_AMOUNT = '/^\s*(?:מ["״\']?ל|מיליליטר|ml|ס["״\']?מ|cm|מ["״\']?מ|mm|מטר|m(?![\p{L}])|גר(?:ם)?|g(?![\p{L}])|kg|ק["״\']?ג|ליטר|l(?![\p{L}])|%|ש["״\']?ח|₪|\$|שקל|nis|ils|usd|קראט|קארט|קרט|karat|carat|ct|kt|k(?![\p{L}])|יח|units?|pcs?)/iu';
+
+    /**
+     * The products a question names by their own code (SKU), exactly as the store writes it, in any case: "יש טבעת שמתאימה
+     * למוצר עם המקט 17156?" names the bracelet of SKU 17156 (Rocks, 19.11: the answer said no such SKU, the title words alone
+     * read, a number alone naming nothing). A code is a number of four digits or more, or one said after "מק"ט"/"SKU", or
+     * letters and digits together ("AB-1234"); never an amount the question keeps to, nor a number before a measure ("400
+     * מ"ל"), a price or a karat. Code only.
+     *
+     * @return list<string> external ids, in the order the question says their codes
+     */
+    private function bySku(string $question): array
+    {
+        if (preg_match_all('/[\p{L}\p{N}]+(?:[\-_.\/][\p{L}\p{N}]+)*/u', $question, $m, PREG_OFFSET_CAPTURE) === 0) {
+            return [];
+        }
+        $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        $amounts = array_map('floatval', array_values(array_filter([$range['min'], $range['max']], fn ($v): bool => $v !== null)));
+        $codes = [];
+        foreach ($m[0] as [$token, $at]) {
+            $token = (string) $token;
+            if (preg_match('/\p{N}/u', $token) !== 1 || preg_match('/^\d{1,2}k$/i', $token) === 1) {
+                continue;
+            }
+            $before = substr($question, 0, (int) $at);
+            $after = substr($question, (int) $at + strlen($token));
+            $digits = preg_match('/^\p{N}+$/u', $token) === 1;
+            if (preg_match(self::AFTER_AMOUNT, $after) === 1 || preg_match('/[₪$]\s*$/u', $before) === 1 || ($digits && in_array((float) $token, $amounts, true))) {
+                continue;
+            }
+            $said = preg_match(self::SKU_WORD, $before) === 1;
+            // letters and digits together: Latin letters ("AB1234"); a Hebrew letter before a number is its prefix ("ל17156")
+            $mixed = ! $digits && preg_match('/[a-z]/i', $token) === 1 && mb_strlen($token) >= 3;
+            if ($digits ? ($said || mb_strlen($token) >= self::SKU_DIGITS) : ($mixed || $said)) {
+                $codes[] = mb_strtolower($token);
+            } elseif (! $digits && preg_match('/^[והבלמש](\p{N}{'.self::SKU_DIGITS.',})$/u', $token, $bare) === 1) {
+                $codes[] = $bare[1];
+            }
+        }
+        $codes = array_values(array_unique($codes));
+        if ($codes === []) {
+            return [];
+        }
+        $found = CatalogProduct::query()->whereNull('removed_at')->whereNotNull('sku')->whereRaw('lower(trim(sku)) in ('.implode(',', array_fill(0, count($codes), '?')).')', $codes)
+            ->orderBy('id')->get(['external_id', 'sku']);
+        $out = [];
+        foreach ($codes as $code) {
+            foreach ($found as $product) {
+                if (mb_strtolower(trim((string) $product->sku)) === $code) {
+                    $out[] = (string) $product->external_id;
+                }
+            }
+        }
+
+        return array_slice(array_values(array_unique($out)), 0, self::NAMED_PRODUCTS);
+    }
+
+    /**
+     * The products a question names by the words of their titles (namedProducts()).
+     *
+     * @return list<string> external ids, best first
+     */
+    private function namedByTitle(string $question): array
     {
         $tokens = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [], fn (string $t): bool => $t !== ''));
         $scores = [];
@@ -1803,6 +1905,15 @@ final class AnswerSiteQuestion implements TriesQuestions
                 [$this->anchors, $viewing] = [$anchors, null];
             }
         }
+        // "יש טבעת שמתאימה לצמיד?" on a bracelet's page, or "…למוצר עם המקט 17156" anywhere: a product of another kind to go
+        // with it. The store's products of that kind, those sharing most with it first, found by code (ProductsGoingWith),
+        // beside the product itself; nothing else, so no product of another kind is offered as one (Rocks, 19.11: on the
+        // bracelet's page the writer had the bracelet alone and answered with a paragraph and no ring). Every store.
+        $this->goesWith = $this->anchors === [] ? $this->goesWith($shopId, $question, $viewing) : null;
+        if ($this->goesWith !== null) {
+            $viewing = $this->goesWith['anchor'];
+            $shown = [$viewing, ...$this->goesWith['ids']];
+        }
         // nothing on the shopper's screen: asked in the box, no search before it
         $nothingShown = $shown === [];
         $this->alone = $viewing ?? (count($shown) === 1 ? (string) $shown[0] : null);
@@ -1914,12 +2025,17 @@ final class AnswerSiteQuestion implements TriesQuestions
         $candidates = $this->withinPrice($shopId, $question, $this->candidates($shown));
         // what the others are measured by is never one of them, whatever brought it back (its own page found by meaning)
         $candidates = array_values(array_filter($candidates, fn (array $c): bool => ! in_array((string) ($c['external_id'] ?? ''), $this->anchors, true)));
+        // the product a match is asked for stays, whatever price the question keeps to: the price is the match's
+        if ($this->goesWith !== null && ! in_array($this->goesWith['anchor'], array_map(fn (array $c): string => (string) ($c['external_id'] ?? ''), $candidates), true)) {
+            $candidates = [...$this->candidates([$this->goesWith['anchor']]), ...$candidates];
+        }
         if ($wish !== []) {
             // a gift card is still there to offer, after what can be given itself
             usort($candidates, fn (array $a, array $b): int => (int) self::giftCard($a['title']) <=> (int) self::giftCard($b['title']));
         }
-        // a reply naming no kind keeps the conversation's, whatever the prompt (code, every store; site_code_rules)
-        if ($this->codeRules()) {
+        // a reply naming no kind keeps the conversation's, whatever the prompt (code, every store; site_code_rules); a match
+        // asked for names its kind
+        if ($this->codeRules() && $this->goesWith === null) {
             $candidates = self::heldKind($this->asked !== '' ? $this->asked : $question, $this->conversation, $candidates);
         }
         $type = AnswerContext::type($question);
@@ -1930,7 +2046,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($found !== [] || $candidates !== []) {
             if ($mode === AnswerContext::DYNAMIC) {
                 $selection = $this->context->select($shopId, $question, $type, $candidates, $found, $viewing);
-                [$candidates, $found, $debug] = [$selection['products'], $selection['passages'], $selection['debug']];
+                // the products found to go with the one asked about were chosen by code already: kept as they are
+                [$candidates, $found, $debug] = [$this->goesWith !== null ? $candidates : $selection['products'], $selection['passages'], $selection['debug']];
             }
         }
         $kept = array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $candidates);
@@ -1959,6 +2076,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         // is on sale, the brands, and whether the question asks for the cheapest or the dearest.
         // The model gets ranks, never prices: the page shows the current price.
         $analysis = self::analysis($question, $productsByRef, $popular);
+        // a match asked for: the kind, the product it is to go with, and what each of those found shares with it, as code
+        // read them off the store's index; none found is said as none (`goes_with`)
+        if ($this->goesWith !== null) {
+            $analysis['goes_with'] = self::goesWithFacts($this->goesWith, $productsByRef);
+        }
         // and the amounts a page sets as a least price for something ("2,000 ש״ח ומעלה" for Layaway), with which products
         // are under them: a model reads "ובהם הטבעת הזו" over a price of ₪650 (Rocks, 9.11). Only when there are some.
         // Only for a question of the store's offers (reserve, pay, ship, return): beside "טבעות עד 5000" the writer told of
@@ -2026,7 +2148,137 @@ final class AnswerSiteQuestion implements TriesQuestions
             ], JSON_UNESCAPED_UNICODE);
 
         return ['type' => $type, 'empty' => $counts['found'] === 0 && $counts['shown'] === 0] + $counts
-            + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug', 'now');
+            + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug', 'now') + ['goes_with' => $this->goesWith];
+    }
+
+    /**
+     * A match asked for, while the product on the screen or one the question names by its code is there: what the store has
+     * of the kind asked to go with it (ProductsGoingWith), where the shop has it on (assistant.goes_with). A question about
+     * the product itself names no other kind and is left as it was; so is a question of the store's (shipping, returns)
+     * that says no word of a match. Null when not asked, or the store's search is not there to ask.
+     *
+     * @return array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}|null
+     */
+    private function goesWith(string $shopId, string $question, ?string $viewing): ?array
+    {
+        if (! Features::enabled('assistant.goes_with', $shopId) || ! app()->bound(ProductsGoingWith::class)) {
+            return null;
+        }
+        // as the shopper typed it, and as the topic check read it
+        $wordings = array_values(array_unique(array_filter([$question, $this->asked])));
+        $anchor = null;
+        foreach ($wordings as $wording) {
+            $anchor ??= $this->bySku($wording)[0] ?? null;
+        }
+        $anchor ??= $viewing;
+        $matching = array_any($wordings, fn (string $w): bool => preg_match(self::GOES_WITH, $w) === 1);
+        if ($anchor === null || (! $matching && ! self::aboutProducts($question))) {
+            return null;
+        }
+        $limit = (int) Settings::get('assistant.goes_with_products', $shopId);
+        // which sources the store lets it choose from (GoesWithSettings)
+        $sources = [
+            'relations' => (bool) Settings::get('assistant.goes_with_use_relations', $shopId),
+            'look' => (bool) Settings::get('assistant.goes_with_use_look', $shopId),
+        ];
+        $rules = AssistantGoesWithRules::of($shopId);
+
+        foreach ($wordings as $wording) {
+            try {
+                // more than shown, so what the store's rules take out leaves enough
+                $found = app(ProductsGoingWith::class)->goingWith($shopId, $anchor, $wording, $rules['pairs'] === [] && $rules['never'] === [] ? $limit : $limit * 3, $sources);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return null;
+            }
+            if ($found !== null) {
+                $ids = array_slice($this->allowedWith($anchor, array_values(array_diff(array_map('strval', $found['ids']), [$anchor])), $rules), 0, $limit);
+
+                return ['kind' => $found['kind'], 'anchor' => $anchor, 'ids' => $ids, 'shares' => array_intersect_key($found['shares'], array_flip($ids)), 'complement' => (bool) ($found['complement'] ?? false)];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Of the products found to go with the anchor, those the store's rules let it offer (AssistantGoesWithRules): none of a
+     * kind, a category or a vendor it never offers; none of a kind it denied beside the anchor's kind; and, once it
+     * allowed kinds for the anchor's kind, only those. A kind is the approved type fact; a product of no known kind passes
+     * the pair rules except where allowed kinds are named.
+     *
+     * @param  list<string>  $ids
+     * @param  array{pairs: list<array{a: string, b: string, allow: bool}>, never: list<array{scope: string, value: string}>}  $rules
+     * @return list<string>
+     */
+    private function allowedWith(string $anchor, array $ids, array $rules): array
+    {
+        if ($ids === [] || ($rules['pairs'] === [] && $rules['never'] === [])) {
+            return $ids;
+        }
+        $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', [$anchor, ...$ids])->with('categories:id,name')->get()->keyBy('external_id');
+        $types = EnrichmentFact::query()->where('kind', FactKind::Type)->where('status', FactStatus::Approved)
+            ->whereIn('product_id', $products->pluck('id'))->orderBy('id')->pluck('value_text', 'product_id');
+        $typeOf = fn (string $id): ?string => isset($products[$id]) && isset($types[$products[$id]->id]) ? (string) $types[$products[$id]->id] : null;
+        $same = fn (string $a, string $b): bool => mb_strtolower(trim($a)) === mb_strtolower(trim($b));
+
+        $never = fn (string $id): bool => array_any($rules['never'], function (array $rule) use ($id, $products, $typeOf, $same): bool {
+            $product = $products[$id] ?? null;
+
+            return match ((string) $rule['scope']) {
+                'type' => $typeOf($id) !== null && $same((string) $rule['value'], (string) $typeOf($id)),
+                'category' => $product !== null && $product->categories->contains(fn ($c): bool => $same((string) $rule['value'], (string) $c->name)),
+                'vendor' => $product !== null && $same((string) $rule['value'], (string) $product->brand),
+                default => false,
+            };
+        });
+
+        $anchorType = $typeOf($anchor);
+        $allowed = [];
+        $denied = [];
+        foreach ($rules['pairs'] as $pair) {
+            $other = $anchorType !== null && $pair['a'] === $anchorType ? $pair['b'] : ($anchorType !== null && $pair['b'] === $anchorType ? $pair['a'] : null);
+            if ($other !== null) {
+                ($pair['allow'] ?? true) ? $allowed[$other] = true : $denied[$other] = true;
+            }
+        }
+
+        return array_values(array_filter($ids, function (string $id) use ($never, $typeOf, $allowed, $denied): bool {
+            if ($never($id)) {
+                return false;
+            }
+            $type = $typeOf($id);
+            if ($type !== null && isset($denied[$type])) {
+                return false;
+            }
+
+            return $allowed === [] || ($type !== null && isset($allowed[$type]));
+        }));
+    }
+
+    /**
+     * What the writer and the checker are told of a match asked for: the kind, the product's ref, and each product found with
+     * what it shares with it; `found` 0 when the store has none of the kind in stock, said as none, never filled with
+     * another kind.
+     *
+     * @param  array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}  $goesWith
+     * @param  array<string, array<string, mixed>>  $productsByRef
+     * @return array{kind: string, with: string|null, found: int, matches: list<array{ref: string, shares: list<string>}>}
+     */
+    private static function goesWithFacts(array $goesWith, array $productsByRef): array
+    {
+        $refOf = array_flip(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), $productsByRef));
+        $matches = [];
+        foreach ($goesWith['ids'] as $id) {
+            if (isset($refOf[$id])) {
+                $matches[] = ['ref' => (string) $refOf[$id], 'shares' => array_values($goesWith['shares'][$id] ?? [])];
+            }
+        }
+
+        return ['kind' => $goesWith['kind'], 'with' => isset($refOf[$goesWith['anchor']]) ? (string) $refOf[$goesWith['anchor']] : null, 'found' => count($matches), 'matches' => $matches]
+            // what is used with the product (its bits, a belt for the dress), not a match by look: the writer explains the use
+            + (($goesWith['complement'] ?? false) ? ['complement' => true] : []);
     }
 
     /**
@@ -2393,14 +2645,16 @@ final class AnswerSiteQuestion implements TriesQuestions
                     ) / 1_000_000);
 
                     $started = hrtime(true);
-                    $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
+                    // a question routed to the goes-with mechanism is written by its own prompt; every other by the released writer
+                    $writerPrompt = ($prepared['goes_with'] ?? null) !== null ? self::GOES_WITH_PROMPT : 'answer_site';
+                    $reply = $this->call($run, $writer, $writerPrompt, $input, $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
                     // In the shopper's language, or not at all: written in another, it is asked once more, and a second
                     // in another language is no answer (the team's line, in theirs). Never Hebrew to an English question
                     // (lets-review-test-4, 15.11).
                     if (! self::inLanguage($reply->data, $this->language)) {
                         $checked['language'] = 'asked_again';
-                        $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
+                        $reply = $this->call($run, $writer, $writerPrompt, $input, $maxOutput, $effort, 'answer');
                         $replies[] = [$reply, 'answer'];
                         if (! self::inLanguage($reply->data, $this->language)) {
                             $checked['language'] = 'none';
@@ -2427,6 +2681,14 @@ final class AnswerSiteQuestion implements TriesQuestions
                         // cordyceps, with no card to buy it from (Mycolivia, 25.10)
                         $picks = self::citedProducts($cited, $byRef, $picks, $prepared['productsByRef']);
                         $picks = $this->withoutAnchors($picks);
+                        // a match asked for shows what goes with the product, not the product again, when it shows any
+                        $anchor = $prepared['goes_with']['anchor'] ?? null;
+                        $others = is_string($anchor) ? array_values(array_filter($picks, fn (array $p): bool => (string) ($p['external_id'] ?? '') !== $anchor)) : [];
+                        $picks = $others !== [] ? $others : $picks;
+                        // and as many cards as the store shows for a match (assistant.goes_with_max_picks)
+                        if (is_string($anchor)) {
+                            $picks = array_slice($picks, 0, max(1, (int) Settings::get('assistant.goes_with_max_picks', $shopId)));
+                        }
                     }
                     // Sentences code took out (a number the pages do not have), the rest kept.
                     $checked['trimmed'] = $screened['trimmed'];
@@ -4805,6 +5067,10 @@ final class AnswerSiteQuestion implements TriesQuestions
 
         $within = fn (array $p): bool => $p['price'] !== null && $p['price'] > 0 && ($min === null || $p['price'] >= $min) && ($max === null || $p['price'] <= $max);
         $inside = array_values(array_filter($candidates, $within));
+        // a match asked for keeps to the kind code found: never widened to whatever else the words name ("צמיד")
+        if ($this->goesWith !== null) {
+            return $inside;
+        }
 
         if ($inside === [] && app()->bound(ProductsNamed::class) && ($named = app(ProductsNamed::class)->all($shopId, $question)) !== []) {
             // in the order the store's search named them, what is in stock first
