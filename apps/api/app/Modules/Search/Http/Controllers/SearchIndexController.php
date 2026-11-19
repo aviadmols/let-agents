@@ -100,6 +100,9 @@ final class SearchIndexController
             'similar' => Features::enabled('search.similar', $shopId) && self::similarReady($tenant, $shopId),
             // What each product carries, as the shop set it on its search display screen.
             'price' => (bool) Settings::get('search.show_price', $shopId),
+            // the parts of the opening screen the store shows (search.start_*): only those turned off are sent
+            'start' => array_filter(['popular' => (bool) Settings::get('search.start_popular', $shopId), 'recent' => (bool) Settings::get('search.start_recent', $shopId),
+                'products' => (bool) Settings::get('search.start_products', $shopId), 'ask' => (bool) Settings::get('search.start_ask', $shopId)], fn (bool $on): bool => ! $on) ?: null,
             'cart' => (bool) Settings::get('search.show_cart', $shopId),
             // where there is no cart: "Product page" or "Read more" (a site that tells about what it offers)
             'cardAction' => (string) Settings::get('search.card_action', $shopId),

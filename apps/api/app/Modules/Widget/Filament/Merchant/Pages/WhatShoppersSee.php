@@ -41,6 +41,11 @@ final class WhatShoppersSee extends Page
         'answers' => ['feature:assistant.on_search'],
         'photos' => ['feature:search.photos'],
         'price' => ['setting:search.show_price'],
+        // the parts of the screen a new search opens on (as Aviad asked, 19.11)
+        'start_popular' => ['setting:search.start_popular'],
+        'start_recent' => ['setting:search.start_recent'],
+        'start_products' => ['setting:search.start_products'],
+        'start_ask' => ['setting:search.start_ask'],
         'heart' => ['feature:shortlist.wishlist'],
         'compare' => ['feature:shortlist.compare'],
         'whatsapp' => ['feature:widget.whatsapp', 'feature:assistant.search_whatsapp'],

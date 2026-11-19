@@ -924,6 +924,30 @@
             "scope": "shop"
         },
         {
+            "name": "start_popular",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "start_recent",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "start_products",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
+            "name": "start_ask",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "brand_words",
             "type": "bool",
             "default": true,

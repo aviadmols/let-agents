@@ -397,6 +397,22 @@ return [
         'label' => 'Tags never shown as a filter',
         'description' => 'The store\'s own tags for its shop pages and campaigns, not for what a product is ("Gift Guide, Vacation Shop"), separated by commas. A tag that starts with one of them is left out too.',
     ],
+    'start_popular' => [
+        'label' => 'Opening screen: popular in the store',
+        'description' => 'Off: this part does not show when a new search opens.',
+    ],
+    'start_recent' => [
+        'label' => 'Opening screen: recent searches',
+        'description' => 'Off: this part does not show when a new search opens.',
+    ],
+    'start_products' => [
+        'label' => 'Opening screen: popular products',
+        'description' => 'Off: this part does not show when a new search opens.',
+    ],
+    'start_ask' => [
+        'label' => 'Opening screen: what people ask',
+        'description' => 'Off: this part does not show when a new search opens.',
+    ],
     'brand_words' => [
         'label' => 'The brand of a product is among its search words',
         'description' => 'Off in a store whose brand field is the supplier a piece was bought from: the name is not in the search index, and products are not found by it.',

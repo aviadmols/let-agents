@@ -50,6 +50,16 @@ return [
         'photos_text' => '{0} A camera in the search field. It shows once your photos are read.|{1} A camera in the search field. One of your photos is already read.|[2,*] A camera in the search field. :n of your photos are already read.',
         'price' => 'Show prices',
         'price_text' => 'The price under each product',
+        'start' => 'When a new search opens',
+        'start_text' => 'Which parts the opening screen shows, before anything is typed',
+        'start_popular' => 'Popular in the store',
+        'start_popular_text' => 'The words searched most in your store',
+        'start_recent' => 'Recent searches',
+        'start_recent_text' => 'What the shopper searched lately, from their own browser only',
+        'start_products' => 'Popular products',
+        'start_products_text' => 'Your most wanted products',
+        'start_ask' => 'What people ask here',
+        'start_ask_text' => 'Questions already answered, one tap away',
     ],
 
     'save' => [

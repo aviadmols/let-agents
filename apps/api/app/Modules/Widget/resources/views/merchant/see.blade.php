@@ -94,6 +94,10 @@
                     @php($read = $this->photosRead())
                     <div class="lp-d-set"><div><b>{{ $t('window.photos') }}</b><span>{{ trans_choice('widget::see.window.photos_text', $read, ['n' => number_format($read)]) }}</span></div>{!! $toggle('photos') !!}</div>
                     <div class="lp-d-set"><div><b>{{ $t('window.price') }}</b><span>{{ $t('window.price_text') }}</span></div>{!! $toggle('price') !!}</div>
+                    <div class="lp-d-set"><div><b>{{ $t('window.start') }}</b><span>{{ $t('window.start_text') }}</span></div></div>
+                    @foreach (['popular', 'recent', 'products', 'ask'] as $part)
+                        <div class="lp-d-set"><div><b>{{ $t('window.start_'.$part) }}</b><span>{{ $t('window.start_'.$part.'_text') }}</span></div>{!! $toggle('start_'.$part) !!}</div>
+                    @endforeach
                     @if ($url = $this->more('search'))<a class="lp-d-more lp-d-set-more" href="{{ $url }}">{{ $t('more') }}</a>@endif
                 </section>
                 <section class="lp-d-setgroup">
