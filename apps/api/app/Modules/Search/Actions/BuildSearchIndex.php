@@ -2098,15 +2098,20 @@ final class BuildSearchIndex
         // Sivan, "לא ידוע", as brands). A WooCommerce store's brand is its own brand field, a real brand (Stanley, Makita).
         $platform = Shop::query()->whereKey($this->tenant->id())->value('platform');
         $platform = $platform instanceof ShopPlatform ? $platform : ShopPlatform::tryFrom((string) $platform);
-        if ($platform === ShopPlatform::Shopify && ! Settings::get('search.vendor_filter', $this->tenant->id())) {
-            return [];
-        }
+        // ...so a Shopify store's brands are those its products' own words say (BrandResolver: a Vendor only where the
+        // product says it too, else a brand read from its title or description), never its Vendor alone (Aviad, 20.11:
+        // "the Vendor is mostly the store's own details it does not want shown"; Shilav: Bugaboo, Britax, BOBUX)
+        $read = $platform === ShopPlatform::Shopify && ! Settings::get('search.vendor_filter', $this->tenant->id())
+            // (a brand read of a Vendor alone, before its product had to say it, is none: code_store_field)
+            ? EnrichmentFact::query()->where('kind', FactKind::Brand)->where('status', FactStatus::Approved)->whereNotNull('product_id')
+                ->where('status_reason', '!=', 'code_store_field')->orderBy('id')->pluck('value_text', 'product_id')->all()
+            : null;
         $byBrand = [];
         $names = [];
         $total = 0;
         foreach (CatalogProduct::query()->active()->orderBy('id')->get(['id', 'brand']) as $product) {
             $total++;
-            $brand = trim((string) $product->brand);
+            $brand = trim((string) ($read === null ? $product->brand : ($read[$product->id] ?? '')));
             if ($brand === '') {
                 continue;
             }

@@ -64,6 +64,31 @@ final class CodeReadingTest extends TestCase
         $this->assertNull($resolver->resolve($this->make(['title' => 'עץ אורן מוקצע בפרופיל 20X45 מ"מ (2X5)'])));
     }
 
+    /**
+     * A Shopify store's Vendor is often who it bought from (Rocks: its consignors "Aeraj", "Sivan"): the brand only where the
+     * product's own words say it too (Aviad, 20.11). Any Shopify store.
+     */
+    public function test_a_shopify_vendor_is_a_brand_only_where_the_product_says_it(): void
+    {
+        $this->buildShop();
+        $resolver = new BrandResolver;
+
+        $consignor = $this->make(['brand' => 'Aeraj', 'title' => 'טבעת וינטג׳ זהב 14K', 'payload' => ['vendor' => 'Aeraj', 'description' => 'טבעת מרהיבה']]);
+        $this->assertNull($resolver->resolve($consignor), 'the Vendor its product never says is no brand');
+
+        $said = $this->make(['brand' => 'Bugaboo', 'title' => 'עגלת BUGABOO Fox 5 שחור', 'payload' => ['vendor' => 'Bugaboo']]);
+        $this->assertSame(['brand' => 'Bugaboo', 'source' => 'store_field_said', 'quote' => 'Bugaboo'], $resolver->resolve($said));
+
+        $bilingual = $this->make(['brand' => 'סגל Segal', 'title' => 'ארון עדי', 'payload' => ['vendor' => 'סגל Segal', 'description' => 'ארון לחדר תינוקות מבית סגל, עשוי MDF']]);
+        $this->assertSame('סגל Segal', $resolver->resolve($bilingual)['brand'] ?? null, 'one part of a name in two scripts, with a letter before it');
+
+        $woo = $this->make(['brand' => 'MAKITA', 'title' => 'סוללה 18V 4Ah']);
+        $this->assertSame('store_field', $resolver->resolve($woo)['source'], 'a store\'s own brand field, not a Vendor, as before');
+
+        // ...nor is it looked for in other products' words
+        $this->assertNotSame('Aeraj', BrandResolver::forCatalog([$consignor, $said])->resolve($this->make(['title' => 'שרשרת Aeraj זהב']))['brand'] ?? null);
+    }
+
     public function test_a_family_is_the_title_without_sizes_in_the_same_category(): void
     {
         $this->buildShop();

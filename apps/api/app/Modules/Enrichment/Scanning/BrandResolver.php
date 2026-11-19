@@ -83,6 +83,10 @@ final class BrandResolver
 
         foreach ($products as $product) {
             foreach (self::fieldValues($product) as $value) {
+                // a Shopify Vendor its own product never says is no brand to look for in other products' words either
+                if (self::vendorOnly($product, $value) && ! self::saidByProduct($product, $value)) {
+                    continue;
+                }
                 $brand = self::KNOWN[mb_strtolower($value)] ?? $value;
                 $brands[mb_strtolower($value)] = $brand;
             }
@@ -92,12 +96,55 @@ final class BrandResolver
     }
 
     /**
+     * Whether a field value is only a Shopify product's Vendor: where many stores keep who they bought from, or their own
+     * codes (Aviad, 20.11: "the Vendor in Shopify's settings is mostly the store's own details it does not want shown").
+     */
+    private static function vendorOnly(CatalogProduct $product, string $value): bool
+    {
+        $vendor = trim((string) ($product->payload['vendor'] ?? ''));
+
+        return $vendor !== '' && mb_strtolower($vendor) === mb_strtolower(trim($value));
+    }
+
+    /**
+     * Whether the product's own words (its title, descriptions and tags) say a name, whole: in full, or the part of it in
+     * one script ("סגל Segal" said as "Segal" or "סגל", with the letters Hebrew joins before a word).
+     */
+    private static function saidByProduct(CatalogProduct $product, string $name): bool
+    {
+        $text = TextNormalizer::clean(strip_tags($product->title.' ; '.$product->shortDescription().' ; '.$product->description().' ; '.implode(' ; ', array_map('strval', (array) ($product->payload['tags'] ?? [])))));
+        $parts = [trim($name)];
+        if (preg_match('/\p{Hebrew}/u', $name) === 1 && preg_match('/\p{Latin}/u', $name) === 1) {
+            $parts[] = trim((string) preg_replace('/[^\p{Hebrew}\s\'"׳״-]+/u', ' ', $name));
+            $parts[] = trim((string) preg_replace('/[^\p{Latin}\d\s&+.\'-]+/u', ' ', $name));
+        }
+        foreach (array_filter($parts, fn (string $p): bool => mb_strlen($p) >= 2) as $part) {
+            $prefix = preg_match('/^\p{Hebrew}/u', $part) === 1 ? '[והבלמש]?' : '';
+            if (preg_match('/(?<![\p{L}\p{N}])'.$prefix.preg_quote((string) preg_replace('/\s+/u', ' ', $part), '/').'(?![\p{L}\p{N}])/iu', (string) preg_replace('/\s+/u', ' ', $text)) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @return array{brand: string, source: string, quote: string}|null
      */
     public function resolve(CatalogProduct $product): ?array
     {
         foreach (self::fieldValues($product) as $value) {
-            return ['brand' => $this->spellings[mb_strtolower($value)] ?? $value, 'source' => 'store_field', 'quote' => $value];
+            // a Shopify Vendor is the brand only where the product's own words say it too (Rocks keeps its consignors'
+            // names there: "Aeraj", "Sivan", "לא ידוע"); else the brand is read from the words, as for any product
+            $vendor = self::vendorOnly($product, $value);
+            if ($vendor && ! self::saidByProduct($product, $value)) {
+                continue;
+            }
+
+            // (a Vendor its product says is told apart: what was read of a Vendor alone before is never taken for it)
+            $source = $vendor ? 'store_field_said' : (mb_strtolower(trim((string) $product->brand)) === mb_strtolower(trim($value)) ? 'store_field' : 'store_attribute');
+
+            return ['brand' => $this->spellings[mb_strtolower($value)] ?? $value, 'source' => $source, 'quote' => $value];
         }
 
         foreach (['title' => $product->title, 'short_description' => $product->shortDescription(), 'description' => $product->description()] as $source => $text) {
