@@ -440,10 +440,11 @@
       Object.keys(seen).map(Number).forEach(function (code) {
         // a value read from the words is counted as it is applied, by its words too ("Women's" on, 9 shown, counted 8
         // beside it: Jean Rachel QA, 16.11); a tag with the others chosen, within what they show
-        // ...and every count is what pressing it shows: a value not chosen, with what is chosen (in its own filter too: all of
-        // them where they go together, any of them where not); one chosen in a filter of any, its own (Rocks, 19.11: "פנינה (3)"
-        // added to "יהלום" showed 42)
-        var g = Math.floor(code / 1000), and = allOf(g) || !(f0[code] || a0[code]);
+        // ...and in a filter whose values go together, what pressing it shows (with what is chosen there too); in a filter of
+        // any, its own products with what is chosen in the other filters, never the total with it added (Rocks, 19.11:
+        // "פנינה (3)" added to "יהלום" showed 42; every stone beside "יהלום (כל הסוגים)" showed the whole 927, so none ever
+        // left the sheet). A value with none of its own left is not offered.
+        var g = Math.floor(code / 1000), and = allOf(g);
         c.f = and ? Object.assign({}, f0) : without(f0, g); c.auto = and ? Object.assign({}, a0) : without(a0, g);
         if (a0[code] && !f0[code]) { c.auto[code] = true; } else { c.f[code] = true; }
         counts[code] = filtered(turn).length;
@@ -502,18 +503,26 @@
     return out;
   }
   function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + Object.keys(c.picked || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
-  // The row over the results offers what more there is to choose; what is chosen, by the shopper or read from the words,
-  // is shown once, in the row under it with its × (activeRow), never a second time here with a ✓ (as Aviad asked, 1.11)
+  // The row over the results offers what more there is to choose. A value chosen in it stays where it was, marked by its
+  // ✓ and its fill, never jumping to the row of chosen filters at the start (Aviad, 19.11); what is chosen elsewhere (the
+  // sheet, the words, a value further down) is in the row under it with its ×, once (activeRow), never in both.
   var OFFERED = 4;
+  // the row's values: in the order of the results, until it offers OFFERED not chosen; the chosen among them in place
+  function barCodes(fc, c) {
+    var out = [], free = 0;
+    for (var i = 0; i < fc.codes.length && free < OFFERED; i++) { out.push(fc.codes[i]); if (!onCode(c, fc.codes[i])) { free++; } }
+    return out;
+  }
   function chipRow(turn) {
     var fc = facetChips(turn, 99), c = C(turn), act = activeFilters(c) + (turn.price ? 1 : 0);
     var chips = '<button class="ls-chip ls-chip--quiet' + (act ? ' is-on' : '') + '" data-filters="' + turn.id + '">' + icon('sliders') + esc(t('filter')) + (act ? '<span class="ls-filter-count">' + act + '</span>' : '') + '</button>';
     if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
-    sizesInOrder(fc.codes.filter(function (code) { return !onCode(c, code); }).slice(0, OFFERED)).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(asWhole(f, v, chipText(f, v)), false, 'f:' + code, turn.id, false, swatch(f, v)); });
+    var bar = barCodes(fc, c);
+    sizesInOrder(bar).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000], on = onCode(c, code); chips += chip(asWhole(f, v, chipText(f, v)), on, 'f:' + code, turn.id, on && c.auto[code] && !c.f[code], swatch(f, v)); });
     // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(capital(c.suggest[k].label), false, 'g:' + k, turn.id, false); } });
-    return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
+    return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn, bar);
   }
   // its count in brackets, smaller: "38 (41)", never "38 41" read as a range of sizes (Vans QA, 16.11)
   function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '"' + (count === 0 && !on ? ' disabled' : '') + ' data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">(' + count + ')</span>' : '') + '</button>'; }

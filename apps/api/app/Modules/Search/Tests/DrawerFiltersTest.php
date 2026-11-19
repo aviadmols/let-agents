@@ -131,10 +131,23 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([], $out[2], 'nor in the row over the results');
     }
 
-    public function test_values_a_product_holds_several_of_go_together_and_the_counts_are_what_pressing_shows(): void
+    public function test_a_value_chosen_in_the_row_over_the_results_stays_in_its_place_and_is_not_repeated_under_it(): void
+    {
+        // Aviad, 19.11: a filter chosen in the row jumped to the row of chosen filters at the start
+        $out = self::drawer("(function () { var all = [1, 2, 3, 4, 5, 6, 7, 8, 9], x = turn('shoes', all, {}), b = T.barCodes(T.facetChips(x, 99), T.C(x));".
+            ' var f = {}; f[b[1]] = true; var y = turn(\'shoes\', all, { f: f }), b2 = T.barCodes(T.facetChips(y, 99), T.C(y));'.
+            ' return [b[1], b2.indexOf(b[1]), T.activeRow(y, b2).indexOf(\'f:\' + b[1]), new RegExp(\'aria-pressed="true" data-chip="f:\' + b[1] + \'"\').test(T.chipRow(y))]; })()');
+
+        $this->assertSame(1, $out[1], 'the chosen value keeps its place in the row');
+        $this->assertSame(-1, $out[2], 'and is not shown a second time in the row of chosen filters');
+        $this->assertTrue($out[3], 'it is marked chosen where it is');
+    }
+
+    public function test_values_a_product_holds_several_of_go_together_and_a_value_of_any_counts_its_own(): void
     {
         // Rocks, 19.11: "פנינה (3)" beside a chosen "יהלום" showed 42, most with no pearl. Stones: a ring holds several, so two
-        // chosen are a ring with both. Metal: one a product, so two chosen are either. Each count is what the press shows.
+        // chosen are a ring with both, and a stone counts what pressing it shows. Metal: one a product, so two chosen are
+        // either, and a metal counts its own rings (beside "יהלום (כל הסוגים)" every stone showed the whole 927: 19.11).
         $jewels = <<<'JS'
             S.facets = [
               { k: 'stone', l: 'אבן', v: [{ k: 'diamond', l: 'יהלום' }, { k: 'pearl', l: 'פנינה' }, { k: 'ruby', l: 'רובי' }] },
@@ -159,7 +172,7 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame(['p:1'], $out[0], 'diamond and pearl: the ring with both');
         $this->assertSame(1, $out[1], 'beside a chosen diamond, pearl counts what pressing it shows');
         $this->assertSame(4, $out[2]);
-        $this->assertSame(6, $out[3], 'a second metal counts the rings of either, as pressing it shows');
+        $this->assertSame(3, $out[3], 'beside a chosen metal, another metal counts its own rings, never the total with it added');
         $this->assertSame(6, $out[4]);
     }
 
