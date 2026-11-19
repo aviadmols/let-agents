@@ -35,4 +35,24 @@ final class SaidBeforeTest extends TestCase
         $this->assertSame($new, AnswerSiteQuestion::withoutSaidBefore($new, self::BEFORE));
         $this->assertSame($new, AnswerSiteQuestion::withoutSaidBefore($new, []));
     }
+
+    /** Shilav, 19.11: a list of a branch's hours was joined into one line once a sentence before it was left out. */
+    public function test_what_is_left_keeps_its_lines_and_its_list(): void
+    {
+        $before = [['question' => 'יש לכם חנות בגבעתיים?', 'answer' => 'הסניף שלנו בגבעתיים ממוקם בקניון גבעתיים בדרך יצחק רבין, בקומה השלישית של המתחם.']];
+        $answer = "הסניף שלנו בגבעתיים ממוקם בקניון גבעתיים בדרך יצחק רבין, בקומה השלישית של המתחם.\n\nשעות הפעילות של הסניף:\n- ימים א׳–ה׳: 09:30–22:00\n- יום ו׳: 09:00–15:00\n\nמספר הטלפון של הסניף הוא 03-5569876.";
+
+        $this->assertSame("שעות הפעילות של הסניף:\n- ימים א׳–ה׳: 09:30–22:00\n- יום ו׳: 09:00–15:00\n\nמספר הטלפון של הסניף הוא 03-5569876.",
+            AnswerSiteQuestion::withoutSaidBefore($answer, $before, 'מה שעות הפתיחה?'));
+    }
+
+    /** ...and the same question asked again is answered again, whole: never a fragment of what was left ("הסניף נגיש ומספרו…"). */
+    public function test_the_same_question_again_is_answered_whole(): void
+    {
+        $before = [['question' => 'יש לכם חנות בגבעתיים?', 'answer' => 'הסניף שלנו בגבעתיים ממוקם בקניון גבעתיים בדרך יצחק רבין 53, בקומה השלישית.']];
+        $answer = 'הסניף שלנו בגבעתיים ממוקם בקניון גבעתיים בדרך יצחק רבין 53, בקומה השלישית. הסניף נגיש ומספרו הישיר הוא 03-5569876.';
+
+        $this->assertSame($answer, AnswerSiteQuestion::withoutSaidBefore($answer, $before, 'יש לכם חנות בגבעתיים?'));
+        $this->assertSame($answer, AnswerSiteQuestion::withoutSaidBefore($answer, $before, 'יש לכם חנות בגבעתיים'), 'its words, whatever its question mark');
+    }
 }

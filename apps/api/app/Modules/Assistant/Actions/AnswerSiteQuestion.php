@@ -3219,9 +3219,13 @@ final class AnswerSiteQuestion implements TriesQuestions
      * הנחות והטבה לכבוד יום ההולדת" in the next). Code, at serving, for any store: what is saved for other shoppers stays
      * whole. When nothing new would be left, the answer is as it was: asked again, it is answered again.
      *
+     * The same question asked again is answered again, whole (Shilav, 19.11: "יש לכם חנות בגבעתיים?" asked twice was answered
+     * the second time with "הסניף נגיש ומספרו הישיר הוא…" alone); and what is left keeps its lines, its lists and its
+     * paragraphs (the same day: a list of a branch's hours was joined into one line, "- ימים א׳–ה׳: … - יום ו׳: …").
+     *
      * @param  list<array{question: string, answer: string}>  $conversation  the visit's questions and answers before, oldest first
      */
-    public static function withoutSaidBefore(string $answer, array $conversation): string
+    public static function withoutSaidBefore(string $answer, array $conversation, string $question = ''): string
     {
         if ($conversation === [] || trim($answer) === '') {
             return $answer;
@@ -3260,16 +3264,55 @@ final class AnswerSiteQuestion implements TriesQuestions
             }
         }
 
-        $kept = [];
-        foreach ($sentences($answer) as $sentence) {
-            $now = $forms($sentence);
-            $again = count($now) >= 5 && array_any($told, fn (array $said): bool => count(array_filter($now, fn (array $set): bool => array_filter($set, fn (string $f): bool => isset($said[$f])) !== [])) / count($now) >= self::SAID_SHARE);
-            if (! $again) {
-                $kept[] = $sentence;
+        // a share of one text's words the other says (as the search reads them)
+        $share = fn (array $now, array $said): float => $now === [] ? 0.0 : count(array_filter($now, fn (array $set): bool => array_filter($set, fn (string $f): bool => isset($said[$f])) !== [])) / count($now);
+        $flat = function (array $sets): array {
+            $out = [];
+            foreach ($sets as $set) {
+                foreach ($set as $form) {
+                    $out[$form] = true;
+                }
             }
+
+            return $out;
+        };
+        // the same question again (most of its words either way): answered again, whole
+        $asked = $forms($question);
+        if ($asked !== [] && array_any($conversation, function (array $turn) use ($asked, $forms, $share, $flat): bool {
+            $before = $forms((string) ($turn['question'] ?? ''));
+
+            return $before !== [] && $share($asked, $flat($before)) >= self::SAID_SHARE && $share($before, $flat($asked)) >= self::SAID_SHARE;
+        })) {
+            return $answer;
         }
 
-        $left = self::withoutOfferedAgain(implode(' ', $kept), $conversation);
+        $kept = [];
+        $lines = [];
+        $item = '/^\s*(?:[-•*]|\d{1,2}[.)])\s+/u';
+        foreach (preg_split('/\n/u', $answer) ?: [] as $line) {
+            if (trim($line) === '') {
+                $lines[] = '';
+
+                continue;
+            }
+            // a line keeps its list mark when its first sentence is left out
+            $mark = preg_match($item, $line, $m) === 1 ? $m[0] : '';
+            $parts = [];
+            foreach ($sentences(mb_substr($line, mb_strlen($mark))) as $sentence) {
+                $now = $forms($sentence);
+                $again = count($now) >= 5 && array_any($told, fn (array $said): bool => $share($now, $said) >= self::SAID_SHARE);
+                if (! $again) {
+                    $parts[] = $sentence;
+                    $kept[] = $sentence;
+                }
+            }
+            if ($parts !== []) {
+                $lines[] = $mark.implode(' ', $parts);
+            }
+        }
+        $joined = trim((string) preg_replace('/\n{3,}/u', "\n\n", implode("\n", $lines)));
+
+        $left = self::withoutOfferedAgain($joined, $conversation);
         // something new is left only when a sentence of its own words is: never "כן," alone or an offer alone
         $body = preg_match(self::OFFER, (string) end($kept) ?: '') === 1 ? array_slice($kept, 0, -1) : $kept;
 

@@ -63,7 +63,7 @@ final class SiteAskController
         // question of its own in the same drawer, the answers before it (`said`), read for this alone and kept nowhere.
         $told = AnswerSiteQuestion::thread($thread !== [] ? $thread : (is_array($body) && is_array($body['said'] ?? null) ? $body['said'] : []));
         if ($told !== [] && is_string($result['answer'] ?? null) && ($result['outcome'] ?? null) === 'answered') {
-            $result['answer'] = AnswerSiteQuestion::withoutSaidBefore($result['answer'], $told);
+            $result['answer'] = AnswerSiteQuestion::withoutSaidBefore($result['answer'], $told, $question);
         }
 
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
