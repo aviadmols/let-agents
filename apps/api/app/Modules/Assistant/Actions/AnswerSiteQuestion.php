@@ -253,6 +253,9 @@ final class AnswerSiteQuestion implements TriesQuestions
      */
     public const GOES_WITH_PROMPT = 'goes_with_answer';
 
+    /** How many of the products found to go with one are kept in order, for the search beside the answer to show first. */
+    private const GOES_WITH_RANKED = 12;
+
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
 
@@ -409,7 +412,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * What the code found to go with the product asked about (goesWith()): the kind asked, the product, and by id what each
      * shares with it. Null when the question asks for none.
      *
-     * @var array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}|null
+     * @var array{kind: string, anchor: string, ids: list<string>, ranked?: list<string>, shares: array<string, list<string>>, complement?: bool}|null
      */
     private ?array $goesWith = null;
 
@@ -2158,20 +2161,21 @@ final class AnswerSiteQuestion implements TriesQuestions
             + compact('byRef', 'productsByRef', 'analysis', 'forModel', 'input', 'debug', 'now') + ['goes_with' => $this->goesWith];
     }
 
-    /**
-     * A match asked for, while the product on the screen or one the question names by its code is there: what the store has
-     * of the kind asked to go with it (ProductsGoingWith), where the shop has it on (assistant.goes_with). A question about
-     * the product itself names no other kind and is left as it was; so is a question of the store's (shipping, returns)
-     * that says no word of a match. Null when not asked, or the store's search is not there to ask.
-     *
-     * @return array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}|null
-     */
     /** Whether a question asks, in so many words, for something to go with a product, in a store that has it on. */
     public static function asksToGoWith(string $shopId, string $question): bool
     {
         return Features::enabled('assistant.goes_with', $shopId) && preg_match(self::GOES_WITH, $question) === 1;
     }
 
+    /**
+     * A match asked for, while the product on the screen or one the question names by its code is there: what the store has
+     * of the kind asked to go with it (ProductsGoingWith), where the shop has it on (assistant.goes_with). A question about
+     * the product itself names no other kind and is left as it was; so is a question of the store's (shipping, returns)
+     * that says no word of a match. Null when not asked, or the store's search is not there to ask. `ids` those the answer
+     * is given, `ranked` more of them in the same order, for the search beside it.
+     *
+     * @return array{kind: string, anchor: string, ids: list<string>, ranked: list<string>, shares: array<string, list<string>>, complement: bool}|null
+     */
     private function goesWith(string $shopId, string $question, ?string $viewing): ?array
     {
         if (! Features::enabled('assistant.goes_with', $shopId) || ! app()->bound(ProductsGoingWith::class)) {
@@ -2199,16 +2203,19 @@ final class AnswerSiteQuestion implements TriesQuestions
         foreach ($wordings as $wording) {
             try {
                 // more than shown, so what the store's rules take out leaves enough
-                $found = app(ProductsGoingWith::class)->goingWith($shopId, $anchor, $wording, $rules['pairs'] === [] && $rules['never'] === [] ? $limit : $limit * 3, $sources);
+                // ...and enough for the search beside the answer to show the best of its products first (`ranked`)
+                $wanted = max($limit, self::GOES_WITH_RANKED);
+                $found = app(ProductsGoingWith::class)->goingWith($shopId, $anchor, $wording, $rules['pairs'] === [] && $rules['never'] === [] ? $wanted : $wanted * 3, $sources);
             } catch (\Throwable $e) {
                 report($e);
 
                 return null;
             }
             if ($found !== null) {
-                $ids = array_slice($this->allowedWith($anchor, array_values(array_diff(array_map('strval', $found['ids']), [$anchor])), $rules), 0, $limit);
+                $allowed = $this->allowedWith($anchor, array_values(array_diff(array_map('strval', $found['ids']), [$anchor])), $rules);
+                $ids = array_slice($allowed, 0, $limit);
 
-                return ['kind' => $found['kind'], 'anchor' => $anchor, 'ids' => $ids, 'shares' => array_intersect_key($found['shares'], array_flip($ids)), 'complement' => (bool) ($found['complement'] ?? false)];
+                return ['kind' => $found['kind'], 'anchor' => $anchor, 'ids' => $ids, 'ranked' => array_slice($allowed, 0, $wanted), 'shares' => array_intersect_key($found['shares'], array_flip($ids)), 'complement' => (bool) ($found['complement'] ?? false)];
             }
         }
 
@@ -5481,7 +5488,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         }
 
         try {
-            return app(AnswerSearches::class)->searches($shopId, $question, $shown, $this->goesWith === null ? null : ['anchor' => $this->goesWith['anchor'], 'ids' => $this->goesWith['ids']],
+            return app(AnswerSearches::class)->searches($shopId, $question, $shown, $this->goesWith === null ? null : ['anchor' => $this->goesWith['anchor'], 'ids' => $this->goesWith['ranked'] ?? $this->goesWith['ids']],
                 (int) Settings::get('assistant.answer_searches_max', $shopId), (int) Settings::get('assistant.answer_searches_min', $shopId), $set === null);
         } catch (\Throwable $e) {
             report($e);

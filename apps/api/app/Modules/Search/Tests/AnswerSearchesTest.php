@@ -139,6 +139,8 @@ final class AnswerSearchesTest extends TestCase
         $this->assertSame(['טבעת · זהב דו-גוני · 14K', "טבעת · וינטג'"], array_column($data['searches'], 'label'), 'every value the ring shares with the bracelet that still leaves a search, then the one left out on its own');
         $this->assertSame([3, 2], array_column($data['searches'], 'count'), 'in stock: the two-tone 14K rings, the vintage rings');
         $this->assertSame(['type', 'metal', 'karat'], array_column($data['searches'][0]['chips'], 'k'), 'never the sale or the size the bracelet is filed under');
+        $this->assertSame(['r1', 'r2'], $data['searches'][0]['first'], 'of its rings, those found to go with the bracelet, the best first: the drawer shows them first (never the kids\' ring)');
+        $this->assertSame(['r1', 'r6'], $data['searches'][1]['first']);
         $this->assertNull($data['searches'][0]['price']);
         $this->assertCount(2, $this->calls, 'one writer, one checker: no model call added');
 

@@ -352,7 +352,10 @@
     if (list.length === 1) {
       var one = list[0], shown = {};
       (turn.picks || []).forEach(function (pk) { shown['p:' + pid(pk.id)] = 1; });
-      var rows = filtered(one.turn);
+      var rows = filtered(one.turn), rank = {};
+      // under a match asked for, those found to go with the product first, the best first (the server's `first`)
+      (one.s.first || []).forEach(function (id, k) { rank['p:' + pid(id)] = k + 1; });
+      rows = rows.map(function (r, k) { return { r: r, k: rank[r.id] || 1e6 + k }; }).sort(function (a, b) { return a.k - b.k; }).map(function (x) { return x.r; });
       rows = rows.filter(function (r) { return !shown[r.id]; }).concat(rows.filter(function (r) { return shown[r.id]; })).slice(0, ANSWER_SEARCH_ROW);
       return '<div class="ls-answer-searches ls-answer-searches--open"><div class="ls-block__title" dir="auto">' + esc(one.label) + ' <span class="ls-num">(' + one.n + ')</span></div>' +
         miniRow(rows.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) +

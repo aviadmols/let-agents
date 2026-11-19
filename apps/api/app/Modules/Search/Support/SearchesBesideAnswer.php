@@ -28,6 +28,9 @@ final class SearchesBesideAnswer implements AnswerSearches
     /** A value this share of the kind's products (or more) hold is no filter of it. */
     private const NARROWS = 0.9;
 
+    /** At most this many of a search's products are named to be shown first. */
+    private const FIRST = 12;
+
     public function __construct(private readonly ProductKinds $kinds) {}
 
     public function searches(string $shopId, string $question, array $picks, ?array $goesWith, int $max, int $min, bool $beyond = true): array
@@ -81,7 +84,12 @@ final class SearchesBesideAnswer implements AnswerSearches
                 continue;
             }
             $seen[$key] = true;
-            $out[] = self::described($facets, $chips, $price, count($shown));
+            // under a match asked for, those of its products found to go with the product, the best first: the drawer shows
+            // them first, never the search's other products in the index's order (Rocks, 19.11: a vintage heart necklace
+            // led the search under hollow hoop earrings)
+            $first = $goesWith === null ? [] : array_values(array_filter(array_map('strval', (array) ($goesWith['ids'] ?? [])),
+                fn (string $id): bool => in_array('p:'.$id, $shown, true)));
+            $out[] = self::described($facets, $chips, $price, count($shown)) + ($first === [] ? [] : ['first' => array_slice($first, 0, self::FIRST)]);
         }
 
         return $out;

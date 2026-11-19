@@ -20,12 +20,14 @@ interface AnswerSearches
      * the same products, filterable); none for a question that names nothing the store files its products by. Each:
      * `label` its values as a shopper reads them, joined (the price apart, written by the drawer in the store's currency);
      * `query` the same values as words to search; `chips` each value as the index files it (its filter's key and the value's
-     * key, with the label); `price` the range the question asked, or null; `count` how many products it shows.
+     * key, with the label); `price` the range the question asked, or null; `count` how many products it shows; under a
+     * match asked for, `first` those of its products found to go with `anchor`, the best first, for the drawer to show first.
      *
      * @param  list<string>  $picks  the external ids of the products the answer shows, in its order
      * @param  array{anchor: string, ids: list<string>}|null  $goesWith  a product of another kind asked to go with `anchor`:
-     *                                                                   the searches are of the kind of the picks, by the values they share with it
-     * @return list<array{label: string, query: string, chips: list<array{k: string, v: string, l: string}>, price: array{min: float|null, max: float|null}|null, count: int}>
+     *                                                                   the searches are of the kind of the picks, by the values they share with it;
+     *                                                                   `ids` those found to go with it, the best first
+     * @return list<array{label: string, query: string, chips: list<array{k: string, v: string, l: string}>, price: array{min: float|null, max: float|null}|null, count: int, first?: list<string>}>
      */
     public function searches(string $shopId, string $question, array $picks, ?array $goesWith, int $max, int $min, bool $beyond = true): array;
 }
