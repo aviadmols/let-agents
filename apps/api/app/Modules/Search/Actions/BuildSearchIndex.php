@@ -954,6 +954,11 @@ final class BuildSearchIndex
      * the black wool jacket was filed under Grey alone. The store's description is not read: it names the colours of
      * what goes with the piece too.
      *
+     * Where the name says several colours and the picture shows some of them, only those (two sources agreeing): "ארון תום
+     * לבן/ אלון אדום", white in its picture, is white, the red of a red oak finish no colour of it (Shilav, 19.11: the white
+     * wardrobes under Red). A name none of whose colours the picture shows still says its colour, as before (the black
+     * jacket of a charcoal picture).
+     *
      * @param  list<string>  $productIds
      * @return array<string, list<string>>
      */
@@ -961,30 +966,41 @@ final class BuildSearchIndex
     {
         $out = [];
         foreach (array_chunk($productIds, 1000) as $ids) {
-            CatalogProduct::query()->whereIn('id', $ids)->get(['id', 'title'])->each(function (CatalogProduct $product) use (&$out): void {
-                foreach (self::colourWordsOf((string) $product->title) as $family) {
-                    $out[(string) $product->id][$family] = $family;
-                }
+            $named = [];
+            CatalogProduct::query()->whereIn('id', $ids)->get(['id', 'title'])->each(function (CatalogProduct $product) use (&$named): void {
+                $named[(string) $product->id] = self::colourWordsOf((string) $product->title);
             });
+            // each product's first described picture that names a colour: its colours, the one most of it first
             $pictured = [];
             RetrievalImage::query()->whereIn('product_id', $ids)->whereNotNull('caption_words')->orderBy('id')
-                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$out, &$pictured): void {
+                ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$pictured): void {
                     $id = (string) $picture->product_id;
                     if (isset($pictured[$id])) {
                         return;
                     }
+                    $seen = [];
                     foreach ((array) $picture->caption_words as $word) {
                         if (is_string($word) && ($family = ColorFamily::ofColourWord($word)) !== null) {
-                            $out[$id][$family->value] = $family->value;
-                            $pictured[$id] = true;
-
-                            return;
+                            $seen[$family->value] = $family->value;
                         }
                     }
+                    if ($seen !== []) {
+                        $pictured[$id] = array_values($seen);
+                    }
                 });
+            foreach (array_unique([...array_keys($named), ...array_keys($pictured)]) as $id) {
+                $id = (string) $id;
+                $name = $named[$id] ?? [];
+                $picture = $pictured[$id] ?? [];
+                $agreed = array_values(array_intersect($name, $picture));
+                $colours = $picture === [] ? $name : [...($agreed !== [] ? $agreed : $name), $picture[0]];
+                if ($colours !== []) {
+                    $out[$id] = array_values(array_unique($colours));
+                }
+            }
         }
 
-        return array_map('array_values', $out);
+        return $out;
     }
 
     /**

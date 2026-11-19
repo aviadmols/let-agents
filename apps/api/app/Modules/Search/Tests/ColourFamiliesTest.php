@@ -316,6 +316,8 @@ final class ColourFamiliesTest extends TestCase
             '4' => ['Della Cropped Jacket', ['jacket', 'charcoal grey', 'cream']],
             '5' => ['Plain Tote', ['tote bag', 'canvas']],
             '6' => ['Kinsley Emb Black Wool Jacket', ['jacket', 'charcoal', 'black', 'wool']],
+            // Shilav, 19.11: a white wardrobe in a red oak frame, under Red
+            '7' => ['ארון תום לבן/ אלון אדום', ['ארון', 'ארון הלבשה', 'לבן', 'לבן מט', 'עץ אלון', 'עץ בהיר', 'שלוש דלתות']],
         ];
         app(TenantContext::class)->run($shop->id, function () use ($shop, $pictures): void {
             foreach ($pictures as $id => [$title, $words]) {
@@ -338,6 +340,9 @@ final class ColourFamiliesTest extends TestCase
         $this->assertContains($value('grey'), $codes('4'));
         $this->assertContains($value('black'), $codes('6'), 'its name says black: black, whatever its picture says first');
         $this->assertContains($value('grey'), $codes('6'), 'and the charcoal its picture shows');
+        $this->assertContains($value('white'), $codes('7'), 'the colour its name and its picture agree on');
+        $red = collect($data['facets'][$at]['v'])->search(fn (array $v): bool => $v['k'] === 'red');
+        $this->assertTrue($red === false || ! in_array($at * 1000 + (int) $red, $codes('7'), true), 'the red of "אלון אדום", which its picture does not show, is no colour of it');
         $this->assertSame([], array_values(array_filter($codes('5'), fn (int $c): bool => intdiv($c, 1000) === $at)), 'a picture that names no colour gives none');
     }
 }
