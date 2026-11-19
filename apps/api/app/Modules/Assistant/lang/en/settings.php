@@ -163,6 +163,10 @@ return [
         'label' => 'The checker takes no sentence out only for a detail left out',
         'description' => 'A sentence the checker marked only "incomplete" stays in the answer and is logged. Measured 18.11: in 68 of 70 such answers the sentence was right. Off brings the earlier behaviour back at once.',
     ],
+    'tell_brand' => [
+        'label' => 'Answers may name the brand of a product',
+        'description' => 'Off in a store whose brand field is the supplier a piece was bought from: the name is not sent to the writer and appears in no answer or pick.',
+    ],
     'reply_keeps_subject' => [
         'label' => 'A reply that asks only a price goes on with the conversation\'s subject',
         'description' => '"What do you have up to 1500?" after a conversation about ruby rings searches ruby rings up to 1500, not the price alone. Only when the reply holds no word but the price.',

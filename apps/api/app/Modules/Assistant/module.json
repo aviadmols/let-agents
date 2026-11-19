@@ -434,6 +434,12 @@
             "scope": "shop"
         },
         {
+            "name": "tell_brand",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "reply_keeps_subject",
             "type": "bool",
             "default": true,

@@ -181,6 +181,25 @@ final class ShopKnowledgeTest extends TestCase
         $this->assertStringContainsString($certificate, $team($knowledge('אפשר לבוא למדוד אצלכם את המוצר?')), 'a visit still reads all of it');
     }
 
+    public function test_what_the_team_wrote_of_a_category_of_the_product_asked_about_is_sent_first_whatever_the_questions_words(): void
+    {
+        // Rocks, 19.11: "אלו עגילים חדשים או יד שנייה" on earrings filed under "Made by Rocks&Gold", and the team's row that
+        // everything in that category is new was not what the writer read; the answer said it could not tell
+        $this->shop = Shop::factory()->create(['name' => 'Rocks and Gold', 'content_locale' => 'he']);
+        $made = 'כל המוצרים שנמצאים בקטגוריה  Made by Rocks & Gold הוא חדש ומיוצר על ידינו';
+        $rows = array_map(fn (int $n): string => "שורה {$n} ".str_repeat('מידע על משלוחים והחזרות ', 24), range(1, 6));
+        $this->inShop(fn () => app(BuildShopKnowledge::class)->own(implode("\n", [...$rows, $made])));
+        $knowledge = fn (string $question, array $filed): array => $this->inShop(fn (): array => (new ReflectionMethod(AnswerSiteQuestion::class, 'knowledge'))
+            ->invoke(app(AnswerSiteQuestion::class), $question, $this->shop->id, [], $filed));
+        $team = fn (array $passages): array => array_values(array_column(array_filter($passages, fn (array $p): bool => ($p['from'] ?? null) === 'store_team'), 'text'));
+
+        $first = $team($knowledge('אלו עגילים מזהב?', ['הגיעו לאחרונה', 'עגילים', 'Made by Rocks&Gold', 'Rocks and Gold']))[0] ?? '';
+        $this->assertStringContainsString($made, $first, 'the row that names its category, in the first passage');
+        $this->assertStringNotContainsString('שורה 1', $first, 'alone, not among every row');
+
+        $this->assertStringNotContainsString($made, $team($knowledge('אלו עגילים מזהב?', ['עגילים', 'דרור עדני']))[0] ?? '', 'another product: no row put first for it');
+    }
+
     public function test_a_visit_brings_the_address_and_hours_however_much_the_team_wrote_and_a_no_opens_with_what_the_store_sells(): void
     {
         // Rocks, 9.11: "אפשר לבוא למדוד אצלכם את המוצר?" was answered without the address: the team's text ran past one

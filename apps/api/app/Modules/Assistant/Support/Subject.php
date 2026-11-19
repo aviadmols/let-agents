@@ -2,6 +2,7 @@
 
 namespace App\Modules\Assistant\Support;
 
+use App\Core\Facades\Settings;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Enrichment\Contracts\ReadsCards;
@@ -59,7 +60,8 @@ final class Subject
             array_filter([
                 'title' => (string) ($card['title'] ?? $product->title),
                 'type' => $card['type'] ?? null,
-                'brand' => $card['brand'] ?? null,
+                // never where the store's "brand" is who it bought from (assistant.tell_brand)
+                'brand' => Settings::get('assistant.tell_brand', (string) $product->shop_id) ? ($card['brand'] ?? null) : null,
                 'category' => $category,
                 'options' => array_values(array_map(fn (array $variant): string => (string) $variant['title'], (array) ($card['variants'] ?? []))),
                 'facts' => (array) ($card['facts'] ?? []),

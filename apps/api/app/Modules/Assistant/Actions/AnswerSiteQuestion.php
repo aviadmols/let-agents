@@ -1362,7 +1362,33 @@ final class AnswerSiteQuestion implements TriesQuestions
      * The store's knowledge entries as the first passages: what its product pages repeat and what
      * its team wrote, whole; of the team's answers, only those that share a word with the question.
      */
-    private function knowledge(string $question, string $shopId, array $found): array
+    /**
+     * The names a product is filed under: each of its categories (the last of its path) and its brand; none when no one
+     * product is asked about.
+     *
+     * @return list<string>
+     */
+    private function filedUnder(?string $externalId): array
+    {
+        $product = $externalId === null ? null : CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first();
+        if ($product === null) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter([...array_map(fn (array $path): string => (string) end($path), $product->categoryPaths()), (string) $product->brand])));
+    }
+
+    /**
+     * Whether the store's "brand" of a product may be told (assistant.tell_brand): in a store that files who it bought a
+     * piece from there, it is for its own eyes, and no answer, pick or passage carries it (Rocks, 19.11: "של המותג בית
+     * התכשיט" told to a shopper).
+     */
+    private function tellsBrand(string $shopId): bool
+    {
+        return (bool) Settings::get('assistant.tell_brand', $shopId);
+    }
+
+    private function knowledge(string $question, string $shopId, array $found, array $filedUnder = []): array
     {
         if (! Features::enabled('assistant.knowledge', $shopId)) {
             return $found;
@@ -1389,10 +1415,24 @@ final class AnswerSiteQuestion implements TriesQuestions
         // "המדינה הזאת" when "המדינה שבדרך" is asked about).
         $words = $this->namedTitles !== [] ? $this->namedTitles : $words;
         $folded = [];
-        $speaks = function (string $piece) use ($words): bool {
+        // ...and what the team wrote of a category or the brand of the one product asked about speaks of the question too,
+        // whatever its words: "כל המוצרים בקטגוריה Made by Rocks & Gold חדשים" for "אלו עגילים חדשים או יד שנייה" on such a
+        // pair of earrings (Rocks, 19.11). Letters and digits alone are compared: the store writes "Rocks & Gold", its
+        // category "Rocks&Gold".
+        $plain = fn (string $text): string => (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($text));
+        $filed = array_values(array_filter(array_map($plain, $filedUnder), fn (string $name): bool => mb_strlen($name) >= 4));
+        $speaks = function (string $piece) use ($words, $filed, $plain): bool {
             foreach ($words as $word) {
                 if (mb_stripos($piece, $word) !== false) {
                     return true;
+                }
+            }
+            if ($filed !== []) {
+                $flat = $plain($piece);
+                foreach ($filed as $name) {
+                    if (str_contains($flat, $name)) {
+                        return true;
+                    }
                 }
             }
 
@@ -1796,7 +1836,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         $found = $this->pagesByWords($question, $found);
         // Before all: what the store says about itself on every product page, in its team's words,
         // and the team's answers to questions like this one.
-        $found = $this->knowledge($question, $shopId, $found);
+        $found = $this->knowledge($question, $shopId, $found, $this->filedUnder($this->alone));
         // a page or post of the site the team stopped (AssistantIgnoredSource) is never a passage
         if (($ignored = AssistantIgnoredSource::contentIds()) !== []) {
             $found = array_values(array_filter($found, fn (array $p): bool => ($p['source'] ?? '') !== 'content' || ! in_array((string) ($p['source_id'] ?? ''), $ignored, true)));
@@ -1899,6 +1939,10 @@ final class AnswerSiteQuestion implements TriesQuestions
             // a passage cut off in the middle of a word ends at the word before: "רוקס אנד ג" was copied into an answer as
             // the store's name (Rocks, the comparison with Zipchat, 16.11)
             $passage['text'] = self::wholeWordsAtEnd((string) ($passage['text'] ?? ''));
+            // a store whose "brand" field is who it bought from never tells it (assistant.tell_brand off): the line is not read
+            if (! $this->tellsBrand($shopId)) {
+                $passage['text'] = trim((string) preg_replace('/^(?:Brand|Vendor|מותג)\s*:.*$\R?/mu', '', $passage['text']));
+            }
             $byRef['s'.($i + 1)] = $passage;
         }
         $productsByRef = [];
@@ -2963,7 +3007,8 @@ final class AnswerSiteQuestion implements TriesQuestions
         $all = [];
         foreach ($candidates as $i => $product) {
             $heads = [self::headWord((string) ($product['title'] ?? ''))];
-            foreach (preg_split('/\s*>\s*/u', (string) ($product['category'] ?? '')) ?: [] as $segment) {
+            // (its first category's path, as before every category was sent)
+            foreach (preg_split('/\s*>\s*/u', explode(' | ', (string) ($product['category'] ?? ''))[0]) ?: [] as $segment) {
                 $heads[] = self::headWord($segment);
             }
             $kindsOf[$i] = array_values(array_unique(array_filter($heads)));
@@ -4790,8 +4835,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                 // not read, and the answer said it can be enlarged, from a guide on rings in general (Rocks, 17.11)
                 'about' => mb_substr(trim((string) ($pages->get($product->id)?->size_note ?? '')."\n".self::about($product, $whole)), 0, $aboutChars)
                     .($pictured && ($picture = PictureOf::product($product)) !== null ? "\nPicture: ".$picture : ''),
-                'category' => implode(' > ', $product->categoryPaths()[0] ?? []),
-                'brand' => $product->brand,
+                // every category the store files it under, its first as before: the one asked about read "הגיעו לאחרונה" alone,
+                // never "Made by Rocks&Gold", which the team's own row tells of (Rocks, 19.11)
+                'category' => implode(' | ', array_slice(array_values(array_unique(array_filter(array_map(fn (array $path): string => implode(' > ', $path), $product->categoryPaths())))), 0, 8)),
+                'brand' => $this->tellsBrand((string) $product->shop_id) ? $product->brand : null,
                 'in_stock' => (bool) $product->in_stock,
                 'on_sale' => (bool) $product->on_sale,
                 'price' => $product->price !== null ? (float) $product->price : null,
