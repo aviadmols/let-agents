@@ -73,7 +73,7 @@ final class SearchSubscriptionsAccessTest extends TestCase
     public function test_it_is_off_by_default_and_the_drawer_shows_nothing_of_it(): void
     {
         $this->assertFalse(Features::enabled('search_subscriptions.enabled', $this->shop->id));
-        $this->assertFalse(Features::enabled('search_subscriptions.offered', $this->shop->id));
+        $this->assertTrue(Features::enabled('search_subscriptions.offered', $this->shop->id), 'the owner\'s page is offered; the service waits for the owner to turn it on');
         $this->assertFalse(Availability::on($this->shop->id));
         $this->assertNull($this->drawerConfig()['subscribe'] ?? null);
         $this->subscribe('dana@example.com', 'ג׳קט ג׳ינס')->assertStatus(403)->assertJsonPath('error', 'not_enabled');
@@ -102,7 +102,7 @@ final class SearchSubscriptionsAccessTest extends TestCase
         $plan = Shop::query()->whereKey($this->shop->id)->value('plan');
         $subscription = $this->confirmed('dana@example.com', 'jeans jacket', now()->subDays(85));
 
-        foreach (['starter', 'essentials', 'pro', null] as $other) {
+        foreach (['starter', 'essentials', 'enterprise', null] as $other) {
             $this->shop->forceFill(['plan' => $other])->save();
             Features::override('search_subscriptions.enabled', true, $this->shop->id);
 
@@ -186,7 +186,8 @@ final class SearchSubscriptionsAccessTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel(User::MERCHANT_PANEL));
         Filament::setTenant($this->shop);
 
-        $this->assertFalse(SearchSubscriptionsSettings::canAccess(), 'not offered yet');
+        Features::override('search_subscriptions.offered', false);
+        $this->assertFalse(SearchSubscriptionsSettings::canAccess(), 'not offered');
         Features::override('search_subscriptions.offered', true);
         $this->assertTrue(SearchSubscriptionsSettings::canAccess());
         $this->shop->forceFill(['plan' => 'starter'])->save();

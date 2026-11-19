@@ -18,7 +18,7 @@
         },
         {
             "name": "offered",
-            "default": false
+            "default": true
         }
     ],
     "settings": [
@@ -147,7 +147,7 @@
         {
             "name": "plans",
             "type": "string",
-            "default": "growth",
+            "default": "growth,pro",
             "min": 0,
             "max": 200,
             "scope": "global"

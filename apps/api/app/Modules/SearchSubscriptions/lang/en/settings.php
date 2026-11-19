@@ -14,6 +14,6 @@ return [
     'bulk_import_skip' => ['label' => 'Skip a bulk import', 'description' => 'Products added together in this number within an hour are not "new" to shoppers. 0: no skipping.'],
     'signups_per_minute' => ['label' => 'Sign-ups per minute', 'description' => 'A limit per IP address against bots.'],
     'forget_after_days' => ['label' => 'Delete after removal', 'description' => 'How many days after a store removed Lets its subscriptions are deleted.'],
-    'plans' => ['label' => 'Plans that include it', 'description' => 'Plan codes, separated by commas (growth). A store on any other plan, or on none, gets no offer and no email.'],
+    'plans' => ['label' => 'Plans that include it', 'description' => 'Plan codes, separated by commas (growth, pro). A store on any other plan, or on none, gets no offer and no email.'],
     'blocked_words' => ['label' => 'Words a search may not hold', 'description' => 'Separated by commas: offensive words, on top of the built-in ones. A search with one of them cannot be subscribed to.'],
 ];

@@ -7,7 +7,7 @@ use App\Core\Facades\Settings;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
- * Whether a store has Search Subscriptions: only on the plans named in search_subscriptions.plans (Growth), and only
+ * Whether a store has Search Subscriptions: only on the plans named in search_subscriptions.plans (Growth, Pro), and only
  * while search_subscriptions.enabled is on for it (off by default). The plan is read from the shop (shops.plan, the
  * code the billing wrote), never changed here. Every door goes through it: the drawer's offer (DrawerOffer), the
  * sign-up and its status (SubscribeController), the weekly email (SendWeekly), the reminder (RemindEnding) and the
