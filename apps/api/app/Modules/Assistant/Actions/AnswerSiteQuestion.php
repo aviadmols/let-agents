@@ -2159,6 +2159,12 @@ final class AnswerSiteQuestion implements TriesQuestions
      *
      * @return array{kind: string, anchor: string, ids: list<string>, shares: array<string, list<string>>}|null
      */
+    /** Whether a question asks, in so many words, for something to go with a product, in a store that has it on. */
+    public static function asksToGoWith(string $shopId, string $question): bool
+    {
+        return Features::enabled('assistant.goes_with', $shopId) && preg_match(self::GOES_WITH, $question) === 1;
+    }
+
     private function goesWith(string $shopId, string $question, ?string $viewing): ?array
     {
         if (! Features::enabled('assistant.goes_with', $shopId) || ! app()->bound(ProductsGoingWith::class)) {

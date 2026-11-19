@@ -65,7 +65,8 @@ final class AskController
             // the store's range in a budget, not this piece: the site's assistant, as on any page (its kinds, its picks, more in
             // the budget), the page's product no subject of it (Rocks, the comparison with Zipchat, 16.11)
             $result = app(AnswerSiteQuestion::class)->handle($connection->shop_id, $question, $visitorHash, $locale, [], [], false);
-        } elseif ($siteOn && AnswerSiteQuestion::asksOfTheStore($question)) {
+        } elseif ($siteOn && (AnswerSiteQuestion::asksOfTheStore($question) || AnswerSiteQuestion::asksToGoWith($connection->shop_id, $question))) {
+            // ...and so is one for something to go with it (a ring for this bracelet): the site's assistant finds it, at once
             $result = $site();
         } else {
             $result = $answer->handle($connection->shop_id, $pageType, $id, $question, $visitorHash, $locale);
