@@ -30,6 +30,33 @@
   function visitQuery() { var v = visit(); return (v.sid ? '&sid=' + encodeURIComponent(v.sid) : '') + '&page=' + encodeURIComponent(v.page) + (v.ref ? '&ref=' + encodeURIComponent(v.ref) : ''); }
   // the same anonymous id the product page module used (cookie, else this browser), so daily questions add up once
   var visitorId = null;
+  // The shopper's consent, where the store asks for it (Shopify's Customer Privacy API, App Store review 19.11): until
+  // analytics are allowed, the visitor's id lives on this page alone (no cookie, nothing kept in the browser) and no visit,
+  // event or learning is sent; what waited is sent once they allow it. A store with no such API (WordPress, a theme with no
+  // consent banner, a region that asks none) counts as before. The search itself never waits for it.
+  var CONSENT = { waiting: false, watched: false };
+  function privacyApi() { var c = win.Shopify && win.Shopify.customerPrivacy; return c && typeof c.analyticsProcessingAllowed === 'function' ? c : null; }
+  function analyticsAllowed() {
+    var c = privacyApi();
+    if (!c) { return !CONSENT.waiting; }
+    try { return c.analyticsProcessingAllowed() !== false; } catch (e) { return true; }
+  }
+  function consentGiven() {
+    if (!analyticsAllowed()) { return; }
+    keepVisitor(); visitFlush(false); learnFlush(false);
+  }
+  function watchConsent() {
+    if (CONSENT.watched || !SHOPIFY || !win.Shopify) { return; }
+    CONSENT.watched = true;
+    if (!privacyApi() && typeof win.Shopify.loadFeatures === 'function') {
+      CONSENT.waiting = true;
+      // the API loads itself; if it cannot, the store counts as before
+      var loaded = function () { if (CONSENT.waiting) { CONSENT.waiting = false; consentGiven(); } };
+      try { win.Shopify.loadFeatures([{ name: 'consent-tracking-api', version: '0.1' }], loaded); } catch (e) { CONSENT.waiting = false; }
+      setTimeout(loaded, 10000);
+    }
+    doc.addEventListener('visitorConsentCollected', consentGiven);
+  }
   function visitor() {
     if (visitorId) { return visitorId; }
     var ok = function (v) { return /^anon-[A-Za-z0-9_-]{16,64}$/.test(v || ''); };
@@ -39,13 +66,13 @@
       var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', bytes = new Uint8Array(22);
       (win.crypto || win.msCrypto).getRandomValues(bytes);
       id = 'anon-'; for (var i = 0; i < bytes.length; i++) { id += abc.charAt(bytes[i] % abc.length); }
-      try { win.localStorage.setItem('let_agents_vid', id); } catch (e) { /* the cookie still carries it */ }
+      if (analyticsAllowed()) { try { win.localStorage.setItem('let_agents_vid', id); } catch (e) { /* the cookie still carries it */ } }
     }
     visitorId = id;
     return id;
   }
   function sendEvents(events, withVisitor) {
-    if (!CFG.api || !CFG.site) { return; }
+    if (!CFG.api || !CFG.site || !analyticsAllowed()) { return; }
     var payload = { events: events, ctx: visit() };
     if (withVisitor) { payload.vid = visitor(); }
     var body = JSON.stringify(payload), url = String(CFG.api).replace(/\/$/, '') + '/search/' + encodeURIComponent(CFG.site) + '/events';

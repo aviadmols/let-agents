@@ -36,7 +36,7 @@
   --lsp-amber: #9a5b00;
 
   /* ---------- primitives: type ---------- */
-  --lsp-font: "Google Sans", "Google Sans Text", "Heebo", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --lsp-font: system-ui, -apple-system, "Segoe UI", "Heebo", Roboto, "Helvetica Neue", Arial, sans-serif;
   --lsp-text-xs: 12px;
   --lsp-text-sm: 13px;
   --lsp-text-md: 14px;

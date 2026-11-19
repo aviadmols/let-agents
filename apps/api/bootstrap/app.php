@@ -51,6 +51,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 // the page answers as it would have
             }
 
+            // An address of the API no route answers says so plainly, never naming the internal route it was looked for
+            // as (App Store review, 19.11: the app proxy's own address answered "The route api/v1/shortlist/proxy could not
+            // be found."). A route's own "not found" (a product, a shop) answers as before.
+            if ($request->is('api/*') && str_starts_with($e->getMessage(), 'The route ')) {
+                return response()->json(['message' => 'Not found.'], 404);
+            }
+
             return null;
         });
     })->create();

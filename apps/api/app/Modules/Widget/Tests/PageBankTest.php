@@ -19,6 +19,7 @@ use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Enrichment\Models\EnrichmentRanking;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
+use App\Modules\Search\Http\Controllers\LetsSearchScriptController;
 use App\Modules\Widget\Actions\BuildPageBank;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -348,7 +349,8 @@ final class PageBankTest extends TestCase
     public function test_the_old_script_address_serves_the_drawer_with_a_version_tag(): void
     {
         $response = $this->get('/api/v1/widget/let-agents.js')->assertOk()->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
-        $this->assertSame($this->get('/api/v1/search/lets-search.js')->getContent(), $response->getContent(), 'stores on the old plugin get the Let’s Search drawer');
+        // the drawer itself (the new address is a loader of it: LetsSearchScriptTest)
+        $this->assertSame(file_get_contents(LetsSearchScriptController::PATH), $response->getContent(), 'stores on the old plugin get the Let’s Search drawer');
         $this->assertStringContainsString('LetAgentsContext', (string) $response->getContent(), 'which reads the old plugin\'s page context');
         $this->assertStringContainsString('if (win.LetsSearch) { return; }', (string) $response->getContent(), 'and loads once on a page that prints both addresses');
 

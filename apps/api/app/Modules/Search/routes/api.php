@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Route;
 // except the plugin route, which the store's own server signs.
 // The Let’s Search drawer (built: resources/search/lets-search/build.js). Before search/{site}.
 Route::get('search/lets-search.js', LetsSearchScriptController::class)->name('api.search.lets-search');
+// the drawer itself, named by its content: kept by the browser for a year (the loader above names the newest)
+Route::get('search/lets-search.{hash}.js', [LetsSearchScriptController::class, 'file'])->where('hash', '[a-f0-9]{12}')->name('api.search.lets-search.file');
 // The old search script's address, still printed by stores on older plugins and the Shopify embed:
 // it serves the same drawer, which reads their LetAgentsSearchContext as its settings.
 Route::get('search/let-agents-search.js', LetsSearchScriptController::class)->name('api.search.script');

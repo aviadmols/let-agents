@@ -90,6 +90,7 @@
     tools.forEach(function (tool) { try { context.registerTool(tool); } catch (e) { /* a name taken, or an older form of the API */ } });
   }
   function boot() {
+    watchConsent();
     // silent (a shopper while the store is in preview): nothing is shown, the page still counts, as the
     // product page module counted it before: the page view, the store's own add to cart, the search's attribution
     if (CFG.silent) {
@@ -103,9 +104,8 @@
       if (PAGE) { bankFor(PAGE.id); }
       return;
     }
-    if (!doc.getElementById('ls-font') && !/Google Sans/.test(getComputedStyle(doc.body).fontFamily)) {
-      var link = doc.createElement('link'); link.id = 'ls-font'; link.rel = 'stylesheet'; link.href = 'https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap'; doc.head.appendChild(link);
-    }
+    // no font is fetched from any other address: the system's own (App Store review, 19.11: a shopper's address is
+    // sent nowhere for a font)
     doc.body.appendChild(host);
     hook();
     inlineField();

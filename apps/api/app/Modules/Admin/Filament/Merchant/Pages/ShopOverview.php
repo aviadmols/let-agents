@@ -118,6 +118,23 @@ final class ShopOverview extends Page
             : __("admin::home.greeting.{$part}", ['name' => $name]);
     }
 
+    /**
+     * Each part of the day's greeting, for the page to choose by the clock of the person reading it (home-head): the
+     * store's clock is only what the page says before it runs (App Store review, 19.11).
+     *
+     * @return array<string, string>
+     */
+    public function greetings(): array
+    {
+        $name = $this->firstName();
+        $out = [];
+        foreach (['morning', 'noon', 'evening', 'night'] as $part) {
+            $out[$part] = $name === '' ? __("admin::home.greeting.{$part}_plain") : __("admin::home.greeting.{$part}", ['name' => $name]);
+        }
+
+        return $out;
+    }
+
     /** The first name, past a title ("Mr.", "ד״ר"); none for a store's own account (one a platform signs in). */
     private function firstName(): string
     {

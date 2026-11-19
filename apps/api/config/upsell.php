@@ -23,6 +23,11 @@ return [
     'rtl_locales' => ['he', 'ar', 'fa', 'ur'],
 
     /*
+    | Where a store team writes for help: the account menu's "Help & support" (App Store review, 19.11).
+    */
+    'support_email' => env('SUPPORT_EMAIL', 'support@lets.co.il'),
+
+    /*
     | Where the downloadable store plugin zip lives. The Docker build puts it here; locally run
     | "php artisan connections:bundle-plugin".
     */

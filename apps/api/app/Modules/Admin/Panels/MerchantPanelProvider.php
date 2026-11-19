@@ -187,6 +187,8 @@ final class MerchantPanelProvider extends PanelProvider
                 ['label' => ConnectionSettings::getNavigationLabel(), 'url' => ConnectionSettings::getUrl(tenant: $shop)],
                 ['label' => PlanSettings::getNavigationLabel(), 'url' => PlanSettings::getUrl(tenant: $shop)],
                 ['label' => __('admin::privacy.title'), 'url' => PrivacySettings::getUrl(tenant: $shop)],
+                // help, one press away from every screen (App Store review, 19.11: the only way to reach us was the listing)
+                ['label' => __('admin::panels.account.support', ['email' => (string) config('upsell.support_email')]), 'url' => 'mailto:'.config('upsell.support_email')],
             ],
             // inside a platform's admin (Shopify's), which signed the person in, there is nothing to sign out of
             'logoutUrl' => HostedPanel::inside() ? null : filament()->getLogoutUrl(),

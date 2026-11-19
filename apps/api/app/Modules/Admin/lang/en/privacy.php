@@ -37,7 +37,7 @@ return [
 
     'delete' => [
         'title' => 'Delete the shop and all its data',
-        'help' => 'The shop, its catalogue, questions, leads, statistics and settings will be deleted for good. The search leaves the site at once and the plan is cancelled. The deletion itself happens after :days days. Until then you can change your mind: keeping the shop here, or installing the app again, calls off the deletion and brings all the data back.',
+        'help' => 'The shop, its catalogue, questions, leads, statistics and settings will be deleted for good. The search leaves the site at once and the plan is cancelled. The deletion itself happens after :days days. Until then you can change your mind: keeping the shop here, or installing the app again, calls off the deletion and brings all the data back. Removing the app from Shopify is another way: everything is deleted 48 hours after the removal, when Shopify asks for it, unless the app is installed again before then.',
         'tip_export' => 'Download the shop\'s data first.',
         'type_name' => 'To confirm, type the shop\'s name: :name',
         'button' => 'Delete the shop',

@@ -159,6 +159,24 @@ final class ExpertBankActivationTest extends TestCase
         $this->assertTrue($this->previous->refresh()->active);
     }
 
+    public function test_an_attribute_of_one_value_stays_out_of_the_vocabulary_and_the_bank_is_still_activated(): void
+    {
+        // Naot, 19.11: "Gender" with "Men" alone (the gate lets whom it is for pass with one value) failed the whole activation
+        $bank = $this->bank();
+        $this->inShop(function () use ($bank): void {
+            $shape = $bank->bank;
+            $shape['attributes'][] = ['id' => 'attribute:audience', 'key' => 'audience', 'label' => 'Gender', 'multiple' => false, 'types' => [], 'values' => [
+                ['id' => 'value:audience.men', 'key' => 'men', 'label' => 'Men', 'words' => ['men'], 'patterns' => ['men']],
+            ]];
+            $bank->update(['bank' => $shape]);
+        });
+
+        ['run' => $run, 'vocabulary' => $vocabulary] = app(ActivateExpertBank::class)->activate($this->shop->id, $bank->id);
+
+        $this->assertSame(RunStatus::Succeeded, $run->status);
+        $this->assertSame(['metal'], array_column($vocabulary->definition()->attributes(), 'key'));
+    }
+
     public function test_the_command_activates_by_id_prints_what_to_run_next_and_deactivates(): void
     {
         $bank = $this->bank();

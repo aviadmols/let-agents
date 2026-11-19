@@ -18,7 +18,12 @@
     try { doc.cookie = name + '=' + encodeURIComponent(value) + '; path=/; max-age=' + maxAge + '; SameSite=Lax' + (win.location.protocol === 'https:' ? '; Secure' : ''); } catch (e) { /* none */ }
   }
   // the store reads let_agents_vid at checkout to link an order to what was used, so it lives in a cookie too
-  function keepVisitor() { writeCookie('let_agents_vid', visitor(), 31536000); }
+  function keepVisitor() {
+    if (!analyticsAllowed()) { return; }
+    var id = visitor();
+    writeCookie('let_agents_vid', id, 31536000);
+    try { win.localStorage.setItem('let_agents_vid', id); } catch (e) { /* the cookie carries it */ }
+  }
   // which side of the measurement this visitor is on, from their own id alone: the same side on every page
   function heldOut(percent) {
     if (!percent) { return false; }
@@ -53,6 +58,7 @@
   }
   function learnFlush(leaving) {
     if (!LEARN.shop || !LEARN.queue.length) { return; }
+    if (!analyticsAllowed()) { if (LEARN.queue.length > 200) { LEARN.queue.splice(0, LEARN.queue.length - 200); } return; }
     var url = API + '/widget/' + SITE + '/events', sid = visit().sid || rid(22);
     while (LEARN.queue.length) {
       var body = JSON.stringify({ v: 1, shop: LEARN.shop, vid: visitor(), session: sid, sent_at: Date.now(), holdout: LEARN.holdout, preview: LEARN.preview, events: LEARN.queue.splice(0, 50) });
@@ -104,6 +110,7 @@
   }
   function visitFlush(leaving) {
     if (!VISIT.queue.length || !CFG.api || !CFG.site) { return; }
+    if (!analyticsAllowed()) { if (VISIT.queue.length > 100) { VISIT.queue.splice(0, VISIT.queue.length - 100); } return; }
     var v = visit();
     if (!v.sid) { VISIT.queue = []; return; }
     while (VISIT.queue.length) {

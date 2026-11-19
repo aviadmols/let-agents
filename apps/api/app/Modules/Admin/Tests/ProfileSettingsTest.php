@@ -199,7 +199,9 @@ final class ProfileSettingsTest extends TestCase
         $this->get("/merchant/{$this->shop->slug}/settings/profile", ['X-Test-Hosted' => '1'])->assertOk()
             ->assertDontSee('data-logout', false)
             ->assertDontSee('data-change-password', false)
-            ->assertSee('data-user-menu', false);
+            ->assertSee('data-user-menu', false)
+            // help is one press away, inside the platform's admin too (App Store review, 19.11)
+            ->assertSee('href="mailto:support@lets.co.il"', false);
 
         // And a password sent anyway is not changed: the page opened inside.
         Livewire::withHeaders(['X-Test-Hosted' => '1'])->test(ProfileSettings::class)

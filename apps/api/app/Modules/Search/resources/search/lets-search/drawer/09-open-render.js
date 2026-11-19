@@ -282,7 +282,8 @@
   function wantedHtml() {
     var list = (S.config.wanted || []).map(rec).filter(Boolean);
     if (!list.length) { return ''; }
-    return '<div class="ls-sec__title">' + esc(t('wanted')) + '</div><div style="margin-bottom:18px">' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) + '</div>';
+    // a store with no adds yet: a few of its own products, said as that (config.wantedFrom), never "popular"
+    return '<div class="ls-sec__title">' + esc(t(S.config.wantedFrom === 'store' ? 'fromStore' : 'wanted')) + '</div><div style="margin-bottom:18px">' + miniRow(list.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) + '</div>';
   }
   // The opening screen, in this order (as Aviad asked, 2026-10-25): the store's popular searches, the shopper's own
   // recent ones, the store's popular products, what people ask here, and search by photo.

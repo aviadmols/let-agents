@@ -143,6 +143,20 @@ class DrawerFiltersTest extends TestCase
         $this->assertLessThan($out[3], $out[2], 'and still narrows when chosen');
     }
 
+    public function test_a_gift_card_shows_only_for_a_search_that_asks_for_a_gift(): void
+    {
+        // App Store review, 19.11: a $10 gift card among the snowboards of "a snowboard for a beginner under $700"
+        $out = self::drawer("(function () { [P(50, 'The Complete Snowboard', {}), P(51, 'Gift Card', { gc: 1 })].forEach(function (r) { S.records[r.id] = r; });".
+            " var a = turn('a snowboard for a beginner under 700', [50, 51], {}); a.kind = 'results';".
+            " var b = turn('gift for a snowboarder', [50, 51], {}); b.kind = 'results';".
+            " var c = turn('כרטיס מתנה', [51], {}); c.kind = 'results';".
+            ' return [titles(a), titles(b), titles(c)]; })()');
+
+        $this->assertSame(['The Complete Snowboard'], $out[0]);
+        $this->assertSame(['The Complete Snowboard', 'Gift Card'], $out[1]);
+        $this->assertSame(['Gift Card'], $out[2]);
+    }
+
     public function test_a_search_that_states_a_side_never_shows_the_opposite_even_as_the_nearest(): void
     {
         // Vans, 19.11 (approved): "חולצה מכופתרת עם שרוול קצר", no short-sleeved shirt, showed the long ones under "no exact match"

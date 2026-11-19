@@ -2,7 +2,9 @@
 @php($t = fn (string $key, array $params = []) => __('admin::today.'.$key, $params))
 <header class="lp-d-top" data-home-head>
     <div>
-        <h1 class="lp-d-hello">{{ $title }}. <em>{{ $mood }}</em></h1>
+        {{-- the greeting by the clock of the person reading it; the store's own until the page runs (App Store review, 19.11:
+             "Good morning" at 17:08 for a reviewer far from the store) --}}
+        <h1 class="lp-d-hello"><span x-data="{ g: @js($this->greetings()), part() { const h = new Date().getHours(); return h < 5 ? 'night' : (h < 12 ? 'morning' : (h < 17 ? 'noon' : (h < 21 ? 'evening' : 'night'))); } }" x-text="g[part()] + '.'">{{ $title }}.</span> <em>{{ $mood }}</em></h1>
         <p class="lp-d-lede">{{ $lede }}</p>
     </div>
     <div class="lp-d-top-tools">

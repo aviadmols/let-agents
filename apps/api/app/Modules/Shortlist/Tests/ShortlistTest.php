@@ -208,4 +208,12 @@ final class ShortlistTest extends TestCase
         event(new ShopperDataRequested($this->shop->id, 'redact', 'a@b.test', '7001'));
         $this->assertSame(0, ShortlistWishlist::query()->withoutGlobalScopes()->where('customer_ref', 'shopify:7001')->count());
     }
+
+    public function test_the_app_proxys_unknown_addresses_answer_not_found_naming_no_route(): void
+    {
+        // App Store review, 19.11: /apps/letagents answered "The route api/v1/shortlist/proxy could not be found."
+        foreach (['/api/v1/shortlist/proxy', '/api/v1/shortlist/proxy/other', '/api/v1/no-such-thing'] as $address) {
+            $this->get($address)->assertNotFound()->assertExactJson(['message' => 'Not found.']);
+        }
+    }
 }

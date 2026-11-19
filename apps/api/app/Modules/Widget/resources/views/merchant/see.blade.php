@@ -116,7 +116,7 @@
                     <div class="lp-d-set">
                         <div><b>{{ $t('whatsapp.number') }}</b><span>{{ $t('whatsapp.number_text') }}</span></div>
                         <form class="lp-d-set-field" wire:submit="saveNumber">
-                            <input type="tel" wire:model="number" dir="ltr" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="+972 50 000 0000" aria-label="{{ $t('whatsapp.number') }}">
+                            <input type="tel" wire:model="number" dir="ltr" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="{{ $t('whatsapp.number_example') }}" aria-label="{{ $t('whatsapp.number') }}">
                             <button type="submit" class="lp-d-btn lp-d-btn-line lp-d-btn-sm">{{ $t('whatsapp.number_save') }}</button>
                         </form>
                     </div>

@@ -252,8 +252,12 @@
     return out;
   }
   // the turn's products, less those whose title says only the opposite of a side the words ask for
+  // a gift card (gc) is shown for a search that asks for a gift or a voucher, never among the snowboards a search for
+  // one finds (App Store review, 19.11: a $10 gift card in "a snowboard for a beginner under $700")
+  var GIFT_ASKED = /gift|voucher|מתנ|גיפט|שובר|תו\s*קני/i;
   function sideKept(turn) {
     var all = (turn.ids || []).map(rec).filter(Boolean), asked = turn.kind === 'results' ? askedSides(turn.q) : [];
+    if (turn.kind === 'results' && !GIFT_ASKED.test(String(turn.q || ''))) { all = all.filter(function (r) { return !r.gc; }); }
     if (!asked.length) { return all; }
     return all.filter(function (r) { var t = sideWords(decode(r.title || '')); return !asked.some(function (pair) { return saysSide(t, pair[1]) && !saysSide(t, pair[0]); }); });
   }

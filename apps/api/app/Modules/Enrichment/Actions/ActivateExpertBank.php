@@ -105,6 +105,11 @@ final class ActivateExpertBank
 
         $attributes = [];
         foreach ((array) ($bank->bank['attributes'] ?? []) as $attribute) {
+            // a vocabulary's attribute is a choice of two values at least: one the gate let pass with a single value (whom
+            // it is for: "Men" alone, Naot 19.11) stays out of the vocabulary, never failing the whole bank's activation
+            if (count((array) ($attribute['values'] ?? [])) < 2) {
+                continue;
+            }
             $attributes[] = array_filter([
                 'key' => $key((string) $attribute['key']),
                 'type' => 'enum',

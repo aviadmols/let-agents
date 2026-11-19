@@ -77,6 +77,7 @@ return [
         'hand' => 'Hand over to WhatsApp',
         'hand_text' => 'The shopper continues with your team',
         'number' => 'WhatsApp number',
+        'number_example' => '+1 555 000 0000',
         'number_text' => 'Outside your hours, shoppers leave their details',
         'number_save' => 'Save',
         'needs_number' => 'Add your WhatsApp number first, then turn this on.',

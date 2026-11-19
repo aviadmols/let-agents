@@ -95,7 +95,10 @@ final class SearchIndexController
             'popular' => Cache::remember('search:popular:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::popular($shopId, (string) $index->items))),
             // "Popular products" on the empty drawer: the shop's own most added to the cart lately, only those added at least
             // search.wanted_min_adds times and in the index; none, no section.
-            'wanted' => Cache::remember('search:wanted:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::wanted($shopId, (string) $index->items))),
+            'wanted' => ($wanted = Cache::remember('search:wanted:'.$shopId.':'.$index->hash, 3600, fn (): array => $tenant->run($shopId, fn (): array => self::wanted($shopId, (string) $index->items)))) ?: self::fromStore($shopId, (string) $index->items),
+            // ...a store with none yet (a new one, a review store) opens on a few of its own products in stock, said as "From
+            // the store", never on an empty screen (App Store review, 19.11)
+            'wantedFrom' => $wanted === [] ? 'store' : null,
             // "Similar items" only where the shop's vectors can answer: with none, the button would lead nowhere.
             'similar' => Features::enabled('search.similar', $shopId) && self::similarReady($tenant, $shopId),
             // What each product carries, as the shop set it on its search display screen.
@@ -328,6 +331,19 @@ final class SearchIndexController
         $held = array_flip(array_column((array) (json_decode($index, true)['items'] ?? []), 'id'));
 
         return array_slice(array_values(array_filter($ids, fn (string $id): bool => isset($held[$id]))), 0, $shown);
+    }
+
+    /** A store with no product added to a cart yet: the first products in stock its index holds, with a picture, no gift card. */
+    private static function fromStore(string $shopId, string $index): array
+    {
+        $shown = (int) Settings::get('search.wanted_shown', $shopId);
+        if ($shown <= 0 || Settings::get('search.start_products', $shopId) === false) {
+            return [];
+        }
+        $items = (array) (json_decode($index, true)['items'] ?? []);
+
+        return array_slice(array_values(array_map(fn (array $r): string => (string) $r['id'], array_filter($items,
+            fn (array $r): bool => str_starts_with((string) ($r['id'] ?? ''), 'p:') && (int) ($r['s'] ?? 0) === 1 && empty($r['gc']) && (string) ($r['img'] ?? '') !== ''))), 0, $shown);
     }
 
     /** The address of the store's privacy policy page, as its catalog read it; null when the store has none we know. */

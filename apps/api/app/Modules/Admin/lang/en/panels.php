@@ -18,6 +18,7 @@ return [
         'merchant' => 'Merchant view',
     ],
     'account' => [
+        'support' => 'Help & support · :email',
         'viewing' => 'Your store',
         'as_operator' => 'You are viewing :shop as an operator. Everything here belongs to that store alone.',
         'switch' => 'Switch store',

@@ -436,6 +436,9 @@ final class BuildSearchIndex
                 // answer about ₪3,000)
                 'pf' => $product->price !== null && isset($ranged[$product->id]) && (float) $ranged[$product->id] > (float) $product->price ? 1 : null,
                 'buy' => $product->type === 'simple' && $product->purchasable && ! isset($asks[$product->id]) ? 1 : 0,
+                // a gift card: shown for a search that asks for a gift, never among the snowboards a search for one finds
+                // (App Store review, 19.11: a $10 gift card in "a snowboard for a beginner under $700")
+                'gc' => self::giftCard($product) ? 1 : null,
                 // No product of its kind (ProductKinds): its similar items are none, so the drawer offers none.
                 'ns' => $kinds->marks($product) !== [] && ! $kinds->hasLike($product) ? 1 : null,
                 // what the store files it as (its type, categories, tags), as word stems: a kind a search names holds it
@@ -1793,6 +1796,19 @@ final class BuildSearchIndex
         $w = HebrewSearch::normalize($word);
 
         return $w !== '' && array_any(array_merge(...self::OPPOSITES), fn (string $side): bool => $w === $side || (mb_strlen($side) >= 3 && str_starts_with($w, $side)));
+    }
+
+    /** A gift card or voucher, by the platform's own mark or by its title or the store's type for it, in any of its names. */
+    public static function giftCard(CatalogProduct $product): bool
+    {
+        $payload = (array) $product->payload;
+        if (($payload['gift_card'] ?? $payload['is_gift_card'] ?? false) === true) {
+            return true;
+        }
+
+        return preg_match('/\bgift[\s-]*cards?\b|\be-?gift\b|\bgift\s*vouchers?\b|כרטיס(?:י)?\s*מתנה|גיפט\s*קארד|שובר(?:י)?\s*מתנה|תו(?:י)?\s*קני[יה]/iu',
+            (string) $product->title.' | '.(string) ($payload['product_type'] ?? '')) === 1
+            || mb_strtolower(trim((string) ($payload['product_type'] ?? ''))) === 'giftcard';
     }
 
     /**
