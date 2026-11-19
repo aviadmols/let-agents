@@ -4,9 +4,11 @@ namespace App\Modules\SearchSubscriptions\Support;
 
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Analytics\Models\AnalyticsVisit;
+use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\SearchSubscriptions\Models\SearchSubscription;
 use App\Modules\SearchSubscriptions\Models\SearchSubscriptionSend;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 
 /**
  * The store's "Searches people follow": the searches with the most people following them now, and what the emails did in
@@ -30,17 +32,70 @@ final class FollowedSearches
     }
 
     /**
+     * What else the page's per-sign-up lines depend on: the catalogue's last change (a new product, one out of stock)
+     * and the weekly emails' (one planned, mailed or taken back). Kept beside stamp() for upcoming()'s cache.
+     */
+    public function changes(string $shopId): string
+    {
+        return $this->tenant->run($shopId, function (): string {
+            $catalogue = CatalogProduct::query()->toBase()->selectRaw('count(*) as n, max(updated_at) as m')->first();
+            $sends = SearchSubscriptionSend::query()->where('kind', 'weekly')->toBase()->selectRaw('count(*) as n, max(updated_at) as m')->first();
+
+            return md5(($catalogue->n ?? 0).'|'.($catalogue->m ?? '').'|'.($sends->n ?? 0).'|'.($sends->m ?? ''));
+        });
+    }
+
+    /**
      * The latest sign-ups, for the store's own page: who (the address the shopper gave this store), to which search,
      * since when and where it stands. Newest first.
      *
-     * @return list<array{email: string, query: string, status: string, at: CarbonInterface|null}>
+     * @return list<array{id: string, hash: string, email: string, query: string, status: string, at: CarbonInterface|null}>
      */
     public function recent(string $shopId, int $limit): array
     {
-        return $this->tenant->run($shopId, fn (): array => SearchSubscription::query()->latest('created_at')->limit($limit)
-            ->get(['email', 'query', 'status', 'created_at', 'confirmed_at'])
-            ->map(fn (SearchSubscription $s): array => ['email' => (string) $s->email, 'query' => Subscribers::cut((string) $s->query, 60), 'status' => (string) $s->status, 'at' => $s->confirmed_at ?? $s->created_at])
+        return $this->tenant->run($shopId, fn (): array => SearchSubscription::query()->latest('created_at')->orderByDesc('id')->limit($limit)
+            ->get(['id', 'email', 'email_hash', 'query', 'status', 'created_at', 'confirmed_at'])
+            ->map(fn (SearchSubscription $s): array => ['id' => (string) $s->id, 'hash' => (string) $s->email_hash, 'email' => (string) $s->email,
+                'query' => Subscribers::cut((string) $s->query, 60), 'status' => (string) $s->status, 'at' => $s->confirmed_at ?? $s->created_at])
             ->all());
+    }
+
+    /**
+     * For the sign-ups shown: how many products each active search has for its address's next email, by the weekly
+     * email's own rule (NextEmail: new since confirmed, in stock, matching, not sent before, the email's cap shared among
+     * the address's searches), and when each address was last emailed. Only these addresses; each search runs once.
+     *
+     * @param  list<string>  $hashes
+     * @return array{next: array<string, int>, last: array<string, string>} subscription id => products; address => last weekly email
+     */
+    public function upcoming(string $shopId, array $hashes): array
+    {
+        $hashes = array_values(array_unique($hashes));
+        if ($hashes === []) {
+            return ['next' => [], 'last' => []];
+        }
+
+        return $this->tenant->run($shopId, function () use ($shopId, $hashes): array {
+            $active = SearchSubscription::query()->where('status', SearchSubscription::ACTIVE)->whereIn('email_hash', $hashes)
+                ->orderBy('email_hash')->orderBy('confirmed_at')->orderBy('id')->get(['id', 'email_hash', 'query', 'query_key', 'confirmed_at']);
+            $earliest = $active->filter(fn (SearchSubscription $s): bool => $s->confirmed_at !== null)->map(fn (SearchSubscription $s): int => $s->confirmed_at->getTimestamp())->min();
+            $since = $earliest !== null ? Carbon::createFromTimestamp($earliest, (string) config('app.timezone')) : null;
+
+            $next = [];
+            $picks = app(NextEmail::class)->start($shopId, $since, $active->pluck('query_key')->unique()->values()->all())
+                ->pick($active->groupBy('email_hash')->all());
+            foreach ($picks as $bySubscription) {
+                foreach ($bySubscription as $id => $products) {
+                    $next[(string) $id] = count($products);
+                }
+            }
+
+            $last = SearchSubscriptionSend::query()->where('kind', 'weekly')->whereIn('email_hash', $hashes)->toBase()
+                ->selectRaw('email_hash, max(sent_at) as last')->groupBy('email_hash')->pluck('last', 'email_hash')
+                ->map(fn ($at): string => (string) $at)->all();
+
+            return ['next' => $next, 'last' => $last];
+        });
     }
 
     /**

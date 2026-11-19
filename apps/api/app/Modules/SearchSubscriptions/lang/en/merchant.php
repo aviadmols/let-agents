@@ -10,8 +10,9 @@ return [
         'end' => 'At the end of the results',
         'no_match' => 'Only with no exact match',
     ],
-    'send_day' => 'Send day',
-    'send_day_sub' => 'The email goes out on this day at :hour, in your store\'s time.',
+    'send_day' => 'When the email goes out',
+    'send_day_sub' => 'The day and the hour, in your store\'s time.',
+    'send_hour' => 'Send hour',
     'days' => [
         'sunday' => 'Sunday',
         'monday' => 'Monday',
@@ -28,6 +29,7 @@ return [
     'errors' => [
         'logo' => 'Enter an image address that starts with https://',
         'reply_to' => 'Enter a valid email address',
+        'send_hour' => 'Choose an hour from the list',
     ],
     'followed' => [
         'title' => 'Searches people follow',
@@ -44,8 +46,11 @@ return [
     ],
     'people' => [
         'title' => 'Who signed up',
-        'help' => 'The latest sign-ups (up to :n): the email the shopper left, the search, when, and where it stands.',
+        'help' => 'The latest sign-ups (up to :n): the email the shopper left, the search, when, where it stands, and what is waiting for their next email.',
         'none' => 'No sign-ups yet.',
+        'next' => '{0} Nothing new yet|{1} 1 new product for their next email|[2,*] :count new products for their next email',
+        'last' => 'Last emailed :date',
+        'never' => 'Not emailed yet',
         'status' => [
             'pending' => 'Waiting for email confirmation',
             'active' => 'Subscribed',

@@ -91,6 +91,15 @@
             "unit": "searches"
         },
         {
+            "name": "mail_requests_per_second",
+            "type": "int",
+            "default": 1,
+            "min": 1,
+            "max": 10,
+            "scope": "global",
+            "unit": "requests"
+        },
+        {
             "name": "keep_days",
             "type": "int",
             "default": 90,

@@ -11,6 +11,7 @@ use App\Modules\SearchSubscriptions\Actions\SendWeekly;
 use App\Modules\SearchSubscriptions\Listeners\ForgetSubscriber;
 use App\Modules\SearchSubscriptions\Support\DrawerOffer;
 use App\Modules\SearchSubscriptions\Support\SubscriberData;
+use App\Modules\SearchSubscriptions\Support\WeeklyEmails;
 use App\Modules\Shopify\Contracts\KeepsShopperData;
 use App\Modules\Shopify\Events\ShopperDataRequested;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -43,9 +44,15 @@ final class SearchSubscriptionsServiceProvider extends ModuleServiceProvider
         // Resend's webhook, from its own servers: signed, so only a generous limit
         RateLimiter::for('search-subscription-bounces', fn (Request $request): Limit => Limit::perMinute(600)->by('search-subscription-bounces:'.$request->ip()));
 
+        // the weekly emails' pace toward the mail service: a request (a batch of up to 100) per this many a second; only
+        // through Resend's batch, anything else (a log mailer, tests) is not held
+        RateLimiter::for('search-subscriptions-mail', fn (): Limit => WeeklyEmails::batched()
+            ? Limit::perSecond((int) Settings::get('search_subscriptions.mail_requests_per_second'))->by('search-subscriptions-mail')
+            : Limit::none());
+
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
-            // each store at its own day and hour, in its own time: looked at every hour
-            $schedule->call(fn () => app(SendWeekly::class)->handle())->hourlyAt(2)->name('search-subscriptions:weekly')->withoutOverlapping(50);
+            // each store at its own day and hour, in its own time: looked at every hour, each due store a job of its own
+            $schedule->call(fn () => app(SendWeekly::class)->dispatchDue())->hourlyAt(2)->name('search-subscriptions:weekly')->withoutOverlapping(50);
             $schedule->call(fn () => app(RemindEnding::class)->handle())->dailyAt('09:15')->name('search-subscriptions:remind')->withoutOverlapping(60);
             $schedule->call(fn () => app(ForgetRemovedStores::class)->handle())->dailyAt('03:40')->name('search-subscriptions:forget-removed');
         });
