@@ -234,7 +234,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @var array<string, list<int>>
      */
     // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42, 45], 'verify_site' => [36, 40], 'scope_site' => [45]];
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
@@ -3434,7 +3434,7 @@ final class AnswerSiteQuestion implements TriesQuestions
     public function screen(array $data, array $prepared, string $question, string $mode): array
     {
         ['byRef' => $byRef, 'productsByRef' => $productsByRef, 'forModel' => $forModel] = $prepared;
-        $answer = self::withoutRefs(self::withoutMarkdown(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS)));
+        $answer = self::withoutRefs(self::withoutMarkdown(mb_substr(trim((string) ($data['answer'] ?? '')), 0, self::MAX_ANSWER_CHARS), (bool) Settings::get('assistant.answer_bold')));
         // a ref as a writer gives it: "s1", or now and then {"ref": "s1"}
         $cited = array_values(array_unique(array_filter(array_map(fn ($ref): string => is_array($ref) ? (string) ($ref['ref'] ?? $ref['id'] ?? '') : (string) $ref, (array) ($data['refs'] ?? [])), fn (string $ref): bool => isset($byRef[$ref]))));
         $picks = $this->picks((array) ($data['picks'] ?? []), $productsByRef);
@@ -3667,13 +3667,29 @@ final class AnswerSiteQuestion implements TriesQuestions
         return trim((string) preg_replace('/[ \t]{2,}/u', ' ', $text));
     }
 
-    /** A writer's bold and italics as plain words: "**חיזוק הגוף**" showed its stars to the shopper (Mycolivia, 25.10). */
-    public static function withoutMarkdown(string $text): string
+    /**
+     * A writer's bold and italics as plain words: "**חיזוק הגוף**" showed its stars to the shopper (Mycolivia, 25.10). Where
+     * bold is shown (assistant.answer_bold, the drawer draws it), a pair that closes on one line is kept as "**…**", "__…__"
+     * written as it, never more than MAX_BOLD of them; a star left alone goes either way.
+     */
+    public static function withoutMarkdown(string $text, bool $keepBold = false): string
     {
-        $text = (string) preg_replace('/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/us', '$2', $text);
+        if (! $keepBold) {
+            $text = (string) preg_replace('/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/us', '$2', $text);
 
-        return str_replace('**', '', $text);
+            return str_replace('**', '', $text);
+        }
+        $kept = 0;
+        $text = (string) preg_replace_callback('/(\*\*|__)(?=\S)([^\n*_]{1,80}?)(?<=\S)\1/u', function (array $m) use (&$kept): string {
+            return ++$kept <= self::MAX_BOLD ? "\u{E000}".$m[2]."\u{E001}" : $m[2];
+        }, $text);
+        $text = str_replace(['**', '__'], '', $text);
+
+        return str_replace(["\u{E000}", "\u{E001}"], '**', $text);
     }
+
+    /** Bold phrases in one answer, at most: a few facts stand out, never the whole answer. */
+    private const MAX_BOLD = 4;
 
     /** Whether a text still shows an internal ref ("p5", "s2") to the shopper. */
     public static function hasRef(string $text): bool

@@ -1301,6 +1301,15 @@ final class BuildSearchIndex
     }
 
     /**
+     * A tag's name as a filter shows it: two words a model joined with a hyphen read as two words ("Shabbat-friendly" is
+     * "Shabbat friendly", as Aviad asked, 19.11); a letter alone before or after the hyphen keeps it ("T-shirt", "X-Large").
+     */
+    public static function chipLabel(string $label): string
+    {
+        return (string) preg_replace('/(?<=\p{L}\p{L})-(?=\p{L}\p{L})/u', ' ', $label);
+    }
+
+    /**
      * The tags sure enough to narrow by (the Taxonomy module, where the shop has them as filters), a
      * filter for each group, after the store's own. A value the store already offers under the same
      * name (its category "ביוגרפיות" and the tag "ביוגרפיות") is the store's: not shown twice.
@@ -1331,7 +1340,7 @@ final class BuildSearchIndex
             }
 
             $at = count($facets);
-            $facets[] = ['k' => 'tag:'.$group['key'], 'l' => $group['label'], 'v' => array_map(fn (array $v): array => ['k' => $v['key'], 'l' => $v['label']], $values)];
+            $facets[] = ['k' => 'tag:'.$group['key'], 'l' => self::chipLabel((string) $group['label']), 'v' => array_map(fn (array $v): array => ['k' => $v['key'], 'l' => self::chipLabel((string) $v['label'])], $values)];
 
             foreach ($values as $i => $value) {
                 foreach ($value['products'] as $id) {

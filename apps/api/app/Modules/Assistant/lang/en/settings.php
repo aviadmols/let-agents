@@ -163,6 +163,10 @@ return [
         'label' => 'The checker takes no sentence out only for a detail left out',
         'description' => 'A sentence the checker marked only "incomplete" stays in the answer and is logged. Measured 18.11: in 68 of 70 such answers the sentence was right. Off brings the earlier behaviour back at once.',
     ],
+    'answer_bold' => [
+        'label' => 'Bold in answers',
+        'description' => 'The key words of an answer (the answer itself, a price, the main fact) are bold, up to four an answer. Off returns plain text.',
+    ],
     'tell_brand' => [
         'label' => 'Answers may name the brand of a product',
         'description' => 'Off in a store whose brand field is the supplier a piece was bought from: the name is not sent to the writer and appears in no answer or pick.',

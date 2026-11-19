@@ -76,7 +76,7 @@
           var lead = LEARN.bank && LEARN.bank.lead && !LEARN.offered ? { given: {}, step: 0, state: 'offer', busy: false } : null;
           if (lead) { LEARN.offered = true; }
           update(turn, { loading: false, answer: d.answer, picks: [], sources: d.sources || [], general: d.source === 'general', follow: [], leadFlow: lead, team: !!d.team, noAnswer: d.no_answer || null });
-          announce(t('announceReady') + ': ' + d.answer);
+          announce(t('announceReady') + ': ' + plainAnswer(d.answer));
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           update(turn, { loading: false, quoted: d.quotes, noAnswer: d.no_answer || null });
           announce(t('quotedTitle'));
@@ -163,7 +163,7 @@
           update(turn, { loading: false, answer: d.answer, team: !!d.team, noAnswer: d.no_answer || null, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question,
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null, alsoBudget: !!(named && named.budget) });
-          announce(t('announceReady') + ': ' + d.answer);
+          announce(t('announceReady') + ': ' + plainAnswer(d.answer));
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
           // the answer could not be checked: never shown; the store's own words, said to be that

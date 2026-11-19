@@ -136,7 +136,10 @@
   // A word of numbers, an email or a link keeps its own order inside a Hebrew line: "10:00–15:00" is not read
   // backwards, and the full stop after "info@store.co.il." still ends the Hebrew sentence (Rocks, 28.10). A short
   // one is never broken across two lines.
-  var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
+  // (the marks of a bold phrase, answerBlocks', stand outside a word's direction: "**3,300 ₪**" is bold, its number still ltr)
+  var LTR_WORD = /^([("'״]*)([^\s֐-׿؀-ۿ]*?)([.,;:!?)"'״]*)$/;
+  // an answer as words alone, for what reads it aloud or keeps it as text: no bold marks
+  function plainAnswer(s) { return String(s || '').replace(/\*\*/g, ''); }
   // an email address in an answer, with whatever is joined to it ("ל־info@store.co.il."): to press, as Aviad asked (15.11)
   var EMAIL_WORD = /^(.*?)([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})([.,;:!?)"'״]*)$/;
   // a phone number in an answer, with whatever is joined to it ("ל־054-4600563", "ל'054-3979035'."): to press, and never in
@@ -159,9 +162,9 @@
   // sentence of parts joined by ";" a list of them
   function answerBlocks(text) {
     var item = /^(?:[-•*]|\d{1,2}[.)])\s+/;
-    // a writer's markdown is no markup here: "**חיזוק הגוף**" reads as its words (answers kept from before the server
-    // took it off too)
-    text = String(text || '').replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2').replace(/\*\*/g, '');
+    // a writer's bold, the few facts the server kept as "**…**" on one line, is drawn bold (as Aviad asked, 19.11): marked
+    // here, made <strong> once the line is safe HTML (answerHtml); any other markdown reads as its words
+    text = String(text || '').replace(/\*\*(?=\S)([^\n*]{1,80}?\S)\*\*/g, '$1').replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2').replace(/\*\*/g, '');
     var lines = String(text || '').split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
     if (lines.length === 1 && lines[0].length > 110) {
       lines = lines[0].replace(/([.!?])\s+(?=\S)/g, '$1\n').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
@@ -206,6 +209,8 @@
       said += before + m[0];
       return plain(before) + '<a class="ls-answer__page-link" href="' + esc(page.url) + '">' + plain(m[0]) + '</a>' + out(s.slice(m.index + m[0].length));
     };
-    return answerBlocks(endsWhole(text)).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + out(s) + '</li>'; }).join('') + '</ul>' : '<p>' + out(b.text) + '</p>'; }).join('');
+    // a bold phrase that opens and closes within its line; a mark left alone (a phrase cut by a link) is no markup
+    var bold = function (html) { return html.replace(/([^]*)/g, '<strong>$1</strong>').replace(/[]/g, ''); };
+    return answerBlocks(endsWhole(text)).map(function (b) { return b.list ? '<ul class="ls-answer__list">' + b.list.map(function (s) { return '<li>' + bold(out(s)) + '</li>'; }).join('') + '</ul>' : '<p>' + bold(out(b.text)) + '</p>'; }).join('');
   }
 
