@@ -397,6 +397,10 @@ return [
         'label' => 'Tags never shown as a filter',
         'description' => 'The store\'s own tags for its shop pages and campaigns, not for what a product is ("Gift Guide, Vacation Shop"), separated by commas. A tag that starts with one of them is left out too.',
     ],
+    'brand_words' => [
+        'label' => 'The brand of a product is among its search words',
+        'description' => 'Off in a store whose brand field is the supplier a piece was bought from: the name is not in the search index, and products are not found by it.',
+    ],
     'vendor_filter' => [
         'label' => 'Vendor as a brand filter',
         'description' => 'On a Shopify store: the products\' Vendor field as a "Brand" filter. Off by default, since many stores keep their supplier\'s name there, not a brand. Turn it on only where it holds real brands.',

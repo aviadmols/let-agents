@@ -943,7 +943,7 @@ final class BuildPageBank
         }
 
         $details = array_filter([
-            $reasons['brand'] ?? null,
+            Settings::get('assistant.tell_brand', $this->shopId) ? ($reasons['brand'] ?? null) : null,
             isset($reasons['voltage_v']) ? $this->measure((float) $reasons['voltage_v'], 'V') : null,
         ]);
 
@@ -1186,7 +1186,8 @@ final class BuildPageBank
             }
         }
 
-        if (isset($reading['brand']['brand'])) {
+        // never where the store's "brand" is who it bought from (assistant.tell_brand off)
+        if (isset($reading['brand']['brand']) && Settings::get('assistant.tell_brand', $this->shopId)) {
             $rows[] = ['key' => 'brand', 'label' => __('widget::bank.brand', [], $this->locale), 'value' => (string) $reading['brand']['brand']];
         }
 

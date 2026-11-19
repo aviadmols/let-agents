@@ -101,9 +101,9 @@ class DrawerFiltersTest extends TestCase
         $out = self::drawer('(function () { '.$jewels.
             "var both = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 0: true, 1: true } });".
             "var one = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 0: true } });".
-            "var w = T.wouldCounts(one, all());".
+            'var w = T.wouldCounts(one, all());'.
             "var metals = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 1000: true } });".
-            "var wm = T.wouldCounts(metals, all());".
+            'var wm = T.wouldCounts(metals, all());'.
             "var anyMetal = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 1000: true, 1001: true } });".
             'return [ids(both), w.counts[1], ids(one).length, wm.counts[1001], ids(anyMetal).length]; })()');
 

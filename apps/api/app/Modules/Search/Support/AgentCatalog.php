@@ -2,6 +2,7 @@
 
 namespace App\Modules\Search\Support;
 
+use App\Core\Facades\Settings;
 use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
@@ -434,7 +435,8 @@ final class AgentCatalog
             'title' => (string) $product->title,
             'url' => $product->url,
             'image' => $product->image_url,
-            'brand' => $product->brand,
+            // never where the store's "brand" is who it bought from (search.brand_words off)
+            'brand' => Settings::get('search.brand_words', (string) $product->shop_id) ? $product->brand : null,
             'sku' => $product->sku,
             'price' => $product->price === null ? null : (float) $product->price,
             'regular_price' => $product->on_sale && $product->regular_price !== null ? (float) $product->regular_price : null,

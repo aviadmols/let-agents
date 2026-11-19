@@ -924,6 +924,12 @@
             "scope": "shop"
         },
         {
+            "name": "brand_words",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "vendor_filter",
             "type": "bool",
             "default": false,

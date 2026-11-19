@@ -1762,9 +1762,12 @@ final class BuildSearchIndex
     /** @param  list<string>  $learned  what the scan learned it is and is for, right after its categories */
     private function productWords(CatalogProduct $product, array $learned = []): array
     {
-        $words = array_filter([(string) $product->brand, (string) $product->sku]);
+        // a store whose "brand" is who it bought from keeps it out of its public index (search.brand_words off): the names
+        // were in every product's words, for anyone who opens the file to read (Rocks, 19.11)
+        $brand = Settings::get('search.brand_words', (string) $product->shop_id) ? (string) $product->brand : '';
+        $words = array_filter([$brand, (string) $product->sku]);
         // its Latin name as a shopper types it in Hebrew ("תיק ליגו" for "Herschel LEGO"), first, before the long lists
-        array_push($words, ...Transliterate::hebrew($product->title.' '.$product->brand));
+        array_push($words, ...Transliterate::hebrew($product->title.' '.$brand));
 
         // a category or a tag that says the opposite of the product's own title is none of its words: "חולצה ארוכה Core
         // Thermal" tagged "חולצות טי קצרות" was found for "חולצה קצרה" (Vans, 12.11). Its title is what it is.
@@ -1779,7 +1782,9 @@ final class BuildSearchIndex
         array_push($words, ...$learned);
 
         array_push($words, ...array_values(array_filter(array_map('strval', (array) ($product->payload['tags'] ?? [])), $fits)));
-        array_push($words, ...array_map('strval', (array) ($product->payload['brands'] ?? [])));
+        if ($brand !== '') {
+            array_push($words, ...array_map('strval', (array) ($product->payload['brands'] ?? [])));
+        }
 
         foreach ($product->storeAttributes() as $attribute) {
             array_push($words, ...array_map('strval', $attribute['values']));
