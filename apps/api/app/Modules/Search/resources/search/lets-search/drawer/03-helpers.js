@@ -1,4 +1,14 @@
   // ---------------------------------------------------------------- tiny helpers
+  // a long list read a slice at a time (about 25 ms each), the page free between them; done() after the last
+  function inSlices(list, fn, done) {
+    var i = 0, now = function () { return win.performance && win.performance.now ? win.performance.now() : Date.now(); };
+    var next = S.engine && S.engine.yielder ? S.engine.yielder() : function (f) { setTimeout(f, 0); };
+    (function step() {
+      var end = now() + 50;
+      while (i < list.length) { fn(list[i++]); if (now() >= end) { next(step); return; } }
+      done();
+    })();
+  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]; }); }
   // The store's privacy policy, a link after every "keep my details" consent (Shopify review, 18.11); none when the store
   // has none we know of. It opens apart, so the form keeps what was typed.

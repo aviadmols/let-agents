@@ -251,9 +251,11 @@
         var s = stemmed(w);
         if (!w || !s || seen[s]) { return; }
         seen[s] = 1;
-        (w.length >= 3 && storeShare(wordForms(w)) > SUBJECT_SHARE ? out.subject : out.w).push(s);
+        // while each product's words are still being read (loadIndex), no word is weighed against them: the whole store read at
+        // once held the page; the screen is drawn again when they are in, and only then is the reading kept
+        (!S.warming && w.length >= 3 && storeShare(wordForms(w)) > SUBJECT_SHARE ? out.subject : out.w).push(s);
       });
-    askRead[q] = out;
+    if (!S.warming) { askRead[q] = out; }
     return out;
   }
   // Two questions are one when they ask about the same words: two thirds of the shorter's are the other's, and those are

@@ -24,17 +24,35 @@
     if (S.indexing) { return S.indexing; }
     S.indexing = json(API + '/search/' + SITE + '/index?locale=' + LANG, { wait: 60000 }).then(function (r) {
       var d = r.body || {};
-      S.index = d; S.config = d.config || {}; S.facets = d.facets || [];
+      S.config = d.config || {}; S.facets = d.facets || [];
       (d.items || []).forEach(function (it) { if (it.url != null) { it.url = safeUrl(it.url); } if (it.img != null) { it.img = safeUrl(it.img); } if (it.i2 != null) { it.i2 = safeUrl(it.i2); } S.records[it.id] = it; });
-      if (S.engine && S.engine.build) {
-        try { S.built = S.engine.build((d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '', tags: i.tg || null, kinds: i.kd || null }; })); } catch (e) { S.built = null; }
-      }
-      // the index carries the shop's look too (and is all a preview reads): the same choices as /look
-      if (S.config.theme) { applyLook(S.config); }
-      if (!CFG.assistant) { CFG.assistant = (S.config.shopName || 'Lets') + ' AI'; }
-      shopSettings();
-      render();
-      return d;
+      var items = (d.items || []).map(function (i) { return { id: i.id, title: i.title, keywords: i.kw || '', tags: i.tg || null, kinds: i.kd || null }; });
+      // built a slice at a time, the page free between them, and then each product's words read the same way (what the opening
+      // screen weighs them by): done at once, they held a phone's page for 4 to 9 seconds after the first tap (Rocks, 19.11).
+      // The index counts as here once it is built, so nothing searches a half of it.
+      return new Promise(function (resolve) {
+        if (!S.engine || !S.engine.build) { resolve(); return; }
+        var made = function (built) {
+          S.built = built;
+          // searching waits for nothing more; the words of each product, for what the opening screen weighs them by, go on
+          // behind it (askWords waits for them, then the screen is drawn again)
+          S.warming = true;
+          inSlices((d.items || []).filter(function (r) { return r.t === 'product'; }), function (r) { try { recForms(r); } catch (e) { /* read when asked */ } }, function () {
+            S.warming = false;
+            if (S.open) { render(); }
+          });
+          resolve();
+        };
+        try { if (S.engine.buildAsync) { S.engine.buildAsync(items, made); } else { made(S.engine.build(items)); } } catch (e) { S.built = null; resolve(); }
+      }).then(function () {
+        S.index = d;
+        // the index carries the shop's look too (and is all a preview reads): the same choices as /look
+        if (S.config.theme) { applyLook(S.config); }
+        if (!CFG.assistant) { CFG.assistant = (S.config.shopName || 'Lets') + ' AI'; }
+        shopSettings();
+        render();
+        return d;
+      });
     }, function (e) {
       // not kept failed: the next search asks for the index again
       S.indexing = null;

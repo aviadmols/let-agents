@@ -182,12 +182,44 @@
 
   /** items: [{ id, title, keywords }] */
   function build(items) {
+    var b = builder(items);
+    b.run(Infinity);
+    return b.result();
+  }
+
+  /**
+   * The same index as build(), made a slice at a time (about 25 ms each), the page free between them: built at once it held
+   * a phone's page for seconds after the drawer's first tap (Rocks, 2,000 products: 4 s at a mid phone's speed, 19.11), the
+   * keyboard and every tap waiting behind it. done(index) when it is whole.
+   */
+  function buildAsync(items, done) {
+    var b = builder(items);
+    var next = yielder();
+    var step = function () {
+      if (b.run(50)) { done(b.result()); } else { next(step); }
+    };
+    step();
+  }
+
+  // the next slice as soon as the page has had its turn: a message, never a timer (a timer waits 4 ms more each time, and
+  // the build took twice as long, 19.11); a timer where there are no messages
+  function yielder() {
+    if (typeof MessageChannel === 'undefined') { return function (fn) { setTimeout(fn, 0); }; }
+    var channel = new MessageChannel(), queue = [];
+    channel.port1.onmessage = function () { var fn = queue.shift(); if (fn) { fn(); } };
+    return function (fn) { queue.push(fn); channel.port2.postMessage(0); };
+  }
+
+  function builder(items) {
     var records = [];
     var list = [];
     var holders = {};
     var postings = {};
+    var at = 0, n = 0;
+    var now = function () { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); };
 
-    for (var at = 0; at < items.length; at++) {
+    // one record's words into the index
+    var addItem = function (at) {
       var item = items[at];
       var name = normalize(item.title);
       // [[phrase, weight], …]: each word of a tag, at the weight of the most central tag that holds it
@@ -218,9 +250,10 @@
           owners.push(at);
         }
       }
-    }
+    };
 
-    for (var n = 0; n < list.length; n++) {
+    // one catalogue word's pieces into the postings
+    var addWord = function (n) {
       var vector = wordVector(list[n]);
       for (var p = 0; p < vector.pieces.length; p++) {
         var piece = vector.pieces[p];
@@ -229,9 +262,24 @@
         }
         postings[piece].push(n, vector.weights[piece]);
       }
-    }
+    };
 
-    return { items: records, list: list, holders: holders, postings: postings };
+    return {
+      // goes on until done or the time is up; true when the index is whole
+      run: function (ms) {
+        var end = now() + ms;
+        while (at < items.length) {
+          addItem(at++);
+          if (now() >= end) { return at >= items.length && list.length === 0; }
+        }
+        while (n < list.length) {
+          addWord(n++);
+          if (now() >= end) { return n >= list.length; }
+        }
+        return true;
+      },
+      result: function () { return { items: records, list: list, holders: holders, postings: postings }; },
+    };
   }
 
   /** @return {{words: string[], score: Object}} close catalogue words in the order PHP keeps them */
@@ -1482,6 +1530,8 @@
     sound: sound,
     fromKeyboard: fromKeyboard,
     build: build,
+    buildAsync: buildAsync,
+    yielder: yielder,
     closeWords: closeWords,
     colorOf: colorOf,
     search: search,
