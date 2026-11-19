@@ -163,6 +163,7 @@
     D.classList.toggle('is-saved', S.tab === 'saved');
     var edge = D.querySelector('.ls-edge'), big = S.expanded || !!S.wide;
     edge.setAttribute('aria-label', t(big ? 'shrink' : 'expand')); edge.querySelector('.ls-edge__tip').textContent = t(big ? 'shrink' : 'expand'); edge.setAttribute('aria-pressed', String(big));
+    D.querySelector('.ls-shrink').hidden = !big;
     // the live results sit over the conversation only; the wide grid and the saved list have the whole body
     SUG.classList.toggle('is-away', S.tab !== 'chat' || !!S.wide);
     if (S.tab === 'saved') { FLOW.innerHTML = savedView(); return; }

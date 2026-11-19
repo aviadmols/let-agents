@@ -374,7 +374,7 @@
 /* overflow menu */
 .ls-menu { position: absolute; z-index: 10; inset-block-start: 56px; inset-inline-end: 12px; min-width: 200px; padding: 6px; border-radius: var(--lsp-r-md); background: var(--ls-bg); box-shadow: var(--lsp-shadow-md), 0 0 0 1px var(--ls-line); transform-origin: top left; animation: ls-panel-in 160ms var(--lsp-ease-out); }
 [dir="rtl"] .ls-menu { transform-origin: top right; }
-.ls-menu[hidden] { display: none; }
+.ls-menu[hidden], .ls-shrink[hidden] { display: none; }
 .ls-menu .ls-row { min-height: 40px; font-size: var(--lsp-text-md); }
 .ls-menu { width: 288px; max-width: calc(100% - 24px); }
 .ls-menu.is-sub { animation: ls-menu-sub 220ms var(--lsp-ease-out); }
@@ -486,6 +486,7 @@
   .ls-drawer .ls-grid { gap: 18px 12px; }
   .ls-drawer.is-wide .ls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ls-edge { display: none; }
+  .ls-shrink { display: none; }
   .ls-drawer.is-expanded { width: 100%; }
   .ls-drawer.is-expanded .ls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
   .ls-drawer.is-expanded .ls-dbody, .ls-drawer.is-wide .ls-dbody { padding-inline: 16px; }

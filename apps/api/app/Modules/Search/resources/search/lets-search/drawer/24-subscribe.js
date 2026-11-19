@@ -1,17 +1,18 @@
   // ---------------------------------------------------------------- search subscriptions
   // Search Subscriptions (the design of 18.11, docs: lets-search-subscriptions): a shopper follows a search and gets one
   // email a week at most with its new products in stock. Only where the store has it (the index's config.subscribe, sent
-  // only for a store whose plan carries it and that turned it on), and only under a search sent: never while typing,
-  // never for letters at random (resultsHtml decides where: subsHead, subsTail).
+  // only for a store whose plan carries it and that turned it on), under the results of a search sent and under the live
+  // results once they have come (Aviad, 19.11: wherever results with filters show, with no Enter), never while they load
+  // (resultsHtml decides where: subsHead, subsTail).
   //   1. the offer at the end of the newest search's results, or only in the no-exact-match state (config.subscribe.at);
   //   2. the same card opened in place into its form: the address, an unchecked consent, the button off until both;
   //   3. "Almost there! Check your email" (nothing is sent before the shopper confirms from that email);
   //   4. the bar above the results of a search this browser already follows, confirmed.
-  // The offer's X hides it for 30 days in this browser, and for the rest of this visit even where storage is blocked.
+  // The offer's X hides it for the rest of this visit (Aviad, 19.11: not for 30 days), even where storage is blocked.
   // What this browser remembers per search is the server's token only (it names no address): whether the search is
   // confirmed, and the way to stop it from the bar. The address typed stays in memory for this page, never stored, and is
   // never filled in from a logged-in customer.
-  var SUBS_KEY = 'ls_subs', SUBS_HIDE_DAYS = 30;
+  var SUBS_KEY = 'ls_subs', SUBS_HIDDEN = false;
   var SUBS_UI = {};       // by turn: { mode: 'form' | 'sent', email, ok, busy, err }
   var SUBS_ASKED = {};    // tokens whose state was asked on this page
   var SUBS_OFF = false;   // the server said no (the store turned it off since the index was read)
@@ -27,11 +28,13 @@
     if (token) { d.q[k] = { t: token, s: state }; } else { delete d.q[k]; }
     store('local', SUBS_KEY, d);
   }
-  function subsHidden() {
-    if (store('session', 'ls_subs_x')) { return true; }
-    var d = subsData();
-    return !!d.hide && d.hide > Date.now();
-  }
+  function subsHidden() { return SUBS_HIDDEN || !!store('session', 'ls_subs_x'); }
+  // the live results are on the screen, over the conversation: the one offer is theirs
+  function subsLiveOn() { return !!S.live && SUG.classList.contains('is-on'); }
+  // a turn whose results are still coming gets nothing yet (the live results wait for the index and the server)
+  function subsReady(turn) { return !!turn && turn.kind === 'results' && !turn.loading && !turn.error && !(turn === S.live && (turn.waiting || turn.pending)); }
+  // drawn again where it shows: the conversation, and the live results when they are on
+  function subsDraw() { render(); if (S.live) { renderLive(false); } }
   // words that may be followed, as the server keeps them: no address, no phone, no markup, not too long
   function subsKeepable(q) {
     q = String(q || '').trim();
@@ -53,7 +56,7 @@
 
   // 4. above the results of a search followed here, confirmed; one still waiting is asked about, once a page
   function subsAbove(turn) {
-    if (!subsCfg() || !turn || turn === S.live || turn.kind !== 'results' || turn.loading || turn.error) { return ''; }
+    if (!subsCfg() || !subsReady(turn)) { return ''; }
     var e = subsEntry(turn.q);
     if (!e) { return ''; }
     if (e.s !== 'active') { subsCheck(turn.q, e); return ''; }
@@ -64,12 +67,14 @@
   // 1–3. at the end of the results (noMatch: the no-exact-match state, where the store may want it only)
   function subsAfter(turn, noMatch) {
     var cfg = subsCfg();
-    if (!cfg || !turn || turn === S.live || turn.kind !== 'results' || turn.loading || turn.error || !subsKeepable(turn.q)) { return ''; }
+    if (!cfg || !subsReady(turn) || !subsKeepable(turn.q)) { return ''; }
     var e = subsEntry(turn.q), ui = SUBS_UI[turn.id];
+    // the live results keep one id while the words change: a form or a "sent" of other words is not this search's
+    if (ui && ui.q !== turn.q) { delete SUBS_UI[turn.id]; ui = null; }
     if (e && e.s === 'active') { return ''; }
     if (ui && ui.mode === 'sent') { return subsSentHtml(turn, ui); }
     if (ui && ui.mode === 'form') { return subsFormHtml(turn, ui); }
-    if ((cfg.at === 'no_match' && !noMatch) || subsHidden() || turn !== subsNewest()) { return ''; }
+    if ((cfg.at === 'no_match' && !noMatch) || subsHidden() || (turn === S.live ? !subsLiveOn() : subsLiveOn() || turn !== subsNewest())) { return ''; }
     return '<div class="ls-sub" data-ss-card>' + subsX(t('subClose'), 'hide') +
       '<span class="ls-sub__tile" aria-hidden="true"><svg class="ls-sub__bell" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span>' +
       '<div class="ls-sub__text"><p class="ls-sub__title">' + subsSay('subTitle')(turn.q) + '</p><p class="ls-sub__line">' + esc(t('subLine')) + '</p></div>' +
@@ -100,7 +105,7 @@
     setTimeout(function () {
       subsPost('/subscription', { token: e.t }).then(function (r) {
         var st = r.ok && r.body ? r.body.status : null;
-        if (st === 'active') { subsRemember(q, e.t, 'active'); render(); } else if (st === 'stopped' || st === 'none') { subsRemember(q, null); }
+        if (st === 'active') { subsRemember(q, e.t, 'active'); subsDraw(); } else if (st === 'stopped' || st === 'none') { subsRemember(q, null); }
       }).catch(function () { /* asked again on the next page */ });
     }, 0);
   }
@@ -124,26 +129,23 @@
   root.addEventListener('click', function (e) {
     var el = e.target.closest && e.target.closest('[data-ss]');
     if (!el) { return; }
-    var sec = el.closest('[data-tid]'), turn = sec ? turnById(sec.dataset.tid) : null, act = el.dataset.ss;
+    var sec = el.closest('[data-tid]'), turn = el.closest('.ls-turn--live') ? S.live : sec ? turnById(sec.dataset.tid) : null, act = el.dataset.ss;
     if (!turn) { return; }
     e.preventDefault();
     var ui = SUBS_UI[turn.id];
-    if (act === 'open') { SUBS_UI[turn.id] = { mode: 'form', email: SUBS_EMAIL, ok: false, busy: false, err: '' }; render(); subsFocusEmail(turn.id); return; }
-    if (act === 'cancel') { delete SUBS_UI[turn.id]; render(); return; }
-    if (act === 'hide') {
-      var d = subsData(); d.hide = Date.now() + SUBS_HIDE_DAYS * 864e5; store('local', SUBS_KEY, d); store('session', 'ls_subs_x', 1);
-      render(); return;
-    }
-    if (act === 'change' && ui) { ui.mode = 'form'; ui.err = ''; render(); subsFocusEmail(turn.id); return; }
+    if (act === 'open') { SUBS_UI[turn.id] = { mode: 'form', q: turn.q, email: SUBS_EMAIL, ok: false, busy: false, err: '' }; subsDraw(); subsFocusEmail(turn.id); return; }
+    if (act === 'cancel') { delete SUBS_UI[turn.id]; subsDraw(); return; }
+    if (act === 'hide') { SUBS_HIDDEN = true; store('session', 'ls_subs_x', 1); subsDraw(); return; }
+    if (act === 'change' && ui) { ui.mode = 'form'; ui.err = ''; subsDraw(); subsFocusEmail(turn.id); return; }
     if (act === 'resend' && ui && !ui.busy) {
-      ui.busy = true; render();
-      subsSend(turn, ui).then(function (err) { render(); toast(err === 'off' ? t('subErrLater') : err || t('subResent')); });
+      ui.busy = true; subsDraw();
+      subsSend(turn, ui).then(function (err) { subsDraw(); toast(err === 'off' ? t('subErrLater') : err || t('subResent')); });
       return;
     }
     if (act === 'stop') {
       var en = subsEntry(turn.q);
       subsRemember(turn.q, null);
-      render(); toast(t('subStopped'));
+      subsDraw(); toast(t('subStopped'));
       if (en && en.t) { subsPost('/subscription/stop', { token: en.t }).catch(function () { /* the email's own link still stops it */ }); }
     }
   });
@@ -164,13 +166,13 @@
     var turn = turnById(f.dataset.ssForm), ui = turn && SUBS_UI[turn.id];
     if (!ui || ui.busy) { return; }
     ui.email = String(f.email.value || '').trim(); ui.ok = f.consent.checked; SUBS_EMAIL = ui.email;
-    if (!subsEmailOk(ui.email)) { ui.err = t('subErrEmail'); render(); subsFocusEmail(turn.id); return; }
+    if (!subsEmailOk(ui.email)) { ui.err = t('subErrEmail'); subsDraw(); subsFocusEmail(turn.id); return; }
     if (!ui.ok) { return; }
     ui.err = ''; ui.busy = true;
-    render();
+    subsDraw();
     subsSend(turn, ui).then(function (err) {
-      if (err === 'off') { delete SUBS_UI[turn.id]; render(); return; }
-      ui.err = err; render();
+      if (err === 'off') { delete SUBS_UI[turn.id]; subsDraw(); return; }
+      ui.err = err; subsDraw();
       if (err) { subsFocusEmail(turn.id); }
     });
   });
