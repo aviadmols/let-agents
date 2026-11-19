@@ -1167,21 +1167,6 @@ final class SearchCatalog
                 $pictures = array_values(array_filter($pictures, $keep));
                 $this->trace?->dropped($before, $ids(), 'not_all_words');
             }
-            // A karat asked is held by everything shown (HebrewSearch::PRECISE): by meaning or by picture a 14K ring is near
-            // "טבעת 21K", and was shown (Rocks, 18.11: 46 rings of other karats). What the words found already holds it.
-            if (array_filter(preg_split('/\s+/u', $query) ?: [], fn (string $w): bool => preg_match(HebrewSearch::PRECISE, $w) === 1) !== []) {
-                $before = $ids();
-                $held = [];
-                foreach ($spelling as $hit) {
-                    $held[$hit['id']] = true;
-                }
-                $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
-                $meaning = array_values(array_filter($meaning, $keep));
-                $pictures = array_values(array_filter($pictures, $keep));
-                $described = array_values(array_filter($described, $keep));
-                $termHits = array_values(array_filter($termHits, $keep));
-                $this->trace?->dropped($before, $ids(), 'precise_value');
-            }
             // "טופז": one word that many products hold as typed is what the shopper asked for. The stones only close to
             // it by meaning or by picture (citrine, a yellow sapphire) are left out. When few hold it ("בטריה" in a store
             // that says "סוללה"), the meaning fills in as before.
@@ -1254,6 +1239,18 @@ final class SearchCatalog
             }
             if (isset($held)) {
                 $guided = array_values(array_filter($guided, fn (string $id): bool => isset($held[$id])));
+            }
+            // A karat asked is held by every product shown, whatever found it (HebrewSearch::PRECISE): the words as the
+            // store writes them ("טבעת זהב" read as its gold rings), the meaning, the pictures, the descriptions. "טבעת 21K"
+            // showed 46 rings of other karats, "טבעת זהב 21 קראט" 1,148 (Rocks, 18.11). Read from the index itself.
+            $karatHeld = self::preciseHolders($index['engine'] ?? [], $query);
+            if ($karatHeld !== null) {
+                $before = $ids();
+                $keep = fn (string $id): bool => isset($karatHeld[$id]) || ! str_starts_with($id, 'p:');
+                $spelling = array_values(array_filter($spelling, fn (array $hit): bool => $keep((string) $hit['id'])));
+                [$meaning, $pictures, $guided, $described, $termHits, $pinned, $subject] = array_map(fn (array $list): array => array_values(array_filter($list, fn ($id): bool => $keep((string) $id))), [$meaning, $pictures, $guided, $described, $termHits, $pinned, $subject]);
+                $translatedHeld = array_values(array_filter($translatedHeld ?? [], fn ($id): bool => $keep((string) $id)));
+                $this->trace?->dropped($before, $ids(), 'precise_value');
             }
             $ranked = $this->merge($spelling, [$meaning, $pictures, $guided, $described, $termHits], [...$pinned, ...$subject, ...($translatedHeld ?? [])], [1.0, 1.0, self::GUIDED_WEIGHT, self::DESCRIBED_WEIGHT, 1.0]);
             // The guides by meaning after those the words found, each once.
@@ -3983,6 +3980,33 @@ final class SearchCatalog
         return array_any($values, fn (string $label): bool => ! array_any($carried, fn (int $code): bool => intdiv($code, 1000) === $at
                 && array_diff($words((string) ($facets[$at]['v'][$code % 1000]['l'] ?? '')), $words($label)) !== [])
             && HebrewSearch::says($text, $label));
+    }
+
+    /**
+     * The products that hold every exact value the query asks (HebrewSearch::PRECISE: "21k"), as the index's own words
+     * say; null when the query asks none.
+     *
+     * @param  array<string, mixed>  $engine
+     * @return array<string, true>|null
+     */
+    private static function preciseHolders(array $engine, string $query): ?array
+    {
+        $held = null;
+        foreach (preg_split('/\s+/u', HebrewSearch::normalize($query)) ?: [] as $word) {
+            if (preg_match(HebrewSearch::PRECISE, $word) !== 1) {
+                continue;
+            }
+            $ids = [];
+            foreach ((array) ($engine['holders'][$word] ?? []) as $at) {
+                $id = (string) ($engine['items'][$at]['id'] ?? '');
+                if ($id !== '') {
+                    $ids[$id] = true;
+                }
+            }
+            $held = $held === null ? $ids : array_intersect_key($held, $ids);
+        }
+
+        return $held;
     }
 
     private static function whole(array $hits): array
