@@ -618,7 +618,7 @@ final class ExpertBankTest extends TestCase
 
         $this->assertStringContainsString('sandals', $texts[0]['head'], 'the path\'s parts are read as categories');
         $this->assertStringContainsString('elegant collection', $texts[0]['head']);
-        $this->assertStringNotContainsString('women-sandals', $texts[0]['head'], 'a plain tag is not what it is');
+        $this->assertStringContainsString('women-sandals', $texts[0]['head'], 'a plain tag says what it is too');
         $this->assertSame(['SALE', 'Women Sale', 'Sandals', 'Women'], $facts['sample'][0]['categories']);
         $this->assertSame(['women-sandals'], $facts['sample'][0]['tags']);
     }

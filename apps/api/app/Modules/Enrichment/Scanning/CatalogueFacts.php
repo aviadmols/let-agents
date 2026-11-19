@@ -80,8 +80,10 @@ final class CatalogueFacts
                 ksort($attributes, SORT_STRING);
                 $description = TextNormalizer::clean(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</li>'], "\n", $product->description())));
 
-                // The title, the store's type and its categories say what a product is; the rest says what it is like.
-                $fields = implode(self::BETWEEN, array_filter([$title, $type, ...$categories], fn (string $part): bool => $part !== ''));
+                // The title, the store's type, its categories and its tags say what a product is (Naot, 19.11: "Backstrap
+                // Sandal" was a tag on 53 products whose titles are model names); the rest says what it is like. A tag that
+                // misfiles a product is the type audit's to catch, as a category that does.
+                $fields = implode(self::BETWEEN, array_filter([$title, $type, ...$categories, ...$tags], fn (string $part): bool => $part !== ''));
                 $own = implode(self::BETWEEN, [...$tags, ...array_map(fn (string $name, array $values): string => $name.': '.implode(', ', $values), array_keys($attributes), $attributes)]);
                 $head = TextNormalizer::forMatching($fields);
                 $full = TextNormalizer::forMatching($fields.self::BETWEEN.$own.self::BETWEEN.mb_substr($description, 0, self::HEAD));
