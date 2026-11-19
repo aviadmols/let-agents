@@ -300,6 +300,28 @@ final class GoesWithTest extends TestCase
         $this->assertSame([], $found['shares']['n2'], 'the rope chain shares nothing the earrings are');
     }
 
+    /**
+     * "מאוד אהבתי את הטבעת הזאת איזה שרשראות יכולים להיות באותו הסגנון?" (Rocks, 19.11) was answered in general words: a
+     * kind asked in the product's style is a match, and so is "…בסגנון הזה" naming another kind. More of the product's own
+     * kind in its style is still the similar products, as before.
+     */
+    public function test_another_kind_in_the_products_style_is_a_match_and_its_own_kind_stays_similar(): void
+    {
+        $this->rocks();
+
+        foreach (['מאוד אהבתי את הצמיד הזה, איזה טבעות יכולות להיות באותו הסגנון?', 'יש לכם טבעת בסגנון הזה?'] as $question) {
+            $this->calls = [];
+            $this->askWith($question, ['17156'], page: true)->assertOk();
+            $writer = json_decode($this->calls[0]['user'], true);
+            $this->assertSame('טבעת', $writer['analysis']['goes_with']['kind'] ?? null, $question);
+            $this->assertSame(['17156', 'r1', 'r2', 'r3'], $this->idsOf($writer), $question);
+        }
+
+        $this->calls = [];
+        $this->askWith('יש עוד צמידים בסגנון הזה?', ['17156'], page: true)->assertOk();
+        $this->assertArrayNotHasKey('goes_with', json_decode($this->calls[0]['user'], true)['analysis'] ?? [], 'its own kind: the similar products');
+    }
+
     public function test_nothing_of_another_kind_shares_anything_is_said_as_none(): void
     {
         $this->hardware();

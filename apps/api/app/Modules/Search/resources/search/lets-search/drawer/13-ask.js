@@ -11,7 +11,7 @@
   var POINTS_AT_IT = /(^|[^֐-׿a-z])(המוצר|הפריט|הטבעת|התכשיט|[וש]?אותה|[וש]?אותו|הזו|הזה|הזאת|it|this(\s+one)?)([^֐-׿a-z]|$)/i;
   // ...and so does one that asks for something to go with it ("יש טבעת שמתאימה לצמיד?" on the bracelet's page went with no
   // product, and the answer asked which bracelet: Rocks 19.11). Narrow on purpose: "מה מתאים לעור יבש?" is not one.
-  var GOES_WITH_IT = /שמתאימ(?:ה|ים|ות)?\s*ל|(^|[^֐-׿])תואמ(?:ת|ים|ות)?([^֐-׿]|$)|(^|[^֐-׿])סט([^֐-׿]|$)|להשלים|משלימ|(?:שילך|שתלך|ללכת|הולך|הולכת|לשלב)\s+(?:עם|איתו|איתה)|(^|[^֐-׿])[והכלמש]{0,2}(?:יתאימו?|תתאימו?|להתאים|ישתלבו?|תשתלבו?|משתלב(?:ת|ים|ות)?)([^֐-׿]|$)|\bmatch(?:es|ing)?\b|\bgoes?\s+with\b|\bcomplete\s+the\s+look\b/i;
+  var GOES_WITH_IT = /שמתאימ(?:ה|ים|ות)?\s*ל|(^|[^֐-׿])תואמ(?:ת|ים|ות)?([^֐-׿]|$)|(^|[^֐-׿])סט([^֐-׿]|$)|להשלים|משלימ|(?:שילך|שתלך|ללכת|הולך|הולכת|לשלב)\s+(?:עם|איתו|איתה)|(^|[^֐-׿])[והכלמש]{0,2}(?:יתאימו?|תתאימו?|להתאים|ישתלבו?|תשתלבו?|משתלב(?:ת|ים|ות)?)([^֐-׿]|$)|(^|[^֐-׿])ו?באות[וה]\s+(?:ה)?(?:סגנון|סטייל|קו|עיצוב|מראה|גוון|צבע|מוטיב|סדרה|קולקציה|רוח)|(^|[^֐-׿])ו?בסגנון\s+(?:של|דומה|זהה|הזה|הזאת|שלו|שלה)|(?:סגנון|סטייל|מראה)\s+(?:דומה|תואם|זהה)|\bsame\s+(?:style|look|design|vibe|collection|line)\b|\bsimilar\s+(?:style|look)\b|\bin\s+the\s+style\s+of\b|\bmatch(?:es|ing)?\b|\bgoes?\s+with\b|\bcomplete\s+the\s+look\b/i;
   // making it bigger or smaller ("אפשר להגדיל למידה 59?"): on a product's page, that product; how far depends on it (Rocks
   // 15.11: asked in the search box it went as the store's question, without the ring, and a general answer came back)
   var RESIZES_IT = /(^|[^֐-׿a-z])[ול]?(להגדיל|להגדל|להקטין|להקטנ|הגדלה|הגדלת|הקטנה|הקטנת|התאמת\s+מידה|שינוי\s+מידה|resiz)/i;

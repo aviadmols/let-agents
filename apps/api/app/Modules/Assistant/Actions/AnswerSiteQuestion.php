@@ -406,7 +406,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * Asks for something to go with a product: "מתאים/ה ל", "שמתאים", "ללכת עם", "סט", "תואם", "להשלים", "משלים", "match",
      * "goes with", "set", "complete the look". A sign only: what is asked for is the kind the question names (goesWith()).
      */
-    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים|יתאים|יתאימו|תתאים|תתאימו|להתאים|ישתלב|ישתלבו|תשתלב|תשתלבו|משתלב|משתלבת|משתלבים|משתלבות)|לשלב\s+(?:עם|איתו|איתה|איתם)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
+    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים|יתאים|יתאימו|תתאים|תתאימו|להתאים|ישתלב|ישתלבו|תשתלב|תשתלבו|משתלב|משתלבת|משתלבים|משתלבות)|לשלב\s+(?:עם|איתו|איתה|איתם)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|[ו]?באות[וה]\s+(?:ה)?(?:סגנון|סטייל|קו|עיצוב|מראה|גוון|צבע|מוטיב|סדרה|קולקציה|רוח)|[ו]?בסגנון\s+(?:של|דומה|זהה|הזה|הזאת|שלו|שלה)|(?:סגנון|סטייל|מראה)\s+(?:דומה|תואם|זהה)|same\s+(?:style|look|design|vibe|collection|line)|similar\s+(?:style|look)|in\s+the\s+style\s+of|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
 
     /**
      * What the code found to go with the product asked about (goesWith()): the kind asked, the product, and by id what each
@@ -1907,7 +1907,13 @@ final class AnswerSiteQuestion implements TriesQuestions
         // by, never one of them (Sella, 17.11: "עקידה" itself was "the closest", twice). The others on the screen are those
         // asked about; with none, the products nearest it by meaning. Every store, every trade.
         $this->anchors = [];
-        if (preg_match(self::ASKS_SIMILAR, $question) === 1) {
+        // ...unless it names another kind than the product's: "שרשרת בסגנון הזה" on a ring's page is a necklace to go with
+        // it, not more rings (Rocks, 19.11); what it shares with the product is the style asked. A kind named, else as before.
+        $early = preg_match(self::ASKS_SIMILAR, $question) === 1 ? $this->goesWith($shopId, $question, $viewing) : null;
+        if ($early !== null && $early['kind'] === '') {
+            $early = null;
+        }
+        if ($early === null && preg_match(self::ASKS_SIMILAR, $question) === 1) {
             $anchors = array_values(array_unique(array_filter([(string) $viewing, ...$this->namedProducts($question), ...(count($shown) === 1 ? [(string) $shown[0]] : [])])));
             if ($anchors !== []) {
                 $others = array_values(array_diff(array_map('strval', $shown), $anchors));
@@ -1919,7 +1925,7 @@ final class AnswerSiteQuestion implements TriesQuestions
         // with it. The store's products of that kind, those sharing most with it first, found by code (ProductsGoingWith),
         // beside the product itself; nothing else, so no product of another kind is offered as one (Rocks, 19.11: on the
         // bracelet's page the writer had the bracelet alone and answered with a paragraph and no ring). Every store.
-        $this->goesWith = $this->anchors === [] ? $this->goesWith($shopId, $question, $viewing) : null;
+        $this->goesWith = $early ?? ($this->anchors === [] ? $this->goesWith($shopId, $question, $viewing) : null);
         if ($this->goesWith !== null) {
             $viewing = $this->goesWith['anchor'];
             $shown = [$viewing, ...$this->goesWith['ids']];
