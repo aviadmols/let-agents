@@ -280,7 +280,7 @@
           if (vgs.length && r.v && !r.v.some(function (x) { return (!stock || x[1] === 1) && vgs.every(function (g) { return groups[g].some(function (code) { return x[0].indexOf(code) >= 0; }); }); })) { return false; }
           return Object.keys(groups).every(function (g) {
             if (r.v && vgs.indexOf(g) >= 0) { return true; }
-            return (all && together.indexOf(g) >= 0) || andGroup(g) ? groups[g].every(function (code) { return holds(r, code); }) : groups[g].some(function (code) { return holds(r, code); });
+            return (all && together.indexOf(g) >= 0) || allOf(g) ? groups[g].every(function (code) { return holds(r, code); }) : groups[g].some(function (code) { return holds(r, code); });
           });
         });
       };
@@ -372,6 +372,37 @@
   // counts beside them say (Jean Rachel QA, 16.11: with Organic on, the other tags still counted the whole search). A
   // colour, a size, a category is one of its values: any of them.
   function andGroup(g) { var f = S.facets && S.facets[g]; return !!(f && f.k === 'store_tags'); }
+  // Values chosen together in one filter are all of them where a product holds several of that filter at once: its
+  // stones, its stones' colours, its cuts ("יהלום" and "פנינה": a ring with both; Rocks, 19.11: 3 counted beside "פנינה",
+  // 42 shown, most with no pearl). Read from the store's own products: an attribute at least MULTI_SHARE of whose
+  // products hold two values of it or more, never one counted for a broader one ("יהלום" beside "יהלום מעבדה"). One value
+  // a product has (its metal, karat, style), a size or colour it is sold in, its categories and its type stay any of them.
+  var MULTI_SHARE = 0.15, multiOf = null, multi = {};
+  function allOf(g) {
+    if (andGroup(g)) { return true; }
+    if (multiOf !== S.records) {
+      multi = {}; multiOf = S.records;
+      var any = {}, two = {};
+      Object.keys(S.records || {}).forEach(function (id) {
+        var r = S.records[id], by = {};
+        if (!r || r.t !== 'product') { return; }
+        (r.f || []).forEach(function (code) { var gg = Math.floor(code / 1000); (by[gg] = by[gg] || []).push(code); });
+        Object.keys(by).forEach(function (gg) {
+          var labels = by[gg].map(function (code) { var f = S.facets[gg]; return f && f.v && f.v[code % 1000] ? String(f.v[code % 1000].l) : ''; });
+          // a value only a kind of another it also holds is no second value
+          var own = labels.filter(function (l, i) { return l && !labels.some(function (o, j) { return j !== i && o && under(l, o); }); });
+          any[gg] = (any[gg] || 0) + 1;
+          if (own.length >= 2) { two[gg] = (two[gg] || 0) + 1; }
+        });
+      });
+      (S.facets || []).forEach(function (f, gg) {
+        var kind = String(f && f.k || '');
+        if (!f || kind === 'category' || kind === 'type' || kind === 'deal' || variantFacet(gg)) { return; }
+        multi[gg] = (any[gg] || 0) > 0 && (two[gg] || 0) / any[gg] >= MULTI_SHARE;
+      });
+    }
+    return !!multi[g];
+  }
   // The articles beside the results, narrowed by the filters on that articles carry too (a tag a post was given, the
   // index's f of a content record): "10 to 14 days" keeps the guides about such trips. A filter no article carries (a
   // price, a colour) narrows the products only, and leaves the articles as they were.
@@ -409,7 +440,10 @@
       Object.keys(seen).map(Number).forEach(function (code) {
         // a value read from the words is counted as it is applied, by its words too ("Women's" on, 9 shown, counted 8
         // beside it: Jean Rachel QA, 16.11); a tag with the others chosen, within what they show
-        var g = Math.floor(code / 1000), and = andGroup(g);
+        // ...and every count is what pressing it shows: a value not chosen, with what is chosen (in its own filter too: all of
+        // them where they go together, any of them where not); one chosen in a filter of any, its own (Rocks, 19.11: "פנינה (3)"
+        // added to "יהלום" showed 42)
+        var g = Math.floor(code / 1000), and = allOf(g) || !(f0[code] || a0[code]);
         c.f = and ? Object.assign({}, f0) : without(f0, g); c.auto = and ? Object.assign({}, a0) : without(a0, g);
         if (a0[code] && !f0[code]) { c.auto[code] = true; } else { c.f[code] = true; }
         counts[code] = filtered(turn).length;
@@ -440,7 +474,7 @@
       if (!value || /^(אחר|other)$/i.test(value.l)) { return false; }
       if (onCode(c, code)) { return true; }
       if (!max) { return (held[code] || 0) > 0 && counts[code] > 0; }
-      return counts[code] >= 2 && ((chosenIn[g] && !andGroup(g)) || counts[code] < now);
+      return counts[code] >= 2 && ((chosenIn[g] && !allOf(g)) || counts[code] < now);
     });
     // what the words come close to naming first ("ספרי מופת" puts "ספרי מופת מתורגמים" in the row), then the most held.
     // A value chosen keeps its place, marked by its ✓ and its fill, never moved to the front (as Aviad asked, 11.11):

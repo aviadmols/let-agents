@@ -82,6 +82,38 @@ class DrawerFiltersTest extends TestCase
         $this->assertSame([false, 0, true, true], self::drawer("(function () { var x = turn('', [1, 2, 6], { f: { 2000: true, 2003: true } }); var fc = T.facetChips(x, 0); return [fc.codes.indexOf(2001) >= 0, fc.counts[2001], fc.codes.indexOf(2000) >= 0, fc.codes.indexOf(2003) >= 0]; })()"));
     }
 
+    public function test_values_a_product_holds_several_of_go_together_and_the_counts_are_what_pressing_shows(): void
+    {
+        // Rocks, 19.11: "פנינה (3)" beside a chosen "יהלום" showed 42, most with no pearl. Stones: a ring holds several, so two
+        // chosen are a ring with both. Metal: one a product, so two chosen are either. Each count is what the press shows.
+        $jewels = <<<'JS'
+            S.facets = [
+              { k: 'stone', l: 'אבן', v: [{ k: 'diamond', l: 'יהלום' }, { k: 'pearl', l: 'פנינה' }, { k: 'ruby', l: 'רובי' }] },
+              { k: 'metal', l: 'מתכת', v: [{ k: 'yellow', l: 'זהב צהוב' }, { k: 'white', l: 'זהב לבן' }] }
+            ];
+            S.records = {};
+            [[1, [0, 1, 1000]], [2, [0, 1000]], [3, [1, 1001]], [4, [0, 2, 1001]], [5, [0, 1001]], [6, [2, 1000]]].forEach(function (p) {
+              S.records['p:' + p[0]] = { id: 'p:' + p[0], t: 'product', title: 'טבעת ' + p[0], s: 1, kw: '', f: p[1] };
+            });
+            var all = function () { return Object.keys(S.records).map(function (id) { return S.records[id]; }); };
+            var ids = function (x) { return T.filtered(x).map(function (r) { return r.id; }); };
+            JS;
+        $out = self::drawer('(function () { '.$jewels.
+            "var both = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 0: true, 1: true } });".
+            "var one = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 0: true } });".
+            "var w = T.wouldCounts(one, all());".
+            "var metals = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 1000: true } });".
+            "var wm = T.wouldCounts(metals, all());".
+            "var anyMetal = turn('טבעת', [1, 2, 3, 4, 5, 6], { f: { 1000: true, 1001: true } });".
+            'return [ids(both), w.counts[1], ids(one).length, wm.counts[1001], ids(anyMetal).length]; })()');
+
+        $this->assertSame(['p:1'], $out[0], 'diamond and pearl: the ring with both');
+        $this->assertSame(1, $out[1], 'beside a chosen diamond, pearl counts what pressing it shows');
+        $this->assertSame(4, $out[2]);
+        $this->assertSame(6, $out[3], 'a second metal counts the rings of either, as pressing it shows');
+        $this->assertSame(6, $out[4]);
+    }
+
     public function test_a_sets_count_in_the_answer_is_the_cards_it_shows(): void
     {
         // the server counts each version of a model, the grid one card a model: "Gold necklaces (3)" over two cards
