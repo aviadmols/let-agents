@@ -298,50 +298,6 @@ return [
         'label' => 'Longest answer about colour names',
         'description' => 'How many tokens each model may write in its answer about the night\'s colour names.',
     ],
-    'goes_with_writer_provider' => [
-        'label' => 'Provider that writes the goes-with map',
-        'description' => 'A family other than the checker\'s. When the two families are the same the run fails before any model is asked.',
-    ],
-    'goes_with_writer_model' => [
-        'label' => 'Model that writes the goes-with map',
-        'description' => 'A model that knows the trade. Writes which of the store\'s kinds of products go together, among the kinds it has only.',
-    ],
-    'goes_with_writer_input_usd_per_million' => [
-        'label' => 'Input price for the map writer (per million tokens)',
-        'description' => 'For the cost of each run.',
-    ],
-    'goes_with_writer_output_usd_per_million' => [
-        'label' => 'Output price for the map writer (per million tokens)',
-        'description' => 'For the cost of each run.',
-    ],
-    'goes_with_checker_provider' => [
-        'label' => 'Provider that checks the goes-with map',
-        'description' => 'A family other than the writer\'s.',
-    ],
-    'goes_with_checker_model' => [
-        'label' => 'Model that checks the goes-with map',
-        'description' => 'Scores every pair of kinds and can only remove.',
-    ],
-    'goes_with_checker_input_usd_per_million' => [
-        'label' => 'Input price for the map checker (per million tokens)',
-        'description' => 'For the cost of each run.',
-    ],
-    'goes_with_checker_output_usd_per_million' => [
-        'label' => 'Output price for the map checker (per million tokens)',
-        'description' => 'For the cost of each run.',
-    ],
-    'goes_with_min_score' => [
-        'label' => 'Least score for a pair in the goes-with map',
-        'description' => 'A pair of kinds the checker scored under this is not kept.',
-    ],
-    'goes_with_partners_per_type' => [
-        'label' => 'Partner kinds per kind of product',
-        'description' => 'At most this many kinds the writer pairs with one kind; the rest are removed.',
-    ],
-    'goes_with_max_types' => [
-        'label' => 'Most kinds of products in the map',
-        'description' => 'A store with more kinds has those holding the most products written.',
-    ],
     'expert_bank_writer_provider' => [
         'label' => 'Provider that writes the store\'s bank (experiment)',
         'description' => 'A family other than the checker\'s. When the two families are the same the run fails before any model is asked.',

@@ -61,7 +61,7 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->bind(ReadsCards::class, StoredCards::class);
         // The category names a store's expert bank already sorts into its own attributes: no second filter of them.
         $this->app->bind(ExpertBankNames::class, StoredExpertBankNames::class);
-        // which kinds and which products go together (the goes-with map, the complement relations): read, never asked live
+        // the products the store itself pairs with a product (its complement relations): read at answer time, never a model
         $this->app->bind(GoesWithPartners::class, StoredGoesWithPartners::class);
     }
 

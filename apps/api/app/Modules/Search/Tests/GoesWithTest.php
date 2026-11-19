@@ -19,7 +19,6 @@ use App\Modules\Enrichment\Enums\FactOrigin;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Enums\RelationKind;
 use App\Modules\Enrichment\Models\EnrichmentFact;
-use App\Modules\Enrichment\Models\EnrichmentGoesWithMap;
 use App\Modules\Enrichment\Models\EnrichmentProductRelation;
 use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
@@ -33,9 +32,9 @@ use Tests\TestCase;
 /**
  * The goes-with mechanism the answerer routes to, and only to: a product of another kind to go with the one on the screen
  * (or named by its SKU), a match by look ("יש טבעת שמתאימה לצמיד?", Rocks 19.11: answered with a paragraph and no ring) or
- * what is used with it ("מה עוד צריך למקדחה?"), from the store's own pairings, its goes-with map and the index. Every other
- * question goes through today's flow untouched, byte for byte. The store focuses it: sources, kinds that may be paired,
- * what is never offered, how many are shown.
+ * what is used with it ("מה עוד צריך למקדחה?"), found by code at question time from the store's own pairings and the
+ * index, and handed to the answer prompt. Every other question goes through today's flow untouched, byte for byte. The
+ * store focuses it: sources, kinds that may be paired, what is never offered, how many are shown.
  */
 final class GoesWithTest extends TestCase
 {
@@ -59,6 +58,8 @@ final class GoesWithTest extends TestCase
         Features::override('assistant.site_scope', false);
         LoadedIndex::forget();
         $this->buildShop();
+        // off by default: a store turns it on from its settings page once its answers were checked
+        Features::override('assistant.goes_with', true, $this->shop->id);
         app(TenantContext::class)->runUnscoped(fn () => StoreConnection::query()->create([
             'shop_id' => $this->shop->id, 'site_url' => 'https://store.test', 'access_token' => self::TOKEN,
         ]));
@@ -221,24 +222,24 @@ final class GoesWithTest extends TestCase
         $this->assertNotContains('c4000', $named('מתנה עד 4000 ש"ח'), 'nor an amount the question keeps to');
     }
 
-    /** A hardware store: what else a drill needs is its bits and screws (the store's map), the same system (Makita) first. */
+    /** A hardware store, no map anywhere: what else a drill needs is what of other kinds shares its system (Makita) first. */
     public function test_a_hardware_store_offers_the_bits_and_screws_of_the_drills_own_system_first(): void
     {
-        $this->hardware(withMap: true);
+        $this->hardware();
 
         $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
 
         $writer = json_decode($this->calls[0]['user'], true);
-        $this->assertSame(['d1', 'b1', 's1', 'b2'], $this->idsOf($writer), 'the Makita bits first, the Makita screws, then the Bosch bits; no drill, no glue, no bit out of stock');
+        $this->assertSame(['d1', 'b1', 's1'], $this->idsOf($writer), 'the Makita bits first (nearer in price), then the Makita screws; no drill, and nothing that shares nothing (the Bosch bits, the glue, a bit out of stock)');
         $goes = $writer['analysis']['goes_with'];
-        $this->assertSame('מקדח / בורג', $goes['kind'], 'the kinds the map pairs with a drill');
+        $this->assertSame('', $goes['kind'], 'no kind was named: whatever other kinds go with it');
         $this->assertTrue($goes['complement']);
         $this->assertSame(['Makita'], $goes['matches'][0]['shares'], 'why: the same system');
-        $this->assertSame([], $goes['matches'][2]['shares']);
+        $this->assertSame(['Makita'], $goes['matches'][1]['shares']);
     }
 
-    /** A fashion store: what goes with the dress is a belt or a bag (the map), the one in its colour first. */
-    public function test_a_fashion_store_offers_a_belt_and_a_bag_with_the_dress(): void
+    /** A fashion store: what goes with the dress is what of other kinds shares its colour, the nearer in price first. */
+    public function test_a_fashion_store_offers_what_goes_with_the_dress_by_its_colour(): void
     {
         $facets = [
             ['k' => 'type', 'l' => 'Type', 'v' => [['k' => 'dress', 'l' => 'Dress'], ['k' => 'belt', 'l' => 'Belt'], ['k' => 'bag', 'l' => 'Bag'], ['k' => 'shoes', 'l' => 'Shoes']]],
@@ -250,63 +251,56 @@ final class GoesWithTest extends TestCase
             ['be2', 'Wide Red Belt', [1, 1001], 70, [], 'belt'],
             ['ba1', 'Evening Clutch Bag', [2, 1000], 140, [], 'bag'],
             ['sh1', 'Court Shoes', [3, 1000], 190, [], 'shoes'],
-            ['dr2', 'Shirt Dress', [0, 1001], 280, [], 'dress'],
+            ['dr2', 'Shirt Dress', [0, 1000], 280, [], 'dress'],
         ];
         $this->index($facets, $items, types: ['dress' => 'Dress', 'belt' => 'Belt', 'bag' => 'Bag', 'shoes' => 'Shoes']);
-        $this->map([['dress', 'belt', 'A belt that marks the waist'], ['dress', 'bag', 'A bag for the evening']]);
 
         $this->askWith('What goes with this dress?', ['dr1'], page: true, locale: 'en')->assertOk();
 
         $writer = json_decode($this->calls[0]['user'], true);
-        $this->assertSame(['dr1', 'ba1', 'be1', 'be2'], $this->idsOf($writer), 'the black bag and belt first (the bag nearer the dress in price), the red belt after; no shoes, no other dress');
-        $this->assertSame('Belt / Bag', $writer['analysis']['goes_with']['kind']);
+        $this->assertSame(['dr1', 'sh1', 'ba1', 'be1'], $this->idsOf($writer), 'the black shoes, bag and belt, the nearer in price first; never another dress, and not the red belt that shares nothing');
+        $this->assertSame('', $writer['analysis']['goes_with']['kind']);
+        $this->assertTrue($writer['analysis']['goes_with']['complement']);
         $this->assertSame(['Black'], $writer['analysis']['goes_with']['matches'][0]['shares']);
     }
 
-    public function test_with_no_map_and_no_pairing_of_the_stores_what_else_is_needed_is_said_as_none(): void
+    public function test_nothing_of_another_kind_shares_anything_is_said_as_none(): void
     {
-        $this->hardware(withMap: false);
+        $this->hardware();
 
-        $this->askWith('מה עוד צריך לזה?', ['d1'], page: true)->assertOk();
+        $this->askWith('מה עוד צריך לזה?', ['g1'], page: true)->assertOk();
 
         $writer = json_decode($this->calls[0]['user'], true);
-        $this->assertSame(['d1'], $this->idsOf($writer), 'the drill alone: nothing stands in for what the store never said goes with it');
+        $this->assertSame(['g1'], $this->idsOf($writer), 'the glue alone: no product that only happens to be of another kind stands in');
         $this->assertSame(['kind' => '', 'with' => 'p1', 'found' => 0, 'matches' => [], 'complement' => true], $writer['analysis']['goes_with']);
     }
 
     public function test_the_stores_own_pairing_is_offered_first_where_it_keeps_relations(): void
     {
-        $this->hardware(withMap: false);
+        $this->hardware();
         Features::override('enrichment.relations', true, $this->shop->id);
         $this->relate('d1', 'g1');
 
         $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
 
         $writer = json_decode($this->calls[0]['user'], true);
-        $this->assertSame(['d1', 'g1'], $this->idsOf($writer), 'what the store itself pairs with the drill, though no map names glue');
+        $this->assertSame(['d1', 'g1', 'b1', 's1'], $this->idsOf($writer), 'what the store itself pairs with the drill first, though the glue shares nothing else');
         $this->assertSame(['החנות מציעה אותם יחד'], $writer['analysis']['goes_with']['matches'][0]['shares']);
 
-        // the store turns that source off: nothing is left to offer
+        // the store turns that source off: the glue is no candidate
         Settings::set('assistant.goes_with_use_relations', false, $this->shop->id);
         $this->calls = [];
         $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
-        $this->assertSame(['d1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
+        $this->assertSame(['d1', 'b1', 's1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
     }
 
-    public function test_the_store_focuses_it_by_sources_pairs_of_kinds_and_what_it_never_offers(): void
+    public function test_the_store_focuses_it_by_pairs_of_kinds_and_what_it_never_offers(): void
     {
-        $this->hardware(withMap: true);
-
-        // the map off: what else is needed has no source left
-        Settings::set('assistant.goes_with_use_map', false, $this->shop->id);
-        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
-        $this->assertSame(0, json_decode($this->calls[0]['user'], true)['analysis']['goes_with']['found']);
-        Settings::set('assistant.goes_with_use_map', true, $this->shop->id);
+        $this->hardware();
 
         // never a Bosch, and never screws with a drill: the Makita bits alone
         $this->inShop(fn () => AssistantGoesWithRules::query()->create(['shop_id' => $this->shop->id,
             'pairs' => [['a' => 'screw', 'b' => 'drill', 'allow' => false]], 'never' => [['scope' => 'vendor', 'value' => 'bosch']]]));
-        $this->calls = [];
         $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
         $this->assertSame(['d1', 'b1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
 
@@ -363,7 +357,7 @@ final class GoesWithTest extends TestCase
     }
 
     /** Gueta's drills, bits, screws and glue, with their kinds approved and the vendors the store writes on them. */
-    private function hardware(bool $withMap): void
+    private function hardware(): void
     {
         $facets = [
             ['k' => 'type', 'l' => 'סוג', 'v' => [['k' => 'drill', 'l' => 'מקדחה'], ['k' => 'drill_bit', 'l' => 'מקדח'], ['k' => 'screw', 'l' => 'בורג'], ['k' => 'glue', 'l' => 'דבק']]],
@@ -379,9 +373,6 @@ final class GoesWithTest extends TestCase
             ['g1', 'דבק עץ', [3], 30, [], 'glue'],
         ];
         $this->index($facets, $items, types: ['drill' => 'מקדחה', 'drill_bit' => 'מקדח', 'screw' => 'בורג', 'glue' => 'דבק']);
-        if ($withMap) {
-            $this->map([['drill', 'drill_bit', 'המקדחים שעובדים איתה'], ['drill', 'screw', 'הברגים שמבריגים איתה']]);
-        }
     }
 
     /**
@@ -413,15 +404,6 @@ final class GoesWithTest extends TestCase
         }
         $json = (string) json_encode(['v' => 1, 'items' => $records, 'facets' => $facets], JSON_UNESCAPED_UNICODE);
         $this->inShop(fn () => SearchIndex::query()->create(['shop_id' => $this->shop->id, 'hash' => md5($json), 'items' => $json, 'counts' => [], 'built_at' => now()]));
-    }
-
-    /** A goes-with map that passed, as BuildGoesWithMap stores it: [type, partner type, why]. */
-    private function map(array $pairs): void
-    {
-        $keys = array_values(array_unique(array_merge(array_column($pairs, 0), array_column($pairs, 1))));
-        $this->inShop(fn () => EnrichmentGoesWithMap::query()->create(['shop_id' => $this->shop->id, 'status' => EnrichmentGoesWithMap::PASSED, 'fingerprint' => 'f',
-            'types' => array_map(fn (string $key): array => ['key' => $key, 'label' => $key, 'products' => 1, 'examples' => []], $keys),
-            'pairs' => array_map(fn (array $p): array => ['type' => $p[0], 'partner_type' => $p[1], 'why' => $p[2], 'score' => 92], $pairs)]));
     }
 
     /** The store pairs two products itself (a cross-sell), as ComputeProductRelations keeps it. */

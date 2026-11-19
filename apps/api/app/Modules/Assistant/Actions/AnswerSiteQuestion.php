@@ -2179,7 +2179,6 @@ final class AnswerSiteQuestion implements TriesQuestions
         // which sources the store lets it choose from (GoesWithSettings)
         $sources = [
             'relations' => (bool) Settings::get('assistant.goes_with_use_relations', $shopId),
-            'map' => (bool) Settings::get('assistant.goes_with_use_map', $shopId),
             'look' => (bool) Settings::get('assistant.goes_with_use_look', $shopId),
         ];
         $rules = AssistantGoesWithRules::of($shopId);

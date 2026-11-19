@@ -17,7 +17,7 @@ use UnitEnum;
 
 /**
  * Settings · Products that go together: whether the assistant offers a product to go with the one a shopper asks about
- * (assistant.goes_with), which sources it may use (the store's own pairings, the goes-with map, a match by look), how many
+ * (assistant.goes_with), which sources it may use (the store's own pairings, a match by what products share), how many
  * it shows, which of the store's kinds may be paired with which, and what is never offered (AssistantGoesWithRules). A
  * merchant's screen: what changes for shoppers, no models and no costs.
  */
@@ -60,7 +60,6 @@ class GoesWithSettings extends Page
         return [
             'on' => 'feature:assistant.goes_with',
             'use_relations' => 'setting:assistant.goes_with_use_relations',
-            'use_map' => 'setting:assistant.goes_with_use_map',
             'use_look' => 'setting:assistant.goes_with_use_look',
             'products' => 'setting:assistant.goes_with_products',
             'max_picks' => 'setting:assistant.goes_with_max_picks',

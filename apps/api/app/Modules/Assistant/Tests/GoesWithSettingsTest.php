@@ -70,7 +70,7 @@ final class GoesWithSettingsTest extends TestCase
     {
         Livewire::test(GoesWithSettings::class)
             ->set('data.on', false)
-            ->set('data.use_map', false)
+            ->set('data.use_look', false)
             ->set('data.products', 5)
             ->set('data.max_picks', 2)
             ->call('addPair')
@@ -89,14 +89,14 @@ final class GoesWithSettingsTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertFalse(Features::enabled('assistant.goes_with', $this->shop->id));
-        $this->assertFalse((bool) Settings::get('assistant.goes_with_use_map', $this->shop->id));
+        $this->assertFalse((bool) Settings::get('assistant.goes_with_use_look', $this->shop->id));
         $this->assertTrue((bool) Settings::get('assistant.goes_with_use_relations', $this->shop->id));
         $this->assertSame(5, Settings::get('assistant.goes_with_products', $this->shop->id));
         $this->assertSame(2, Settings::get('assistant.goes_with_max_picks', $this->shop->id));
         $rules = app(TenantContext::class)->run($this->shop->id, fn (): array => AssistantGoesWithRules::of($this->shop->id));
         $this->assertSame([['a' => 'ring', 'b' => 'socks', 'allow' => false], ['a' => 'ring', 'b' => 'earrings', 'allow' => true]], $rules['pairs']);
         $this->assertSame([['scope' => 'vendor', 'value' => 'Pandora']], $rules['never'], 'an empty line is not kept');
-        $this->assertTrue(Features::enabled('assistant.goes_with', Shop::factory()->create()->id), 'another shop keeps the default');
+        $this->assertFalse(Features::enabled('assistant.goes_with', Shop::factory()->create()->id), 'another shop keeps the default: off until the store turns it on here');
     }
 
     public function test_a_pair_of_one_kind_or_of_a_kind_the_store_has_not_saves_nothing(): void

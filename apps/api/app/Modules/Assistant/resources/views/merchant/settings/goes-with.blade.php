@@ -8,7 +8,6 @@
         <div x-data x-bind:style="$wire.data.on ? '' : 'opacity: .5'">
             <div class="lp-set-label">{{ $t('sources') }}</div>
             <x-lp::row :title="$t('use_relations')" :sub="$t('use_relations_sub')"><x-lp::toggle model="data.use_relations" :label="$t('use_relations')" /></x-lp::row>
-            <x-lp::row :title="$t('use_map')" :sub="$t('use_map_sub')"><x-lp::toggle model="data.use_map" :label="$t('use_map')" /></x-lp::row>
             <x-lp::row :title="$t('use_look')" :sub="$t('use_look_sub')"><x-lp::toggle model="data.use_look" :label="$t('use_look')" /></x-lp::row>
 
             <div class="lp-set-label">{{ $t('how_many') }}</div>

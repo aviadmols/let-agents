@@ -10,7 +10,6 @@ use App\Modules\Enrichment\Actions\ActivateExpertBank;
 use App\Modules\Enrichment\Actions\AuditContentReading;
 use App\Modules\Enrichment\Actions\BuildCards;
 use App\Modules\Enrichment\Actions\BuildExpertBank;
-use App\Modules\Enrichment\Actions\BuildGoesWithMap;
 use App\Modules\Enrichment\Actions\BuildStructure;
 use App\Modules\Enrichment\Actions\CollectProviderBatches;
 use App\Modules\Enrichment\Actions\CompleteVocabulary;
@@ -57,12 +56,11 @@ use Illuminate\Console\Command;
  *   enrichment expert-bank gueta-avigdor --show     (the last report, as the filters a shopper would get)
  *   enrichment expert-bank gueta-avigdor <id> --activate   (a bank that passed becomes the store's vocabulary)
  *   enrichment expert-bank gueta-avigdor --deactivate      (and back: the vocabularies it replaced return)
- *   enrichment goes-with-map gueta-avigdor          (which kinds go together, once; --force asks again)
  */
 final class EnrichmentCommand extends Command
 {
     protected $signature = 'enrichment
-        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, goes-with-map, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
+        {step : nightly, complete, collect, vocabulary, schema, structure, expert-bank, code, cards, words, content, audit, promises, tasks, results, rankings, rules or relations}
         {target? : shop slug, or batch ID for results; none with --scheduled}
         {argument? : task type for tasks, results file for results, the id of a stored report for expert-bank --show or --activate}
         {--template= : vocabulary template name}
@@ -108,8 +106,6 @@ final class EnrichmentCommand extends Command
             'structure' => $this->shopStep(fn (Shop $shop): Run => app(BuildStructure::class)->handle($shop->id, (bool) $this->option('force'))),
             // An experiment: a bank written for this store alone, measured and checked, kept as a report. Activates nothing.
             'expert-bank' => $this->expertBank(),
-            // Which of the store's kinds of products go together, written once and read by the assistant (--force asks again).
-            'goes-with-map' => $this->shopStep(fn (Shop $shop): Run => app(BuildGoesWithMap::class)->handle($shop->id, (bool) $this->option('force')), BuildGoesWithMap::FEATURE),
             'audit' => $this->shopStep(fn (Shop $shop): Run => app(AuditContentReading::class)->handle($shop->id), 'enrichment.weekly_audit'),
             'content' => $this->shopStep(fn (Shop $shop): Run => app(ReadContentInCode::class)->handle($shop->id)),
             'promises' => $this->shopStep(fn (Shop $shop): Run => app(ReadPromisesInCode::class)->handle($shop->id)),

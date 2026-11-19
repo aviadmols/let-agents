@@ -10,7 +10,8 @@ use App\Modules\Search\Actions\BuildSearchIndex;
 use App\Modules\Tenancy\Models\Shop;
 
 /**
- * The products of another kind that go with a product, read off the store's search index (ProductsGoingWith). Code only,
+ * The products of another kind that go with a product, read off the store's search index at question time
+ * (ProductsGoingWith): code finds the candidates and hands them to the answer prompt, which composes the answer. Code only,
  * any store, no word list of its own: the kinds are the index's type filter (else its one-word categories), the shared
  * values its filters, the shared words its titles, keywords and the product's description.
  *
@@ -18,13 +19,13 @@ use App\Modules\Tenancy\Models\Shop;
  *
  * - a match ("יש טבעת שמתאימה לצמיד?" on a two-tone 14K chain-link bracelet, Rocks 19.11, answered with a paragraph and no
  *   ring): the kind the question names, its products in stock, those sharing most with the product first;
- * - a complement ("מה עוד צריך למקדחה?", "what goes with this dress?"): the kinds the store's goes-with map pairs with the
- *   product's kind (GoesWithPartners), and the products the store itself pairs with it (its cross-sells, what is bought
- *   together), when the shop lets each source be read ($sources).
+ * - a complement, no kind named ("מה עוד צריך למקדחה?", "what goes with this dress?"): the products of other kinds than
+ *   the product's own, never the same kind, those that share something with it, ranked the same way.
  *
  * Each candidate is weighed by what it shares with the product:
  *
- * - the store pairing them (a complement relation): most of all;
+ * - the store pairing them itself (a complement relation: its cross-sells, what is bought together; GoesWithPartners,
+ *   where the shop lets them be read): most of all;
  * - each filter value both carry (its metal, colour, karat, stone, style, collection, brand), by how few products carry it: a
  *   value every product has says nothing. Never the kind itself, a sale, a size, a length or whom it is for; never a
  *   value a check refused for either; half for a value read weakly. A filter where both have values and none shared
@@ -35,7 +36,8 @@ use App\Modules\Tenancy\Models\Shop;
  *   description too. Never a word that names a kind;
  * - how near its price is, a tie-breaker only.
  *
- * None of the kind in stock: none, never another kind instead (the store's rule: fewer or none, never unrelated).
+ * None of the kind in stock, or nothing of another kind that shares anything: none, never another product instead (the
+ * store's rule: fewer or none, never unrelated).
  */
 final class GoingWith implements ProductsGoingWith
 {
@@ -93,57 +95,20 @@ final class GoingWith implements ProductsGoingWith
         if ($index === null || $own === null || trim($question) === '' || $limit < 1) {
             return null;
         }
-        $use = ['relations' => true, 'map' => true, 'look' => true];
-        foreach ($use as $source => $default) {
-            $use[$source] = (bool) ($sources[$source] ?? $default);
-        }
+        $use = ['relations' => (bool) ($sources['relations'] ?? true), 'look' => (bool) ($sources['look'] ?? true)];
         $facets = array_values((array) ($index['facets'] ?? []));
         $asked = self::askedKind($index, $facets, $question, $own);
-        $asksComplement = preg_match(self::ASKS_COMPLEMENT, HebrewSearch::normalize($question)) === 1;
-        if ($asked === null && ! $asksComplement) {
+        $complement = preg_match(self::ASKS_COMPLEMENT, HebrewSearch::normalize($question)) === 1;
+        if ($asked === null && ! $complement) {
             return null;
         }
 
-        // what the store knows goes with it: the kinds its map pairs with the product's kind, and the products it pairs itself
-        $typeAt = array_search('type', array_map(fn (array $f): string => (string) ($f['k'] ?? ''), $facets), true);
-        $typeValues = is_int($typeAt) ? (array) ($facets[$typeAt]['v'] ?? []) : [];
-        $ownTypes = is_int($typeAt) ? array_values(array_filter(array_map(fn (int $code): ?string => intdiv($code, 1000) === $typeAt ? (string) ($typeValues[$code % 1000]['k'] ?? '') : null, self::codes($own)))) : [];
-        $partners = [];
-        if ($use['map']) {
-            foreach ($ownTypes as $type) {
-                foreach ($this->partners->partnersOf($shopId, $type) as $partner) {
-                    $partners[$partner['type']] ??= $partner;
-                }
-            }
-        }
+        // the products the store itself pairs with it
         $paired = [];
         if ($use['relations']) {
             foreach ($this->partners->complementsOf($shopId, $viewed) as $relation) {
                 $paired[(string) $relation['external_id']] ??= (int) $relation['score'];
             }
-        }
-        $partnerCodes = [];
-        foreach ($typeValues as $i => $value) {
-            if (isset($partners[(string) ($value['k'] ?? '')])) {
-                $partnerCodes[] = $typeAt * 1000 + $i;
-            }
-        }
-
-        $complement = $asksComplement;
-        if ($asked === null) {
-            // a complement asked with no kind named: the kinds the map pairs with it, the products the store pairs with it
-            if ($partnerCodes === [] && $paired === []) {
-                return ['kind' => '', 'ids' => [], 'shares' => [], 'complement' => true];
-            }
-            $asked = ['codes' => $partnerCodes, 'label' => implode(' / ', array_values(array_unique(array_map(fn (int $code): string => (string) ($typeValues[$code % 1000]['l'] ?? ''), $partnerCodes))))];
-            $complement = true;
-            $byKind = true;
-        } else {
-            // a kind named: the map saying it goes with the product's makes it a complement; with no match by look allowed,
-            // only a kind the map or the store's pairings know
-            $knownKind = array_intersect($asked['codes'], $partnerCodes) !== [];
-            $complement = $complement || $knownKind;
-            $byKind = $use['look'] || $knownKind;
         }
 
         $products = array_filter($index['records'], fn (array $r): bool => ($r['t'] ?? null) === 'product');
@@ -154,6 +119,8 @@ final class GoingWith implements ProductsGoingWith
         $ownWeak = array_map('intval', array_keys((array) ($own['ev'] ?? [])));
         $shareable = self::shareable($facets);
         $anchor = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $viewed)->first();
+        // a complement with no kind named: anything of another kind than the product's own, never the same kind
+        $sameKind = $asked === null ? self::sameKindAs($facets, $own) : null;
 
         // what the product says that few others do, by key, with how it writes it
         $ownTitle = self::keyed((string) ($own['title'] ?? ''));
@@ -170,10 +137,9 @@ final class GoingWith implements ProductsGoingWith
         foreach ($products as $id => $record) {
             $external = substr((string) $id, 2);
             $codes = self::codes($record);
-            $ofKind = $asked['codes'] !== [] && array_intersect($codes, $asked['codes']) !== [];
-            // a product the store pairs with it counts when it is of the kind asked, or when no kind was named
-            $isPaired = isset($paired[$external]) && ($asked['codes'] === [] || $ofKind || ! isset($knownKind));
-            if ($id === 'p:'.$viewed || (int) ($record['s'] ?? 0) !== 1 || ! (($byKind && $ofKind) || $isPaired)) {
+            $ofKind = $asked !== null ? array_intersect($codes, $asked['codes']) !== [] : ! $sameKind($record);
+            $isPaired = isset($paired[$external]) && $ofKind;
+            if ($id === 'p:'.$viewed || (int) ($record['s'] ?? 0) !== 1 || ! $ofKind || ! ($use['look'] || $isPaired)) {
                 continue;
             }
             $score = 0.0;
@@ -243,15 +209,44 @@ final class GoingWith implements ProductsGoingWith
             $order($scored);
         }
 
+        // of another kind than the product's, a candidate is one that shares something with it: never a product that only
+        // happens to be of another kind (the store's rule: fewer or none, never unrelated)
+        if ($asked === null) {
+            $scored = array_filter($scored, fn (array $s): bool => $s['score'] > 0);
+        }
+
         $ids = $this->forItsAudience($viewed, array_slice(array_map('strval', array_keys($scored)), 0, max($limit * 3, self::POOL)));
         $ids = array_slice($ids, 0, $limit);
 
         return [
-            'kind' => $asked['label'],
+            'kind' => $asked['label'] ?? '',
             'ids' => $ids,
             'shares' => array_combine($ids, array_map(fn (string $id): array => $scored[$id]['shares'], $ids)) ?: [],
             'complement' => $complement,
         ];
+    }
+
+    /**
+     * Whether a record is of the product's own kind: it carries a value of the type filter the product carries (a kind
+     * filed in several words too), else, where the product is filed under no type, its title opens with the same word.
+     *
+     * @param  list<array<string, mixed>>  $facets
+     * @param  array<string, mixed>  $own
+     * @return callable(array<string, mixed>): bool
+     */
+    private static function sameKindAs(array $facets, array $own): callable
+    {
+        $typeAt = array_search('type', array_map(fn (array $f): string => (string) ($f['k'] ?? ''), $facets), true);
+        $ownTypes = is_int($typeAt) ? array_values(array_filter(self::codes($own), fn (int $code): bool => intdiv($code, 1000) === $typeAt)) : [];
+        $ownHead = self::headKey((string) ($own['title'] ?? ''));
+
+        return function (array $record) use ($ownTypes, $ownHead): bool {
+            if ($ownTypes !== []) {
+                return array_intersect(self::codes($record), $ownTypes) !== [];
+            }
+
+            return $ownHead !== '' && self::headKey((string) ($record['title'] ?? '')) === $ownHead;
+        };
     }
 
     /**

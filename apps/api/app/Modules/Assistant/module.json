@@ -67,7 +67,7 @@
         },
         {
             "name": "goes_with",
-            "default": true
+            "default": false
         }
     ],
     "settings": [
@@ -99,12 +99,6 @@
         },
         {
             "name": "goes_with_use_relations",
-            "type": "bool",
-            "default": true,
-            "scope": "shop"
-        },
-        {
-            "name": "goes_with_use_map",
             "type": "bool",
             "default": true,
             "scope": "shop"
