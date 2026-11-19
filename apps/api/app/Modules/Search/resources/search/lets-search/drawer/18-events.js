@@ -157,7 +157,10 @@
     // back to: Rocks, 18.11)
     var leftPick = el.tagName === 'A' && !el.dataset.heart && !el.closest('[data-card]') ? el.closest('.ls-pick') : null;
     var pickAfter = leftPick ? leftPick.querySelector('[data-after]') : null;
-    var left = el.tagName === 'A' && !el.dataset.heart ? el.closest('[data-card]') || (pickAfter ? { dataset: { card: pickAfter.dataset.after } } : null) : null;
+    // ...and so is a product of a row under an answer (the search it leads into, shown open): left through one, the
+    // conversation was closed when the shopper came back (Aviad, 19.11)
+    var leftMini = el.tagName === 'A' && el.classList.contains('ls-mini') && el.dataset.pid ? el.dataset.pid : null;
+    var left = el.tagName === 'A' && !el.dataset.heart ? el.closest('[data-card]') || (pickAfter ? { dataset: { card: pickAfter.dataset.after } } : null) || (leftMini ? { dataset: { card: leftMini } } : null) : null;
     if (turn && left) { keepBackTo(turn, left.dataset.card); }
     if (!turn || !turn.q) { return null; }
     var card = el.closest('[data-card]'), pick = el.closest('.ls-pick'), after = pick && pick.querySelector('[data-after]');

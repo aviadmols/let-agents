@@ -15,7 +15,8 @@
   // an answer comes back with the conversation it closed, as it was on screen, and goes on with it (Rocks, 18.11)
   function keepBackTo(turn, card) {
     var conv = turn.kind === 'answer' ? chatTurns().filter(function (x) { return !x.prev && x.kind !== 'about' && x !== turn; }).map(function (x) { return x.id; }) : [];
-    store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, tids: conv.length ? conv : null, wide: S.wide === turn.id, card: card || null, more: turn.more || null, c: turn === S.live ? turn.c || null : null, y: BODY.scrollTop, at: Date.now() });
+    // (and the product page it was left from: back on that page, its own field opens the conversation too)
+    store('local', 'ls_back', { q: turn.kind === 'results' ? turn.q || null : null, tid: turn.id, tids: conv.length ? conv : null, wide: S.wide === turn.id, card: card || null, more: turn.more || null, c: turn === S.live ? turn.c || null : null, y: BODY.scrollTop, at: Date.now(), ctx: S.ctx ? String(S.ctx) : null });
   }
   function backTo() {
     var b = store('local', 'ls_back');
@@ -23,6 +24,8 @@
   }
   function open(opts) {
     opts = opts || {};
+    // opened from the product page's own field back on the page a conversation was left from: that conversation, as it was
+    var cameBack = false;
     if (nudgeOff) { nudgeOff(); }
     loadIndex();
     if (!S.open) {
@@ -44,10 +47,14 @@
       // except the search the shopper left through one of its results: opened again, it is there as it was
       // (a search sent stays its turn; one only typed comes back in the field, its live results with it)
       // (the theme's own field opens us with what it holds, often nothing: "" is no words of its own)
-      var back = !opts.about && !opts.text ? backTo() : null;
+      // ...from the product page's own field too, when the conversation was left from this very page: back from a product
+      // its answer showed, the conversation is there, not closed (Aviad, 19.11)
+      var back0 = !opts.text ? backTo() : null;
+      var back = back0 && (!opts.about || (back0.tid && back0.ctx && S.ctx && back0.ctx === String(S.ctx))) ? back0 : null;
       var restored = false;
       if (back) {
         var bt = back.tid ? turnById(back.tid) : null;
+        if (bt && opts.about) { cameBack = true; }
         if (bt) {
           // the conversation the answer closed, in its order, still this one's: a next question goes on with it
           var conv = (back.tids || []).map(turnById).filter(function (x) { return x && x !== bt; });
@@ -59,17 +66,17 @@
           // a search comes back with its words in the field, as they were left
           if (bt.kind === 'results' && bt.q) { keepInField(bt.q); restored = true; }
         }
-        else if (back.q) { opts.text = back.q; restored = true; S.backLive = back; }
+        else if (back.q && !opts.about) { opts.text = back.q; restored = true; S.backLive = back; }
       }
       // "about this product" only from the product page's own search row; the header's search is the store's search
-      if (opts.about && S.ctx && productAsks() && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
+      if (opts.about && !cameBack && S.ctx && productAsks() && !S.turns.some(function (x) { return x.kind === 'about' && x.id === S.ctx; })) { aboutTurn(S.ctx); }
     }
     // the product's own view only where the store answers about it; elsewhere the drawer is the store's search
     if (opts.about && !productAsks()) { opts.about = false; }
     S.askMode = !!(opts.about && S.ctx);
     // opened from the product page's own search row: only the product's information, and under it only
     // the line that loads the previous conversation (everything asked before, on this page too, waits there)
-    if (opts.about && S.ctx) {
+    if (opts.about && S.ctx && !cameBack) {
       var ab = S.turns.filter(function (x) { return x.kind === 'about' && x.id === S.ctx; }).pop();
       S.turns.forEach(function (x) { x.prev = x !== ab; if (x !== ab) { x.earlier = true; } });
       if (ab) { S.turns = S.turns.filter(function (x) { return x !== ab; }).concat([ab]); }
@@ -78,7 +85,7 @@
     if (opts.text != null) { INPUT.value = opts.text; }
     render();
     // back at the product the shopper left the list through, not at its top
-    if (back && back.card) { requestAnimationFrame(function () { var key = String(back.card).replace(/["\\]/g, ''), cd = D.querySelector('[data-card="' + key + '"]') || D.querySelector('.ls-pick [data-after="' + key + '"]'); if (cd && cd.scrollIntoView) { cd.scrollIntoView({ block: 'center' }); } }); }
+    if (back && back.card) { requestAnimationFrame(function () { var key = String(back.card).replace(/["\\]/g, ''), cd = D.querySelector('[data-card="' + key + '"]') || D.querySelector('.ls-pick [data-after="' + key + '"]') || D.querySelector('.ls-answer-searches .ls-mini[data-pid="' + key + '"]'); if (cd && cd.scrollIntoView) { cd.scrollIntoView({ block: 'center' }); } }); }
     var focusField = function () {
       if (opts.focus === false) { return; }
       INPUT.focus({ preventScroll: true });

@@ -357,12 +357,13 @@
       (one.s.first || []).forEach(function (id, k) { rank['p:' + pid(id)] = k + 1; });
       rows = rows.map(function (r, k) { return { r: r, k: rank[r.id] || 1e6 + k }; }).sort(function (a, b) { return a.k - b.k; }).map(function (x) { return x.r; });
       rows = rows.filter(function (r) { return !shown[r.id]; }).concat(rows.filter(function (r) { return shown[r.id]; })).slice(0, ANSWER_SEARCH_ROW);
-      return '<div class="ls-answer-searches ls-answer-searches--open"><div class="ls-block__title" dir="auto">' + esc(one.label) + ' <span class="ls-num">(' + one.n + ')</span></div>' +
+      // a line that says what the row is before it (Aviad, 19.11), the search's own name under it
+      return '<div class="ls-answer-searches ls-answer-searches--open"><p class="ls-answer-searches__lead" dir="auto">' + esc(t('answerSearchOne')) + '</p><div class="ls-block__title" dir="auto">' + esc(one.label) + ' <span class="ls-num">(' + one.n + ')</span></div>' +
         miniRow(rows.map(function (r) { return { id: r.id, title: r.title, url: r.url, image: r.img, price: r.pr }; })) +
         '<button type="button" class="ls-btn ls-btn--secondary ls-btn--sm ls-answer-search" style="margin-top:10px" data-answer-search="' + esc(turn.id) + '" data-i="' + one.i + '" dir="auto">' + icon('search', 'ls-icon--sm') +
         '<span>' + esc(t('showAll', { n: one.n })) + '</span></button></div>';
     }
-    return '<div class="ls-answer-searches"><div class="ls-block__title">' + esc(t('answerSearches')) + '</div>' + list.map(function (x) {
+    return '<div class="ls-answer-searches"><p class="ls-answer-searches__lead" dir="auto">' + esc(t('answerSearches')) + '</p>' + list.map(function (x) {
       return '<button type="button" class="ls-btn ls-btn--secondary ls-btn--sm ls-answer-search" data-answer-search="' + esc(turn.id) + '" data-i="' + x.i + '" dir="auto">' + icon('search', 'ls-icon--sm') +
         '<span>' + esc(x.label) + ' <span class="ls-num">(' + x.n + ')</span></span></button>';
     }).join('') + '</div>';

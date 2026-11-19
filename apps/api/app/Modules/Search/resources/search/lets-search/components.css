@@ -397,6 +397,8 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 /* the searches an answer leads into: one clear button each, its whole label read, one under the other */
 .ls-answer-searches { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
 .ls-answer-searches .ls-block__title { margin: 0; }
+/* the line that says what the searches are, before them */
+.ls-answer-searches__lead { margin: 0; font-size: var(--lsp-text-sm); line-height: 1.5; color: var(--ls-fg-muted); }
 .ls-answer-search { --h: auto; min-height: 36px; max-width: 100%; padding-block: 7px; gap: 6px; white-space: normal; text-align: start; justify-content: flex-start; }
 .ls-answer-search .ls-icon { flex: none; }
 .ls-answer-search .ls-num { color: var(--ls-fg-muted); }
