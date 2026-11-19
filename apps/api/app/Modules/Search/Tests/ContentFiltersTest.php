@@ -46,8 +46,9 @@ final class ContentFiltersTest extends TestCase
                 ['5', '9 Day Tour in Morocco', $morocco, null, ['Morocco', 'Desert']],
                 ['6', '4 Magical Days in Spain', $spain, 800, ['Spain', 'blog']],
                 ['7', '5 Day Jewish Heritage Tour in Majorca', $spain, 950, ['Spain', 'blog']],
-                ['8', 'Morocco Coast and Desert Retreat', $morocco, null, ['Morocco']],
-                ['9', 'Barcelona and Gaudí', $spain, null, ['Spain']],
+                // how a tour is sold, and a code of words joined by "_", are no filter (Shilav, 19.11: "איסוף עצמי", "צעצועים_ומשחקים")
+                ['8', 'Morocco Coast and Desert Retreat', $morocco, null, ['Morocco', 'Free Shipping', 'Pick up in store', 'סיור_מודרך']],
+                ['9', 'Barcelona and Gaudí', $spain, null, ['Spain', 'Free Shipping', 'Pick up in store', 'סיור_מודרך']],
             ] as [$id, $title, $in, $price, $tags]) {
                 $product = CatalogProduct::query()->create(['shop_id' => $this->shop->id, 'external_id' => $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title,
                     'url' => "https://tours.test/t/{$id}", 'price' => $price, 'in_stock' => true, 'purchasable' => false, 'hash' => "h{$id}",
@@ -63,7 +64,7 @@ final class ContentFiltersTest extends TestCase
         $facets = array_column($this->facets(), null, 'k');
 
         $this->assertSame(['Israel Tours', 'Morocco', 'Spain'], array_column($facets['category']['v'], 'l'));
-        $this->assertSame(['Desert', 'Family'], array_column($facets['store_tags']['v'], 'l'), 'its own tags, the most used first, never one a category offers, nor "blog"');
+        $this->assertSame(['Desert', 'Family'], array_column($facets['store_tags']['v'], 'l'), 'its own tags, the most used first, never one a category offers, nor "blog", nor how it is sold, nor a code');
         $this->assertSame(['2 to 5 days', '6 to 9 days', '10 to 14 days'], array_column($facets['length']['v'], 'l'), 'in the order of the days');
     }
 

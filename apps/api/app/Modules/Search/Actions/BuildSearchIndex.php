@@ -67,6 +67,11 @@ final class BuildSearchIndex
     /** The filters read from products' variants (variantFacets): the drawer asks them of one variant together. */
     public const VARIANT_COLOUR = 'variant_color';
 
+    /** A colour phrase this many products' names say, whose pictures show its colour this rarely, names a thing. */
+    private const THING_PHRASE_MIN = 2;
+
+    private const THING_PHRASE_SHOWN = 0.34;
+
     public const VARIANT_SIZE = 'variant_size';
 
     /** Products with a size on their page before those sizes are a filter. */
@@ -954,24 +959,24 @@ final class BuildSearchIndex
      * the black wool jacket was filed under Grey alone. The store's description is not read: it names the colours of
      * what goes with the piece too.
      *
-     * Where the name says several colours and the picture shows some of them, only those (two sources agreeing): "ארון תום
-     * לבן/ אלון אדום", white in its picture, is white, the red of a red oak finish no colour of it (Shilav, 19.11: the white
-     * wardrobes under Red). A name none of whose colours the picture shows still says its colour, as before (the black
-     * jacket of a charcoal picture).
+     * A colour word that is a word of something else is learned from the store's own products, never from a list: a phrase
+     * of a colour and the word before it ("אלון אדום", "מד חום", "אינפרא אדום") that several products' names say and whose
+     * pictures almost never show that colour names a thing, not a colour, and adds none (Shilav, 19.11: white
+     * wardrobes in a red oak frame under Red, thermometers under Brown). A colour one name says alone stands: a picture's
+     * description that leaves a colour out is no proof it is not there (the pink of a two-sided blanket).
      *
      * @param  list<string>  $productIds
      * @return array<string, list<string>>
      */
     private static function productColours(array $productIds): array
     {
-        $out = [];
+        $named = [];
+        $pictured = [];
         foreach (array_chunk($productIds, 1000) as $ids) {
-            $named = [];
             CatalogProduct::query()->whereIn('id', $ids)->get(['id', 'title'])->each(function (CatalogProduct $product) use (&$named): void {
-                $named[(string) $product->id] = self::colourWordsOf((string) $product->title);
+                $named[(string) $product->id] = self::colourPhrasesOf((string) $product->title);
             });
             // each product's first described picture that names a colour: its colours, the one most of it first
-            $pictured = [];
             RetrievalImage::query()->whereIn('product_id', $ids)->whereNotNull('caption_words')->orderBy('id')
                 ->get(['product_id', 'caption_words'])->each(function (RetrievalImage $picture) use (&$pictured): void {
                     $id = (string) $picture->product_id;
@@ -988,15 +993,34 @@ final class BuildSearchIndex
                         $pictured[$id] = array_values($seen);
                     }
                 });
-            foreach (array_unique([...array_keys($named), ...array_keys($pictured)]) as $id) {
-                $id = (string) $id;
-                $name = $named[$id] ?? [];
-                $picture = $pictured[$id] ?? [];
-                $agreed = array_values(array_intersect($name, $picture));
-                $colours = $picture === [] ? $name : [...($agreed !== [] ? $agreed : $name), $picture[0]];
-                if ($colours !== []) {
-                    $out[$id] = array_values(array_unique($colours));
+        }
+
+        // each phrase's products with a described picture, and those whose picture shows its colour
+        $said = [];
+        $shown = [];
+        foreach ($named as $id => $phrases) {
+            if (! isset($pictured[$id])) {
+                continue;
+            }
+            foreach ($phrases as [$family, $phrase]) {
+                if ($phrase === null) {
+                    continue;
                 }
+                $said[$phrase] = ($said[$phrase] ?? 0) + 1;
+                if (in_array($family, $pictured[$id], true)) {
+                    $shown[$phrase] = ($shown[$phrase] ?? 0) + 1;
+                }
+            }
+        }
+        $notColours = array_filter($said, fn (int $n, string $phrase): bool => $n >= self::THING_PHRASE_MIN && ($shown[$phrase] ?? 0) / $n < self::THING_PHRASE_SHOWN, ARRAY_FILTER_USE_BOTH);
+
+        $out = [];
+        foreach (array_unique([...array_keys($named), ...array_keys($pictured)]) as $id) {
+            $id = (string) $id;
+            $name = array_map(fn (array $p): string => $p[0], array_filter($named[$id] ?? [], fn (array $p): bool => $p[1] === null || ! isset($notColours[$p[1]])));
+            $colours = array_values(array_unique([...$name, ...(isset($pictured[$id]) ? [$pictured[$id][0]] : [])]));
+            if ($colours !== []) {
+                $out[$id] = $colours;
             }
         }
 
@@ -1004,12 +1028,12 @@ final class BuildSearchIndex
     }
 
     /**
-     * The colour families a product's name says, each word or pair of words that is a colour alone ("Black", "Light
-     * Blue", "שחור"), in the order said.
+     * The colours a product's name says, each with the phrase it is said in (the word before it and its colour: "אלון|red"),
+     * null for a colour that opens the name.
      *
-     * @return list<string>
+     * @return list<array{0: string, 1: string|null}>
      */
-    private static function colourWordsOf(string $title): array
+    private static function colourPhrasesOf(string $title): array
     {
         $words = preg_split('/[\s,|\/()\-–]+/u', mb_strtolower($title), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $found = [];
@@ -1017,12 +1041,12 @@ final class BuildSearchIndex
             $pair = isset($words[$i + 1]) ? ColorFamily::ofColourWord($words[$i].' '.$words[$i + 1]) : null;
             $one = $pair ?? ColorFamily::ofColourWord($words[$i]);
             if ($one !== null) {
-                $found[$one->value] = $one->value;
+                $found[] = [$one->value, $i > 0 ? $words[$i - 1].'|'.$one->value : null];
                 $i += $pair !== null ? 1 : 0;
             }
         }
 
-        return array_values($found);
+        return $found;
     }
 
     private function variantFacets(array &$facets, string $locale, string $shopId = ''): array
@@ -1614,6 +1638,9 @@ final class BuildSearchIndex
     }
 
     /** A store's tags that file a page, not describe what it offers: never a filter value (Gil Travel's "blog"). */
+    /** A tag that says how a product is sold, sent or kept in stock, in either language: a service, never what it is. */
+    private const SERVICE_TAG = '/איסוף|משלוח|במלאי|(?:^|\s)מלאי(?:\s|$)|אונליין|באתר\s*בלבד|רק\s*באתר|בלעדי\s*(?:ל|ב)?אתר|\b(?:online|pick\s*-?\s*up|pickup|shipping|delivery|in\s*stock|out\s*of\s*stock|pre\s*-?\s*order|click\s*(?:&|and)\s*collect|web\s*exclusive|online\s*exclusive)\b/iu';
+
     private const NOT_TAGS = ['blog', 'news', 'uncategorized', 'uncategorised', 'featured', 'home', 'homepage', 'all', 'all products', 'בלוג', 'ללא קטגוריה', 'כללי', 'ראשי', 'חדשות'];
 
     /** A price as it is: whole as a whole number (250), else to the cent (202.46). */
@@ -1654,7 +1681,11 @@ final class BuildSearchIndex
         // and an app's word run together ("shsdchildproduct"), a menu's heading ("SHOP BY OCCASION"), a hashtag
         // ("#Naotic Favorites"): Naot QA, 15.11
         return preg_match('/^[a-z0-9]+(?:[_-][a-z0-9]+)+$|^[A-Za-z0-9]+_[A-Za-z0-9_]+$|^[A-Z][a-z]+(?:[A-Z][a-z]+)+$|^[a-z]{14,}$/', $tag) === 1
-            || preg_match(self::NAVIGATION, $tag) === 1;
+            // words joined by "_" in any language are a code, never a shopper's words ("צעצועים_ומשחקים": Shilav, 19.11)
+            || preg_match('/^[\p{L}\p{N}]+(?:_[\p{L}\p{N}]+)+$/u', $tag) === 1
+            || preg_match(self::NAVIGATION, $tag) === 1
+            // and how a product is sold or sent is no kind of it ("איסוף עצמי", "online only": Shilav, 19.11)
+            || preg_match(self::SERVICE_TAG, $tag) === 1;
     }
 
     /**
