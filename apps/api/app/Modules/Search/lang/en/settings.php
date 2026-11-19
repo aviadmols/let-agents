@@ -401,6 +401,10 @@ return [
         'label' => 'Tags never shown as a filter',
         'description' => 'The store\'s own tags for its shop pages and campaigns, not for what a product is ("Gift Guide, Vacation Shop"), separated by commas. A tag that starts with one of them is left out too.',
     ],
+    'start_welcome' => [
+        'label' => 'Opening screen: the heading "What are you looking for today?"',
+        'description' => 'Off: the heading and the line under it do not show when a new search opens.',
+    ],
     'start_popular' => [
         'label' => 'Opening screen: popular in the store',
         'description' => 'Off: this part does not show when a new search opens.',

@@ -936,6 +936,12 @@
             "scope": "shop"
         },
         {
+            "name": "start_welcome",
+            "type": "bool",
+            "default": true,
+            "scope": "shop"
+        },
+        {
             "name": "start_popular",
             "type": "bool",
             "default": true,
