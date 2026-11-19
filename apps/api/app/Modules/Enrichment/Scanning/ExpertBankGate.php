@@ -20,6 +20,9 @@ namespace App\Modules\Enrichment\Scanning;
  */
 final class ExpertBankGate
 {
+    /** The attribute of who a product is for (expert_bank v3), as the search's audience filter reads it. */
+    public const AUDIENCE = 'audience';
+
     /** An attribute a shopper can filter by offers a choice: at least this many values. */
     public const MIN_VALUES = 2;
 
@@ -128,7 +131,9 @@ final class ExpertBankGate
         $kept = [];
         foreach ($bank['attributes'] as $attribute) {
             $share = (float) ($measured['attributes'][$attribute['key']]['share'] ?? 0.0);
-            if (count($attribute['values']) < self::MIN_VALUES) {
+            // who it is for stands with one value: a store that names only "mens" has a filter "for men" (Jean Rachel, 19.11);
+            // every other rule (its evidence, its products, the checker's score) still holds
+            if (count($attribute['values']) < ($attribute['key'] === self::AUDIENCE ? 1 : self::MIN_VALUES)) {
                 $removed[] = self::removed($attribute, 'attribute', 'code', $step, 'too_few_values', (string) count($attribute['values']));
             } elseif ($share < $minShare) {
                 $removed[] = self::removed($attribute, 'attribute', 'code', $step, 'too_thin', (string) $share);

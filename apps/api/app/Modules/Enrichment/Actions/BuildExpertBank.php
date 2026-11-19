@@ -61,7 +61,7 @@ final class BuildExpertBank
     public const VERSION = 2;
 
     /** The released version each prompt is sent at; a released one is never edited. */
-    public const PROMPTS = ['expert_bank' => 2, 'expert_bank_check' => 1];
+    public const PROMPTS = ['expert_bank' => 3, 'expert_bank_check' => 1];
 
     private const WRITER_TOKENS = 20000;
 

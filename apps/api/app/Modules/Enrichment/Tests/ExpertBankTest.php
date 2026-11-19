@@ -431,7 +431,7 @@ final class ExpertBankTest extends TestCase
         ['run' => $run, 'bank' => $stored] = app(BuildExpertBank::class)->handle($this->shop->id);
 
         $this->assertSame(['round_1', 'round_2', 'check_1'], array_column($stored->calls, 'step'));
-        $this->assertSame(['expert_bank.v2', 'expert_bank.v2', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
+        $this->assertSame(['expert_bank.v3', 'expert_bank.v3', 'expert_bank_check.v1'], array_column($stored->calls, 'prompt'));
         // the writer at $4 and $20 a million, the checker at $1 and $8
         $this->assertSame([0.076, 0.076, 0.019], array_column($stored->calls, 'usd'));
         $this->assertSame(25000, $run->input_tokens);
@@ -720,7 +720,7 @@ final class ExpertBankTest extends TestCase
         $this->assertSame(['short' => [8, 3], 'long' => [0, 7]], LongestPhrase::claims('abc def def', ['short' => ['def'], 'long' => ['abc def']]), 'a word said again outside the phrase stands');
 
         // and the expert is told so, in a new version of its prompt; the released one is not edited
-        $this->assertSame(2, BuildExpertBank::PROMPTS['expert_bank']);
+        $this->assertSame(3, BuildExpertBank::PROMPTS['expert_bank'], 'v3 since 19.11: who it is for');
         $prompts = dirname(__DIR__).'/Prompts/';
         $this->assertStringContainsString('code reads the longest phrase first', (string) file_get_contents($prompts.'expert_bank.v2.md'));
         $this->assertStringNotContainsString('longest phrase', (string) file_get_contents($prompts.'expert_bank.v1.md'));
