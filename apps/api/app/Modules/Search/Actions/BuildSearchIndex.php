@@ -1794,6 +1794,45 @@ final class BuildSearchIndex
         return false;
     }
 
+    /**
+     * A name that joins two kinds or more: "X and Y" in Hebrew (a later word opening with ו, "ו־", "ו-"), "&", "+", "/",
+     * " and ". A word that opens with וי or וו is its own word ("וינטג'", "ווסט"), never "and".
+     */
+    public static function joinsKinds(string $name): bool
+    {
+        if (preg_match('/\s(?:&|\+|and)\s|\//iu', $name) === 1) {
+            return true;
+        }
+        $words = preg_split('/\s+/u', trim($name)) ?: [];
+
+        return count($words) >= 2 && array_any(array_slice($words, 1), fn (string $w): bool => preg_match('/^ו(?:[־-][א-ת]{2}|[א-הז-טך-ת][א-ת])/u', $w) === 1);
+    }
+
+    /**
+     * The words of a name the title says too, by their stem ("חולצות" in "חולצת טי"), in the name's order: what a joined
+     * name says of this product. Nothing when the title says none of them.
+     */
+    public static function saidByTitle(string $title, string $name): string
+    {
+        $stem = function (string $w): string {
+            $w = mb_strtolower($w);
+
+            return preg_match('/^[א-ת]+$/u', $w) === 1 ? HebrewSearch::stem($w) : HebrewSearch::singular($w);
+        };
+        $said = array_map($stem, array_values(array_filter(explode(' ', HebrewSearch::normalize($title)))));
+        $kept = [];
+        foreach (preg_split('/\s+/u', trim($name)) ?: [] as $i => $word) {
+            // the "and" a later word opens with is not the word ("ומכופתרות" is "מכופתרות"); וי and וו open words of their own
+            $bare = $i > 0 ? (string) preg_replace('/^ו(?:[־-](?=[א-ת]{2})|(?=[א-הז-טך-ת][א-ת]))/u', '', $word) : $word;
+            $norm = trim(HebrewSearch::normalize($bare));
+            if ($norm !== '' && ! str_contains($norm, ' ') && in_array($stem($norm), $said, true)) {
+                $kept[] = $bare;
+            }
+        }
+
+        return implode(' ', $kept);
+    }
+
     /** @param  list<string>  $learned  what the scan learned it is and is for, right after its categories */
     private function productWords(CatalogProduct $product, array $learned = []): array
     {
@@ -1808,15 +1847,21 @@ final class BuildSearchIndex
         // Thermal" tagged "חולצות טי קצרות" was found for "חולצה קצרה" (Vans, 12.11). Its title is what it is.
         $fits = fn (string $name): bool => ! self::contradicts((string) $product->title, $name);
 
+        // a name that joins two kinds ("חולצות טי ומכופתרות", "Tees & Shirts") holds products of either: each is one of them,
+        // so only what its own title says of the name is its word. Every tee filed there was found for "חולצה מכופתרת"
+        // (Vans, 19.11); the button-down shirts keep the word from a name of their own ("חולצות מכופתרות").
+        $own = fn (string $name): string => self::joinsKinds($name) ? self::saidByTitle((string) $product->title, $name) : $name;
+
         foreach ($product->categories as $category) {
-            if ($fits((string) $category->name)) {
-                $words[] = (string) $category->name;
+            if ($fits((string) $category->name) && ($name = $own((string) $category->name)) !== '') {
+                $words[] = $name;
             }
         }
 
         array_push($words, ...$learned);
 
-        array_push($words, ...array_values(array_filter(array_map('strval', (array) ($product->payload['tags'] ?? [])), $fits)));
+        $tags = array_values(array_filter(array_map('strval', (array) ($product->payload['tags'] ?? [])), $fits));
+        array_push($words, ...array_values(array_filter(array_map($own, $tags), fn (string $w): bool => $w !== '')));
         if ($brand !== '') {
             array_push($words, ...array_map('strval', (array) ($product->payload['brands'] ?? [])));
         }

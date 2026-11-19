@@ -44,4 +44,23 @@ final class FiledOppositeTest extends TestCase
         $this->assertFalse(BuildSearchIndex::contradicts('שמלה קצרה עם שרוול ארוך', 'שמלות קצרות'), 'the title says both');
         $this->assertFalse(BuildSearchIndex::contradicts('טבעת זהב', 'SALE'));
     }
+
+    public function test_a_name_that_joins_two_kinds_gives_a_product_only_what_its_title_says_of_it(): void
+    {
+        // Vans, 19.11: every tee filed under "חולצות טי ומכופתרות" was found for "חולצה מכופתרת ארוכה"
+        $this->assertTrue(BuildSearchIndex::joinsKinds('חולצות טי ומכופתרות'));
+        $this->assertTrue(BuildSearchIndex::joinsKinds('טבעות ו־עגילים'));
+        $this->assertTrue(BuildSearchIndex::joinsKinds('Tees & Shirts'));
+        $this->assertTrue(BuildSearchIndex::joinsKinds('Shirts and Polos'));
+        $this->assertTrue(BuildSearchIndex::joinsKinds('Hoodies/Sweatshirts'));
+        $this->assertFalse(BuildSearchIndex::joinsKinds('חולצות מכופתרות'));
+        $this->assertFalse(BuildSearchIndex::joinsKinds('בגדים וינטג\''), 'וי opens a word of its own');
+        $this->assertFalse(BuildSearchIndex::joinsKinds('ז\'קט ווסט'), 'and so does וו');
+        $this->assertFalse(BuildSearchIndex::joinsKinds('וילונות'));
+
+        $this->assertSame('חולצות טי', BuildSearchIndex::saidByTitle('חולצת טי קצרה Sex Pistols', 'חולצות טי ומכופתרות'));
+        $this->assertSame('חולצות מכופתרות', BuildSearchIndex::saidByTitle('חולצה מכופתרת ארוכה Martinez Cord', 'חולצות טי ומכופתרות'));
+        $this->assertSame('', BuildSearchIndex::saidByTitle('Larkspur Plaid', 'חולצות טי ומכופתרות'), 'a title that says none of it gets none of it');
+        $this->assertSame('Shirts', BuildSearchIndex::saidByTitle('Oxford Shirt', 'Tees & Shirts'));
+    }
 }

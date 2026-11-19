@@ -143,16 +143,17 @@ class DrawerFiltersTest extends TestCase
         $this->assertLessThan($out[3], $out[2], 'and still narrows when chosen');
     }
 
-    public function test_a_value_chosen_in_the_row_over_the_results_stays_in_its_place_and_is_not_repeated_under_it(): void
+    public function test_a_value_chosen_in_the_row_over_the_results_stays_in_its_place_plain_and_shows_with_its_x_under_it(): void
     {
-        // Aviad, 19.11: a filter chosen in the row jumped to the row of chosen filters at the start
+        // Aviad, 19.11: a filter chosen in the row jumped to the row of chosen filters at the start, then stayed marked: it
+        // keeps its place, plain, and is among the chosen filters under the row, with its ×
         $out = self::drawer("(function () { var all = [1, 2, 3, 4, 5, 6, 7, 8, 9], x = turn('shoes', all, {}), b = T.barCodes(T.facetChips(x, 99), T.C(x));".
-            ' var f = {}; f[b[1]] = true; var y = turn(\'shoes\', all, { f: f }), b2 = T.barCodes(T.facetChips(y, 99), T.C(y));'.
-            ' return [b[1], b2.indexOf(b[1]), T.activeRow(y, b2).indexOf(\'f:\' + b[1]), new RegExp(\'aria-pressed="true" data-chip="f:\' + b[1] + \'"\').test(T.chipRow(y))]; })()');
+            ' var f = {}; f[b[1]] = true; var y = turn(\'shoes\', all, { f: f }), b2 = T.barCodes(T.facetChips(y, 99), T.C(y)), row = T.chipRow(y);'.
+            ' return [b[1], b2.indexOf(b[1]), T.activeRow(y).indexOf(\'data-chip="f:\' + b[1] + \'"\') >= 0, new RegExp(\'aria-pressed="false" data-chip="f:\' + b[1] + \'"\').test(row.split(\'ls-active\')[0])]; })()');
 
         $this->assertSame(1, $out[1], 'the chosen value keeps its place in the row');
-        $this->assertSame(-1, $out[2], 'and is not shown a second time in the row of chosen filters');
-        $this->assertTrue($out[3], 'it is marked chosen where it is');
+        $this->assertTrue($out[2], 'and is in the row of chosen filters, with its ×');
+        $this->assertTrue($out[3], 'not marked in the row over the results');
     }
 
     public function test_values_a_product_holds_several_of_go_together_and_a_value_of_any_counts_its_own(): void

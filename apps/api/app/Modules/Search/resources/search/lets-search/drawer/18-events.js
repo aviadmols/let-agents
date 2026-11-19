@@ -300,7 +300,9 @@
       busy(el);
       products(filtered(lt).slice(0, lt.limit).map(function (r) { return r.id; })).then(render, render); return;
     }
-    if (d.chip) { var ct = turnById(d.turn); if (ct) { applyChip(ct, d.chip); } return; }
+    // a value chosen keeps its place in the row over the results, plain: pressed again there it stays chosen (its × is in
+    // the row of chosen filters under it)
+    if (d.chip) { var ct = turnById(d.turn); if (ct && !(el.closest('.ls-chips--bar') && /^f:\d+$/.test(d.chip) && onCode(C(ct), +d.chip.slice(2)))) { applyChip(ct, d.chip); } return; }
     if (d.filters) { filtersLayer(turnById(d.filters)); return; }
     if (d.sort) { sortLayer(turnById(d.sort)); return; }
     if (d.clearFilters) { var cf = turnById(d.clearFilters); if (cf) { clearC(cf, false); refresh(cf); } return; }

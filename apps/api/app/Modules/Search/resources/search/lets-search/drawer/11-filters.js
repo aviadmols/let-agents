@@ -487,10 +487,9 @@
   }
 
   // active filters, each a dark pill with its ×: what was chosen, and what was read from the words (✦)
-  // shown: the values the row over the results shows marked in their places (chipRow), not repeated here
-  function activeRow(turn, shown) {
+  function activeRow(turn) {
     var c = C(turn), pills = [];
-    codesOn(c).forEach(function (code) { var x = valueOf(code); if (shown && shown.indexOf(code) >= 0) { return; } if (x && x.value) { pills.push({ key: 'f:' + code, label: chipText(x.facet, x.value), auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
+    codesOn(c).forEach(function (code) { var x = valueOf(code); if (x && x.value) { pills.push({ key: 'f:' + code, label: chipText(x.facet, x.value), auto: !c.f[code], sw: swatch(x.facet, x.value) }); } });
     Object.keys(c.words || {}).forEach(function (k) { pills.push({ key: 'w:' + k, label: capital(c.words[k].label), auto: true }); });
     Object.keys(c.picked || {}).forEach(function (k) { pills.push({ key: 'g:' + k, label: capital(c.picked[k].label), auto: false }); });
     // the price the words asked for, as the server applied it: taken off, the rest of the words are searched

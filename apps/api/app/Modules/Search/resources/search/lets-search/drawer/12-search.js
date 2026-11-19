@@ -503,9 +503,9 @@
     return out;
   }
   function activeFilters(c) { return codesOn(c).length + Object.keys(c.words || {}).length + Object.keys(c.picked || {}).length + (onStock(c) ? 1 : 0) + (onSale(c) ? 1 : 0); }
-  // The row over the results offers what more there is to choose. A value chosen in it stays where it was, marked by its
-  // ✓ and its fill, never jumping to the row of chosen filters at the start (Aviad, 19.11); what is chosen elsewhere (the
-  // sheet, the words, a value further down) is in the row under it with its ×, once (activeRow), never in both.
+  // The row over the results offers what more there is to choose. A value chosen in it keeps its place there, plain (not
+  // marked), so the row never shifts under the finger, and is shown with its × in the row of chosen filters under it,
+  // where every chosen filter is (activeRow) (Aviad, 19.11).
   var OFFERED = 4;
   // the row's values: in the order of the results, until it offers OFFERED not chosen; the chosen among them in place
   function barCodes(fc, c) {
@@ -519,10 +519,10 @@
     if (fc.stock && !onStock(c)) { chips += chip(t('inStock'), false, 'stock', turn.id, false); }
     if (fc.sale && !onSale(c)) { chips += chip(t('onSale'), false, 'sale', turn.id, false); }
     var bar = barCodes(fc, c);
-    sizesInOrder(bar).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000], on = onCode(c, code); chips += chip(asWhole(f, v, chipText(f, v)), on, 'f:' + code, turn.id, on && c.auto[code] && !c.f[code], swatch(f, v)); });
+    sizesInOrder(bar).forEach(function (code) { var f = S.facets[Math.floor(code / 1000)], v = f.v[code % 1000]; chips += chip(asWhole(f, v, chipText(f, v)), false, 'f:' + code, turn.id, false, swatch(f, v)); });
     // the store's words close to what was typed, offered to choose (a chosen one is in the row under it)
     Object.keys(c.suggest || {}).forEach(function (k) { if (!(c.picked || {})[k]) { chips += chip(capital(c.suggest[k].label), false, 'g:' + k, turn.id, false); } });
-    return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn, bar);
+    return '<div class="ls-chips ls-chips--bar">' + chips + '</div>' + activeRow(turn);
   }
   // its count in brackets, smaller: "38 (41)", never "38 41" read as a range of sizes (Vans QA, 16.11)
   function chip(label, on, key, tid, auto, sw, count) { return '<button class="ls-chip' + (auto ? ' is-auto' : '') + '" aria-pressed="' + !!on + '"' + (count === 0 && !on ? ' disabled' : '') + ' data-chip="' + esc(key) + '" data-turn="' + tid + '"' + (auto ? ' title="' + esc(t('detected')) + '"' : '') + '><span class="ls-chip__check">' + icon('check', 'ls-icon--sm') + '</span>' + (sw || '') + esc(label) + (count != null ? ' <span class="ls-chip__count ls-num">(' + count + ')</span>' : '') + '</button>'; }
