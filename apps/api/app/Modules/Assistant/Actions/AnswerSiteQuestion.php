@@ -3901,11 +3901,14 @@ final class AnswerSiteQuestion implements TriesQuestions
         $priced = array_filter($productsByRef, fn (array $p): bool => $p['in_stock'] && $p['price'] !== null && $p['price'] > 0);
         uasort($priced, fn (array $a, array $b): int => $a['price'] <=> $b['price']);
         $text = mb_strtolower($question);
+        // a question about a price, not for the dearest or the cheapest: "למה הצמיד כל כך יקר?" was answered with the
+        // store's dearest bracelet, another one (Rocks, 19.11). Why, so, too, worth: the writer explains it.
+        $aboutThePrice = preg_match('/(?<!\p{L})(?:ו?למה|ו?מדוע|כל\s*כך|כ["״]כ|מדי|שווה)(?!\p{L})|\bwhy\b|\bso\s+(?:expensive|cheap)\b|\btoo\s+(?:expensive|cheap|much)\b|\bworth\b/u', $text) === 1;
         $asks = match (true) {
             // a word, never letters inside one: "סניקרס" holds "יקר", and "יש לכם נעלי סניקרס לילדים?" was answered with the
             // dearest of them (Vans QA, 16.11)
-            preg_match('/(?<!\p{L})[והבלמשכ]{0,2}זול\p{L}{0,3}(?!\p{L})|במחיר\s+נמוך|הכי\s+משתלם|\bcheap|\bbudget/u', $text) === 1 => 'cheapest',
-            preg_match('/(?<!\p{L})[והבלמשכ]{0,2}יקר\p{L}{0,3}(?!\p{L})|\bexpensive/u', $text) === 1 => 'most_expensive',
+            ! $aboutThePrice && preg_match('/(?<!\p{L})[והבלמשכ]{0,2}זול\p{L}{0,3}(?!\p{L})|במחיר\s+נמוך|הכי\s+משתלם|\bcheap|\bbudget/u', $text) === 1 => 'cheapest',
+            ! $aboutThePrice && preg_match('/(?<!\p{L})[והבלמשכ]{0,2}יקר\p{L}{0,3}(?!\p{L})|\bexpensive/u', $text) === 1 => 'most_expensive',
             preg_match('/מבצע|הנחה|sale|discount/u', $text) === 1 => 'on_sale',
             self::asksPopular($text) => 'popular',
             default => null,

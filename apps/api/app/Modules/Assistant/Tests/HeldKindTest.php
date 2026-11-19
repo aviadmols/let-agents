@@ -101,6 +101,13 @@ final class HeldKindTest extends TestCase
         $this->assertSame('cheapest', $asks('סניקרס זולות לילדים'));
         $this->assertSame('cheapest', $asks('what is the cheapest ring?'));
         $this->assertSame('on_sale', $asks('ומה עם מוצרים במבצע?'));
+
+        // Rocks, 19.11: a question about a price is no search for the dearest; the writer explains it
+        $this->assertNull($asks('למה הצמיד כל כך יקר?'));
+        $this->assertNull($asks('מדוע זה יקר?'));
+        $this->assertNull($asks('זה לא יקר מדי?'));
+        $this->assertNull($asks('why is this ring so expensive?'));
+        $this->assertNull($asks('is it worth the price?'));
     }
 
     public function test_products_whose_own_titles_say_a_word_of_the_question_are_brought(): void
