@@ -1167,6 +1167,21 @@ final class SearchCatalog
                 $pictures = array_values(array_filter($pictures, $keep));
                 $this->trace?->dropped($before, $ids(), 'not_all_words');
             }
+            // A karat asked is held by everything shown (HebrewSearch::PRECISE): by meaning or by picture a 14K ring is near
+            // "טבעת 21K", and was shown (Rocks, 18.11: 46 rings of other karats). What the words found already holds it.
+            if (array_filter(preg_split('/\s+/u', $query) ?: [], fn (string $w): bool => preg_match(HebrewSearch::PRECISE, $w) === 1) !== []) {
+                $before = $ids();
+                $held = [];
+                foreach ($spelling as $hit) {
+                    $held[$hit['id']] = true;
+                }
+                $keep = fn (string $id): bool => isset($held[$id]) || ! str_starts_with($id, 'p:');
+                $meaning = array_values(array_filter($meaning, $keep));
+                $pictures = array_values(array_filter($pictures, $keep));
+                $described = array_values(array_filter($described, $keep));
+                $termHits = array_values(array_filter($termHits, $keep));
+                $this->trace?->dropped($before, $ids(), 'precise_value');
+            }
             // "טופז": one word that many products hold as typed is what the shopper asked for. The stones only close to
             // it by meaning or by picture (citrine, a yellow sapphire) are left out. When few hold it ("בטריה" in a store
             // that says "סוללה"), the meaning fills in as before.

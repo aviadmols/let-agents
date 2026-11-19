@@ -90,6 +90,9 @@ final class HebrewSearch
     /** How much a generic word counts in a record's score, against 1 for a word that says what. */
     public const GENERIC_WEIGHT = 0.2;
 
+    /** A word that is one exact value, never loosened: a karat as karats() writes it ("21k"). */
+    public const PRECISE = '/^\d{1,2}k$/u';
+
     /** A word in the name counts 1; one of the keywords (the description, the store's fields) less. */
     public const KEYWORD_WEIGHT = 0.7;
 
@@ -1256,8 +1259,14 @@ final class HebrewSearch
      */
     public static function karats(string $text): string
     {
-        return (string) preg_replace('~(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])~u', '$1$2k', $text);
+        $text = (string) preg_replace('~(^|[^\p{L}\p{N}.,])(\d{1,2})[\s-]*(?:(?:קראט|קארט|קאראט|קרט)(?:ימ)?|karats?|carats?|kt|ct|k)(?![\p{L}\p{N}])~u', '$1$2k', $text);
+
+        // "זהב 21", "gold 18": a gold's karat without its word, as a jeweller says it; never a measure ("זהב 21 סמ")
+        return (string) preg_replace(self::GOLD_KARAT, '$1$2 $3k', $text);
     }
+
+    /** Gold and a karat's number after it, no unit: "זהב 21" is 21k (normalized text: no quotes, no final letters). */
+    private const GOLD_KARAT = '~(^|[^\p{L}\p{N}])([בהול]?זהב|gold)\s+(8|9|10|14|18|20|21|22|24)(?![\p{L}\p{N}.,])(?!\s*(?:סמ|ממ|מ|גרמ|גר|אינצ|cm|mm|m|g|gr|in)(?![\p{L}\p{N}]))~u';
 
     /** The months, as the day before them is written in digits. */
     private const MONTHS = ['ינואר' => 1, 'פברואר' => 2, 'מרצ' => 3, 'מרס' => 3, 'אפריל' => 4, 'מאי' => 5, 'יוני' => 6, 'יולי' => 7, 'אוגוסט' => 8, 'ספטמבר' => 9, 'אוקטובר' => 10, 'נובמבר' => 11, 'דצמבר' => 12];
@@ -1744,11 +1753,26 @@ final class HebrewSearch
             }
         }
 
+        // A karat asked ("טבעת 21k") is held as written: never a ring of another karat that holds the rest, nor one only
+        // close to it by spelling ("24k"). When nothing holds it with the rest, nothing is found, and the narrower
+        // searches are offered (focus). The same in the browser (hebrew-search-engine.js); change both.
+        $precise = [];
+        foreach ($tokens as $token) {
+            if (preg_match(self::PRECISE, (string) $token) === 1) {
+                $precise[] = array_flip($index['holders'][$token] ?? []);
+            }
+        }
+
         foreach ($index['items'] as $at => $record) {
             $tier = self::exactTier($record, $query, $tokens, $index['holders'] ?? []);
 
             if ($tier < 0 && ($hits[$at] ?? 0) < $needed) {
                 continue;
+            }
+            foreach ($precise as $holders) {
+                if (! isset($holders[$at])) {
+                    continue 2;
+                }
             }
 
             $found[] = [

@@ -36,6 +36,10 @@ final class KaratTest extends TestCase
             'a weight stays a weight' => ['יהלום 0.21 קראט', 'יהלומ 0 21 קראט'],
             'a weight with a comma' => ['2,21 קרט', '2 21 קרט'],
             'the word alone' => ['קראט', 'קראט'],
+            'gold and its number' => ['יש לכם זהב 21?', 'יש לכמ זהב 21k'],
+            'in gold and its number' => ['טבעת בזהב 18', 'טבעת בזהב 18k'],
+            'gold and a measure stays' => ['שרשרת זהב 21 ס"מ', 'שרשרת זהב 21 סמ'],
+            'gold and a number no karat is' => ['זהב 17', 'זהב 17'],
         ];
     }
 
@@ -73,5 +77,26 @@ final class KaratTest extends TestCase
         $ids = array_column(app(SearchCatalog::class)->handle($shop->id, 'תליונים 21 קארט', ['product'], false, null, false)['groups']['product'], 'external_id');
 
         $this->assertSame(['1'], $ids);
+    }
+
+    public function test_a_karat_asked_is_never_loosened_to_another_karat(): void
+    {
+        // Rocks, 18.11: "טבעת 21K" showed 46 rings of 9K, 14K and 18K, the words and the meaning both widened past the karat
+        LoadedIndex::forget();
+        $shop = Shop::factory()->create(['content_locale' => 'he']);
+        $titles = ['1' => 'טבעת סוליטר משובצת יהלום - זהב 14K', '2' => 'טבעת איטרנטי - זהב 18K', '3' => 'שרשרת חוליות - זהב 21K', '4' => 'טבעת חלקה - זהב 24K', '5' => 'טבעת נישואין - זהב 21K'];
+        app(TenantContext::class)->run($shop->id, function () use ($shop, $titles): void {
+            foreach ($titles as $id => $title) {
+                CatalogProduct::query()->create(['shop_id' => $shop->id, 'external_id' => (string) $id, 'type' => 'simple', 'status' => 'publish', 'title' => $title, 'url' => "https://b.test/p/$id", 'price' => 80, 'in_stock' => true, 'purchasable' => true, 'hash' => "h$id", 'payload' => []]);
+            }
+        });
+        app(BuildSearchIndex::class)->handle($shop->id);
+        $found = fn (string $q): array => array_column(app(SearchCatalog::class)->handle($shop->id, $q, ['product'], false, null, false)['groups']['product'], 'external_id');
+
+        $this->assertSame(['5'], $found('טבעת 21K'), 'the 21K ring only: no ring of another karat, no 21K chain beside it');
+        $this->assertSame(['5'], $found('טבעת זהב 21 קראט'));
+        $this->assertNotContains('1', $found('טבעת 22K'), 'none of 22K: never the 14K, 18K or 24K ring instead');
+        $this->assertNotContains('2', $found('טבעת 22K'));
+        $this->assertNotContains('4', $found('טבעת 22K'), 'nor 24K, close to it by spelling');
     }
 }
