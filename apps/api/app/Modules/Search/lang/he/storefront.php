@@ -8,6 +8,7 @@ return [
     'wa_message' => 'שאלה מהאתר: :question',
     'similar' => 'פריטים דומים',
     'facet_type' => 'סוג מוצר',
+    'goes_with_paired' => 'החנות מציעה אותם יחד',
     'facet_category' => 'קטגוריה',
     'facet_deal' => 'מבצעים',
     'facet_audience' => 'למי',

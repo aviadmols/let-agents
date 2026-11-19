@@ -69,4 +69,8 @@ return [
         'label' => 'Attribute bank written for the store itself (experiment)',
         'description' => 'A dry run only, on request: an advanced model that knows the trade writes the bank from the store\'s own words, code measures every value on its products, and a model of another family scores every tag. The result is kept as a report. Nothing is activated on the store. Off by default.',
     ],
+    'goes_with_map' => [
+        'label' => 'Goes-with map (which kinds of products go together)',
+        'description' => 'Once per store, on request: a model writes which of the store\'s kinds of products a shopper needs together (a drill and its bits, a dress and a belt, a bracelet and the ring of its set), a model of another family scores every pair, and code keeps only pairs whose two kinds both hold products. The assistant reads the map without a model when a shopper asks what else goes with a product. Asked again only when the kinds change. Off by default: it costs a model call per store.',
+    ],
 ];

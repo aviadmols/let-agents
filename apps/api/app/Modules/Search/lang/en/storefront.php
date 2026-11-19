@@ -8,6 +8,7 @@ return [
     'wa_message' => 'A question from the site: :question',
     'similar' => 'Similar items',
     'facet_type' => 'Product type',
+    'goes_with_paired' => 'the store offers them together',
     'facet_category' => 'Category',
     'facet_deal' => 'Deals',
     'facet_audience' => 'For',

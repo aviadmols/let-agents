@@ -17,12 +17,17 @@ namespace App\Modules\Assistant\Contracts;
 interface ProductsGoingWith
 {
     /**
-     * Null when the question names no other kind. Else `kind`: the kind asked, as the store names it; `ids`: in stock, of
-     * that kind, for the viewed product's audience, what they share best first, at most $limit, empty when the store has
-     * none in stock; `shares`: by id, the values and words each shares with the viewed product, as the store writes them.
+     * Null when the question names no other kind and asks for no complement. Else `kind`: the kind asked, as the store
+     * names it (the kinds the store's goes-with map pairs with the product's, for "what else do I need with this?"; '' when
+     * it knows none); `ids`: in stock, of that kind, for the viewed product's audience, what they share best first, at most
+     * $limit, empty when the store has none in stock; `shares`: by id, the values and words each shares with the viewed
+     * product, as the store writes them; `complement`: whether what was asked is what is used with the product (its bits,
+     * its screws, a belt for the dress) rather than a match by look.
      *
      * @param  string  $viewed  the external id of the product on the screen
-     * @return array{kind: string, ids: list<string>, shares: array<string, list<string>>}|null
+     * @param  array{relations?: bool, map?: bool, look?: bool}  $sources  which sources the store lets it choose from: the
+     *                                                                     store's own pairings, its goes-with map, a match by look; each on when not given
+     * @return array{kind: string, ids: list<string>, shares: array<string, list<string>>, complement: bool}|null
      */
-    public function goingWith(string $shopId, string $viewed, string $question, int $limit): ?array;
+    public function goingWith(string $shopId, string $viewed, string $question, int $limit, array $sources = []): ?array;
 }

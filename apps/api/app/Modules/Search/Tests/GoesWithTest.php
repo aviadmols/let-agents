@@ -3,14 +3,25 @@
 namespace App\Modules\Search\Tests;
 
 use App\Core\Facades\Features;
+use App\Core\Facades\Settings;
 use App\Core\Tenancy\TenantContext;
 use App\Modules\Ai\Contracts\ChatModel;
 use App\Modules\Ai\Contracts\ModelReply;
 use App\Modules\Ai\Enums\AiProviderName;
 use App\Modules\Assistant\Actions\AnswerSiteQuestion;
+use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantGoesWithRules;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Connections\Models\StoreConnection;
 use App\Modules\Connections\Support\SiteKeys;
+use App\Modules\Enrichment\Enums\FactKind;
+use App\Modules\Enrichment\Enums\FactOrigin;
+use App\Modules\Enrichment\Enums\FactStatus;
+use App\Modules\Enrichment\Enums\RelationKind;
+use App\Modules\Enrichment\Models\EnrichmentFact;
+use App\Modules\Enrichment\Models\EnrichmentGoesWithMap;
+use App\Modules\Enrichment\Models\EnrichmentProductRelation;
+use App\Modules\Enrichment\Models\EnrichmentVocabulary;
 use App\Modules\Enrichment\Tests\Concerns\BuildsCatalog;
 use App\Modules\Retrieval\Contracts\Passages;
 use App\Modules\Search\Models\SearchIndex;
@@ -20,10 +31,11 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * "יש טבעת שמתאימה לצמיד?" on the page of a two-tone 14K chain-link bracelet (Rocks, 19.11) was answered with a general
- * paragraph and no ring: on a product's page the writer had that product alone. Code now finds the store's products of the
- * kind asked, in stock, for the product's audience, those sharing most with it first, and gives them to the writer beside
- * it; no product of another kind is offered as one, and a question about the product itself is left as it was.
+ * The goes-with mechanism the answerer routes to, and only to: a product of another kind to go with the one on the screen
+ * (or named by its SKU), a match by look ("יש טבעת שמתאימה לצמיד?", Rocks 19.11: answered with a paragraph and no ring) or
+ * what is used with it ("מה עוד צריך למקדחה?"), from the store's own pairings, its goes-with map and the index. Every other
+ * question goes through today's flow untouched, byte for byte. The store focuses it: sources, kinds that may be paired,
+ * what is never offered, how many are shown.
  */
 final class GoesWithTest extends TestCase
 {
@@ -32,11 +44,13 @@ final class GoesWithTest extends TestCase
 
     private const TOKEN = 'lat_gggggggggggggggggggggggggggggggggggggggggggggggg';
 
-    /** @var list<array{provider: AiProviderName, user: string}> */
+    /** @var list<array{provider: AiProviderName, system: string, user: string}> */
     public array $calls = [];
 
     /** @var list<array<string, mixed>> */
     public array $replies = [];
+
+    private ?string $vocabularyId = null;
 
     protected function setUp(): void
     {
@@ -56,9 +70,9 @@ final class GoesWithTest extends TestCase
 
             public function json(AiProviderName $provider, string $model, string $system, string $user, int $maxOutputTokens, ?string $reasoningEffort = null): ModelReply
             {
-                $this->test->calls[] = ['provider' => $provider, 'user' => $user];
+                $this->test->calls[] = ['provider' => $provider, 'system' => $system, 'user' => $user];
 
-                return new ModelReply(array_shift($this->test->replies) ?? [], 700, 120);
+                return new ModelReply(array_shift($this->test->replies) ?? ['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true], 700, 120);
             }
         });
         $this->app->instance(Passages::class, new class implements Passages
@@ -81,7 +95,7 @@ final class GoesWithTest extends TestCase
 
         $data = $this->askWith('יש טבעת שמתאימה לצמיד?', ['17156', 'b2'], page: true)->assertOk()->json('data');
 
-        $writer = json_decode($this->calls[0]['user'] ?? 'null', true);
+        $writer = json_decode($this->calls[0]['user'], true);
         $ids = $this->idsOf($writer);
         $this->assertSame('p1', $writer['viewing'] ?? null, 'the bracelet is still the product on the page');
         $this->assertSame(['17156', 'r1', 'r2', 'r3'], $ids, 'the rings in stock, those sharing most with the bracelet first, the silver one last');
@@ -92,6 +106,7 @@ final class GoesWithTest extends TestCase
 
         $goes = $writer['analysis']['goes_with'];
         $this->assertSame(['kind' => 'טבעת', 'with' => 'p1', 'found' => 3], array_intersect_key($goes, array_flip(['kind', 'with', 'found'])));
+        $this->assertArrayNotHasKey('complement', $goes, 'a match by look, not what is used with it');
         $this->assertSame('p2', $goes['matches'][0]['ref']);
         foreach (['זהב דו-גוני', '14K', "וינטג'", 'חוליות', 'Jubilee'] as $shared) {
             $this->assertContains($shared, $goes['matches'][0]['shares'], 'why the first ring matches: '.$shared);
@@ -99,6 +114,7 @@ final class GoesWithTest extends TestCase
         $this->assertNotContains('SALE', $goes['matches'][0]['shares'], 'a sale is no match');
         $this->assertSame([], $goes['matches'][2]['shares'], 'the silver ring shares nothing');
 
+        $this->assertSame(file_get_contents(dirname(__DIR__, 2).'/Assistant/Prompts/goes_with_answer.v1.md'), $this->calls[0]['system'], 'written by the mechanism\'s own prompt');
         $this->assertSame('answered', $data['outcome']);
         $this->assertSame(['r1'], array_column($data['picks'], 'external_id'), 'the ring is shown, not the bracelet again');
         $this->assertArrayHasKey('goes_with', json_decode($this->calls[1]['user'], true)['analysis'] ?? [], 'the checker reads what the ring shares with the bracelet');
@@ -108,7 +124,6 @@ final class GoesWithTest extends TestCase
     public function test_no_product_of_the_kind_asked_is_said_as_none_never_another_kind(): void
     {
         $this->rocks(withRings: false);
-        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => 'לא מצאנו כרגע טבעת שמתאימה לצמיד הזה.', 'fine' => true]];
 
         $this->askWith('יש טבעת שמתאימה לצמיד?', ['17156', 'b2'], page: true)->assertOk();
 
@@ -117,26 +132,35 @@ final class GoesWithTest extends TestCase
         $this->assertSame(['kind' => 'טבעת', 'with' => 'p1', 'found' => 0, 'matches' => []], $writer['analysis']['goes_with']);
     }
 
-    public function test_a_question_about_the_product_itself_is_left_as_it_was(): void
+    /**
+     * Every other question goes through today's flow untouched: what the writer is given, the prompt it is given with and
+     * the picks are the same bytes with the mechanism on and off. A price question, a store question, a question about the
+     * product itself.
+     */
+    public function test_every_other_question_is_answered_exactly_as_before_with_the_mechanism_on_and_off(): void
     {
         $this->rocks();
+        $released = (string) file_get_contents(dirname(__DIR__, 2).'/Assistant/Prompts/answer_site.v'.AnswerSiteQuestion::PROMPT_VERSION.'.md');
+        $reply = fn (): array => ['found' => true, 'answer' => 'תשובה.', 'refs' => [], 'picks' => [['ref' => 'p1', 'why' => 'הצמיד']], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true];
+        $check = ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true];
 
-        foreach (['מה המידה?', 'הצמיד הזה 14K?', 'what size is it?'] as $question) {
-            $this->calls = [];
-            $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true]];
-            $this->askWith($question, ['17156', 'b2'], page: true)->assertOk();
-
-            $writer = json_decode($this->calls[0]['user'], true);
-            $this->assertSame(['17156', 'b2'], $this->idsOf($writer), $question.': what the page showed');
-            $this->assertArrayNotHasKey('goes_with', $writer['analysis'], $question);
+        foreach (['כמה עולה הצמיד?', 'מה מדיניות ההחזרות?', 'מה המידה של הצמיד?', 'what size is it?'] as $question) {
+            $seen = [];
+            foreach ([true, false] as $on) {
+                Features::override('assistant.goes_with', $on, $this->shop->id);
+                $this->calls = [];
+                $this->replies = [$reply(), $check];
+                $data = $this->askWith($question, ['17156', 'b2'], page: true)->assertOk()->json('data');
+                $input = json_decode($this->calls[0]['user'], true);
+                $this->assertArrayNotHasKey('goes_with', $input['analysis'] ?? [], $question);
+                $this->assertSame($released, $this->calls[0]['system'], $question.': the released writer, on or off');
+                $snapshot = app(AnswerSiteQuestion::class)->snapshot($this->shop->id, $question, ['17156', 'b2']);
+                $seen[] = ['input' => $this->calls[0]['user'], 'snapshot' => $snapshot['input'], 'picks' => array_column($data['picks'] ?? [], 'external_id'), 'outcome' => $data['outcome']];
+                // a saved answer would answer the second round without a model: asked afresh each time
+                $this->inShop(fn () => AssistantAnswer::query()->delete());
+            }
+            $this->assertSame($seen[0], $seen[1], $question.': the same bytes with the mechanism on and off');
         }
-
-        // and with the shop's switch off, a match asked for is too
-        Features::override('assistant.goes_with', false);
-        $this->calls = [];
-        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true]];
-        $this->askWith('יש טבעת שמתאימה לצמיד?', ['17156', 'b2'], page: true)->assertOk();
-        $this->assertArrayNotHasKey('goes_with', json_decode($this->calls[0]['user'], true)['analysis']);
     }
 
     public function test_an_english_store_finds_the_bracelet_that_goes_with_its_necklace(): void
@@ -173,7 +197,6 @@ final class GoesWithTest extends TestCase
     public function test_a_product_named_by_its_sku_off_its_page_is_matched_as_if_on_it(): void
     {
         $this->rocks();
-        $this->replies = [['found' => false, 'answer' => '', 'refs' => [], 'picks' => [], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true]];
 
         $this->askWith('יש לכם טבעת שמתאימה למוצר עם המקט 17156?', [])->assertOk();
 
@@ -196,6 +219,113 @@ final class GoesWithTest extends TestCase
         $this->assertSame(['ab'], array_slice($named('מה המחיר של ab-1234?'), 0, 1), 'letters and digits, in any case');
         $this->assertNotContains('c400', $named('שמפו 400 מ"ל'), 'a number before a measure names nothing by its number');
         $this->assertNotContains('c4000', $named('מתנה עד 4000 ש"ח'), 'nor an amount the question keeps to');
+    }
+
+    /** A hardware store: what else a drill needs is its bits and screws (the store's map), the same system (Makita) first. */
+    public function test_a_hardware_store_offers_the_bits_and_screws_of_the_drills_own_system_first(): void
+    {
+        $this->hardware(withMap: true);
+
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+
+        $writer = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['d1', 'b1', 's1', 'b2'], $this->idsOf($writer), 'the Makita bits first, the Makita screws, then the Bosch bits; no drill, no glue, no bit out of stock');
+        $goes = $writer['analysis']['goes_with'];
+        $this->assertSame('מקדח / בורג', $goes['kind'], 'the kinds the map pairs with a drill');
+        $this->assertTrue($goes['complement']);
+        $this->assertSame(['Makita'], $goes['matches'][0]['shares'], 'why: the same system');
+        $this->assertSame([], $goes['matches'][2]['shares']);
+    }
+
+    /** A fashion store: what goes with the dress is a belt or a bag (the map), the one in its colour first. */
+    public function test_a_fashion_store_offers_a_belt_and_a_bag_with_the_dress(): void
+    {
+        $facets = [
+            ['k' => 'type', 'l' => 'Type', 'v' => [['k' => 'dress', 'l' => 'Dress'], ['k' => 'belt', 'l' => 'Belt'], ['k' => 'bag', 'l' => 'Bag'], ['k' => 'shoes', 'l' => 'Shoes']]],
+            ['k' => 'variant_colour', 'l' => 'Colour', 'v' => [['k' => 'black', 'l' => 'Black'], ['k' => 'red', 'l' => 'Red']]],
+        ];
+        $items = [
+            ['dr1', 'Wrap Midi Dress', [0, 1000], 320, [], 'dress'],
+            ['be1', 'Slim Leather Belt', [1, 1000], 60, [], 'belt'],
+            ['be2', 'Wide Red Belt', [1, 1001], 70, [], 'belt'],
+            ['ba1', 'Evening Clutch Bag', [2, 1000], 140, [], 'bag'],
+            ['sh1', 'Court Shoes', [3, 1000], 190, [], 'shoes'],
+            ['dr2', 'Shirt Dress', [0, 1001], 280, [], 'dress'],
+        ];
+        $this->index($facets, $items, types: ['dress' => 'Dress', 'belt' => 'Belt', 'bag' => 'Bag', 'shoes' => 'Shoes']);
+        $this->map([['dress', 'belt', 'A belt that marks the waist'], ['dress', 'bag', 'A bag for the evening']]);
+
+        $this->askWith('What goes with this dress?', ['dr1'], page: true, locale: 'en')->assertOk();
+
+        $writer = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['dr1', 'ba1', 'be1', 'be2'], $this->idsOf($writer), 'the black bag and belt first (the bag nearer the dress in price), the red belt after; no shoes, no other dress');
+        $this->assertSame('Belt / Bag', $writer['analysis']['goes_with']['kind']);
+        $this->assertSame(['Black'], $writer['analysis']['goes_with']['matches'][0]['shares']);
+    }
+
+    public function test_with_no_map_and_no_pairing_of_the_stores_what_else_is_needed_is_said_as_none(): void
+    {
+        $this->hardware(withMap: false);
+
+        $this->askWith('מה עוד צריך לזה?', ['d1'], page: true)->assertOk();
+
+        $writer = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['d1'], $this->idsOf($writer), 'the drill alone: nothing stands in for what the store never said goes with it');
+        $this->assertSame(['kind' => '', 'with' => 'p1', 'found' => 0, 'matches' => [], 'complement' => true], $writer['analysis']['goes_with']);
+    }
+
+    public function test_the_stores_own_pairing_is_offered_first_where_it_keeps_relations(): void
+    {
+        $this->hardware(withMap: false);
+        Features::override('enrichment.relations', true, $this->shop->id);
+        $this->relate('d1', 'g1');
+
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+
+        $writer = json_decode($this->calls[0]['user'], true);
+        $this->assertSame(['d1', 'g1'], $this->idsOf($writer), 'what the store itself pairs with the drill, though no map names glue');
+        $this->assertSame(['החנות מציעה אותם יחד'], $writer['analysis']['goes_with']['matches'][0]['shares']);
+
+        // the store turns that source off: nothing is left to offer
+        Settings::set('assistant.goes_with_use_relations', false, $this->shop->id);
+        $this->calls = [];
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+        $this->assertSame(['d1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
+    }
+
+    public function test_the_store_focuses_it_by_sources_pairs_of_kinds_and_what_it_never_offers(): void
+    {
+        $this->hardware(withMap: true);
+
+        // the map off: what else is needed has no source left
+        Settings::set('assistant.goes_with_use_map', false, $this->shop->id);
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+        $this->assertSame(0, json_decode($this->calls[0]['user'], true)['analysis']['goes_with']['found']);
+        Settings::set('assistant.goes_with_use_map', true, $this->shop->id);
+
+        // never a Bosch, and never screws with a drill: the Makita bits alone
+        $this->inShop(fn () => AssistantGoesWithRules::query()->create(['shop_id' => $this->shop->id,
+            'pairs' => [['a' => 'screw', 'b' => 'drill', 'allow' => false]], 'never' => [['scope' => 'vendor', 'value' => 'bosch']]]));
+        $this->calls = [];
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+        $this->assertSame(['d1', 'b1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
+
+        // allowed kinds named for the drill: only those
+        $this->inShop(fn () => AssistantGoesWithRules::query()->sole()->update(['pairs' => [['a' => 'drill', 'b' => 'screw', 'allow' => true]], 'never' => []]));
+        $this->calls = [];
+        $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk();
+        $this->assertSame(['d1', 's1'], $this->idsOf(json_decode($this->calls[0]['user'], true)));
+
+        // and at most as many cards as the store shows
+        $this->inShop(fn () => AssistantGoesWithRules::query()->delete());
+        Settings::set('assistant.goes_with_max_picks', 1, $this->shop->id);
+        $this->calls = [];
+        $this->replies = [
+            ['found' => true, 'answer' => 'כדאי להוסיף מקדחים וברגים.', 'refs' => [], 'picks' => [['ref' => 'p2', 'why' => 'מקדחים'], ['ref' => 'p3', 'why' => 'ברגים']], 'names' => [], 'general' => [], 'not_found' => '', 'fine' => true],
+            ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true],
+        ];
+        $data = $this->askWith('מה עוד צריך למקדחה?', ['d1'], page: true)->assertOk()->json('data');
+        $this->assertSame(['b1'], array_column($data['picks'], 'external_id'));
     }
 
     /**
@@ -232,23 +362,74 @@ final class GoesWithTest extends TestCase
         $this->index($facets, $items);
     }
 
+    /** Gueta's drills, bits, screws and glue, with their kinds approved and the vendors the store writes on them. */
+    private function hardware(bool $withMap): void
+    {
+        $facets = [
+            ['k' => 'type', 'l' => 'סוג', 'v' => [['k' => 'drill', 'l' => 'מקדחה'], ['k' => 'drill_bit', 'l' => 'מקדח'], ['k' => 'screw', 'l' => 'בורג'], ['k' => 'glue', 'l' => 'דבק']]],
+            ['k' => 'brand', 'l' => 'מותג', 'v' => [['k' => 'makita', 'l' => 'Makita'], ['k' => 'bosch', 'l' => 'Bosch']]],
+        ];
+        $items = [
+            ['d1', 'מקדחה רוטטת 18V', [0, 1000], 800, ['brand' => 'Makita'], 'drill'],
+            ['d2', 'מקדחה רוטטת מקצועית', [0, 1001], 900, ['brand' => 'Bosch'], 'drill'],
+            ['b1', 'סט מקדחים לבטון ולעץ', [1, 1000], 400, ['brand' => 'Makita'], 'drill_bit'],
+            ['b2', 'מקדח לבטון', [1, 1001], 60, ['brand' => 'Bosch'], 'drill_bit'],
+            ['b3', 'סט מקדחים לעץ', [1, 1000], 350, ['brand' => 'Makita', 'in_stock' => false], 'drill_bit'],
+            ['s1', 'ברגים לדק', [2, 1000], 40, ['brand' => 'Makita'], 'screw'],
+            ['g1', 'דבק עץ', [3], 30, [], 'glue'],
+        ];
+        $this->index($facets, $items, types: ['drill' => 'מקדחה', 'drill_bit' => 'מקדח', 'screw' => 'בורג', 'glue' => 'דבק']);
+        if ($withMap) {
+            $this->map([['drill', 'drill_bit', 'המקדחים שעובדים איתה'], ['drill', 'screw', 'הברגים שמבריגים איתה']]);
+        }
+    }
+
     /**
-     * The products, in the catalogue and in the index, each [external id, title, filter codes, price, overrides].
+     * The products, in the catalogue and in the index, each [external id, title, filter codes, price, overrides, type key],
+     * and, where kinds are given, the vocabulary that names them with each product's approved type.
      *
      * @param  list<array<string, mixed>>  $facets
      * @param  list<array<int, mixed>>  $items
+     * @param  array<string, string>  $types  type key => label
      */
-    private function index(array $facets, array $items): void
+    private function index(array $facets, array $items, array $types = []): void
     {
+        if ($types !== []) {
+            $this->vocabularyId = $this->inShop(fn (): string => EnrichmentVocabulary::query()->create(['shop_id' => $this->shop->id, 'key' => 'store', 'version' => 1, 'root_category_external_id' => '*', 'active' => true, 'definition_hash' => 'h',
+                'definition' => ['schema_version' => 1, 'key' => 'store', 'name' => ['he' => 'חנות', 'en' => 'Store'], 'root_category_external_id' => '*',
+                    'product_types' => array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => ['he' => $label, 'en' => $label]], array_keys($types), $types),
+                    'attributes' => []]])->id);
+        }
         $records = [];
         foreach ($items as $item) {
             [$id, $title, $codes, $price] = $item;
             $overrides = ($item[4] ?? []) + ['price' => (string) $price, 'in_stock' => true];
-            $this->product((string) $id, (string) $title, (string) $title, [], $overrides);
+            $product = $this->product((string) $id, (string) $title, (string) $title, [], $overrides);
+            if (isset($item[5]) && $this->vocabularyId !== null) {
+                $this->inShop(fn () => EnrichmentFact::query()->create(['shop_id' => $this->shop->id, 'product_id' => $product->id, 'vocabulary_id' => $this->vocabularyId, 'kind' => FactKind::Type, 'key' => 'type',
+                    'value_text' => (string) $item[5], 'origin' => FactOrigin::Code, 'status' => FactStatus::Approved, 'input_hash' => 't'.$id]));
+            }
             $records[] = ['id' => 'p:'.$id, 't' => 'product', 'title' => $title, 'kw' => '', 's' => $overrides['in_stock'] ? 1 : 0, 'pr' => (float) $price, 'f' => $codes];
         }
         $json = (string) json_encode(['v' => 1, 'items' => $records, 'facets' => $facets], JSON_UNESCAPED_UNICODE);
         $this->inShop(fn () => SearchIndex::query()->create(['shop_id' => $this->shop->id, 'hash' => md5($json), 'items' => $json, 'counts' => [], 'built_at' => now()]));
+    }
+
+    /** A goes-with map that passed, as BuildGoesWithMap stores it: [type, partner type, why]. */
+    private function map(array $pairs): void
+    {
+        $keys = array_values(array_unique(array_merge(array_column($pairs, 0), array_column($pairs, 1))));
+        $this->inShop(fn () => EnrichmentGoesWithMap::query()->create(['shop_id' => $this->shop->id, 'status' => EnrichmentGoesWithMap::PASSED, 'fingerprint' => 'f',
+            'types' => array_map(fn (string $key): array => ['key' => $key, 'label' => $key, 'products' => 1, 'examples' => []], $keys),
+            'pairs' => array_map(fn (array $p): array => ['type' => $p[0], 'partner_type' => $p[1], 'why' => $p[2], 'score' => 92], $pairs)]));
+    }
+
+    /** The store pairs two products itself (a cross-sell), as ComputeProductRelations keeps it. */
+    private function relate(string $product, string $related): void
+    {
+        $ids = $this->inShop(fn () => CatalogProduct::query()->whereIn('external_id', [$product, $related])->pluck('id', 'external_id'));
+        $this->inShop(fn () => EnrichmentProductRelation::query()->create(['shop_id' => $this->shop->id, 'product_id' => $ids[$product], 'related_product_id' => $ids[$related],
+            'kind' => RelationKind::Complement, 'source' => 'merchant', 'score' => 150, 'reasons' => ['merchant' => 'cross_sell'], 'computed_at' => now()]));
     }
 
     /** @return list<string> the products the writer was given, by external id, in order */

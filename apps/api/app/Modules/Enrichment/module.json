@@ -61,6 +61,10 @@
             "default": false
         },
         {
+            "name": "goes_with_map",
+            "default": false
+        },
+        {
             "name": "picture_suggestions",
             "default": true
         },
@@ -742,6 +746,105 @@
             "unit": "usd"
         },
         {
+            "name": "goes_with_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "goes_with_writer_model",
+            "type": "string",
+            "default": "claude-sonnet-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "goes_with_writer_input_usd_per_million",
+            "type": "float",
+            "default": 3,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "goes_with_writer_output_usd_per_million",
+            "type": "float",
+            "default": 15,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "goes_with_checker_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "goes_with_checker_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "goes_with_checker_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "goes_with_checker_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "goes_with_min_score",
+            "type": "int",
+            "default": 70,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "points"
+        },
+        {
+            "name": "goes_with_partners_per_type",
+            "type": "int",
+            "default": 6,
+            "min": 1,
+            "max": 12,
+            "scope": "shop"
+        },
+        {
+            "name": "goes_with_max_types",
+            "type": "int",
+            "default": 120,
+            "min": 10,
+            "max": 300,
+            "scope": "shop"
+        },
+        {
             "name": "expert_bank_writer_provider",
             "type": "enum",
             "options": [
@@ -1077,6 +1180,45 @@
             "run": {
                 "command": "enrichment",
                 "step": "expert-bank",
+                "shop_argument": "target"
+            }
+        },
+        {
+            "name": "goes_with_map",
+            "action": "build_goes_with_map",
+            "when": "on_request",
+            "features": [
+                "goes_with_map"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "goes_with_writer_provider",
+                    "model": "goes_with_writer_model",
+                    "prices": [
+                        "goes_with_writer_input_usd_per_million",
+                        "goes_with_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "goes_with_map"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "goes_with_checker_provider",
+                    "model": "goes_with_checker_model",
+                    "prices": [
+                        "goes_with_checker_input_usd_per_million",
+                        "goes_with_checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "goes_with_map_check"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "goes-with-map",
                 "shop_argument": "target"
             }
         },

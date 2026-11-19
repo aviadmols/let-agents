@@ -1,0 +1,21 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["pairs", "notes"],
+    "properties": {
+        "pairs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "partner_type", "why"],
+                "properties": {
+                    "type": {"type": "string"},
+                    "partner_type": {"type": "string"},
+                    "why": {"type": "string"}
+                }
+            }
+        },
+        "notes": {"type": "array", "items": {"type": "string"}}
+    }
+}

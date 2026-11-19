@@ -5,23 +5,33 @@ namespace App\Modules\Search\Support;
 use App\Modules\Assistant\Contracts\ProductsGoingWith;
 use App\Modules\Catalog\Contracts\ProductKinds;
 use App\Modules\Catalog\Models\CatalogProduct;
+use App\Modules\Enrichment\Contracts\GoesWithPartners;
 use App\Modules\Search\Actions\BuildSearchIndex;
+use App\Modules\Tenancy\Models\Shop;
 
 /**
  * The products of another kind that go with a product, read off the store's search index (ProductsGoingWith). Code only,
  * any store, no word list of its own: the kinds are the index's type filter (else its one-word categories), the shared
  * values its filters, the shared words its titles, keywords and the product's description.
  *
- * "יש טבעת שמתאימה לצמיד?" on a two-tone 14K chain-link bracelet (Rocks, 19.11) was answered with a paragraph and no ring:
- * on a product's page the writer had that product alone. Now the store's rings in stock, for the bracelet's audience,
- * each weighed by what it shares with the bracelet:
+ * Two things are asked, one pipeline:
  *
- * - each filter value both carry (its metal, colour, karat, stone, style, collection), by how few products carry it: a
+ * - a match ("יש טבעת שמתאימה לצמיד?" on a two-tone 14K chain-link bracelet, Rocks 19.11, answered with a paragraph and no
+ *   ring): the kind the question names, its products in stock, those sharing most with the product first;
+ * - a complement ("מה עוד צריך למקדחה?", "what goes with this dress?"): the kinds the store's goes-with map pairs with the
+ *   product's kind (GoesWithPartners), and the products the store itself pairs with it (its cross-sells, what is bought
+ *   together), when the shop lets each source be read ($sources).
+ *
+ * Each candidate is weighed by what it shares with the product:
+ *
+ * - the store pairing them (a complement relation): most of all;
+ * - each filter value both carry (its metal, colour, karat, stone, style, collection, brand), by how few products carry it: a
  *   value every product has says nothing. Never the kind itself, a sale, a size, a length or whom it is for; never a
  *   value a check refused for either; half for a value read weakly. A filter where both have values and none shared
  *   (gold beside silver) weighs against;
+ * - the same vendor (the brand the store writes on both): the same system, in a store of tools;
  * - each word of the product's title, keywords or description that few of the store's products say ("חוליות", "Jubilee",
- *   "וינטג'"), in any of its forms, found in the other's title or keywords, and a word of its title in the other's
+ *   "Makita"), in any of its forms, found in the other's title or keywords, and a word of its title in the other's
  *   description too. Never a word that names a kind;
  * - how near its price is, a tie-breaker only.
  *
@@ -32,7 +42,7 @@ final class GoingWith implements ProductsGoingWith
     /** A word or value more than this share of the store's products carry tells nothing apart. */
     private const COMMON_SHARE = 0.3;
 
-    /** Of the products of the kind, how many best by their index are read again with their descriptions. */
+    /** Of the products of the kind, how many best by their index are read again with their descriptions and vendors. */
     private const POOL = 40;
 
     /** A word of the product's own title weighs this; one of its keywords or description this. */
@@ -45,6 +55,12 @@ final class GoingWith implements ProductsGoingWith
 
     /** A filter where both have values and none is shared: this much against. */
     private const CONFLICT = 0.5;
+
+    /** The store pairing them itself (a complement relation) weighs this, and its score on top. */
+    private const PAIRED = 3.0;
+
+    /** The same vendor on both (the same system: Makita with Makita) weighs this. */
+    private const VENDOR = 2.0;
 
     /** How much a price nearer the product's weighs at most: a tie-breaker, never a reason. */
     private const PRICE_NEAR = 0.3;
@@ -59,22 +75,75 @@ final class GoingWith implements ProductsGoingWith
     private const LINK_WORDS = ['the', 'and', 'with', 'for', 'of', 'an', 'in', 'on', 'to', 'by', 'this', 'that', 'it', 'is', 'are', 'set', 'new',
         'עמ', 'של', 'את', 'על', 'או', 'גמ', 'זה', 'זו', 'הזה', 'הזאת', 'סט', 'כל', 'בלי', 'ללא', 'מאוד', 'יותר', 'אשר'];
 
+    /**
+     * Asks what is used with the product, naming no kind: "מה עוד צריך", "מה הולך עם", "מה משלים", "what else do I need",
+     * "what goes with". On the question normalized (no final letters).
+     */
+    private const ASKS_COMPLEMENT = '/(?:^|[^\p{L}])(?:מה\s+(?:עוד|הולכ\S*|מתאימ\S*|משלימ\S*|צריכ\S*|נחוצ\S*|כדאי|מומלצ\S*)|עוד\s+(?:משהו|דברימ|מוצרימ|צריכ\S*|נחוצ\S*)|צריכ\S*\s+(?:עוד|גמ|בנוספ|איתו|איתה|לזה)|(?:הולכ\S*|משלימ\S*|מתאימ\S*|ביחד|יחד)\s+(?:עמ|ל)|להשלימ|what\s+(?:else|goes|pairs|do\s+i\s+need|should\s+i)|anything\s+else|go(?:es)?\s+with|pairs?\s+with|complete\s+the|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
+
     /** @var array<string, array{df: array<string, int>, keys: array<string, list<string>>, products: int}> by index hash */
     private static array $words = [];
 
-    public function __construct(private readonly ProductKinds $kinds) {}
+    public function __construct(private readonly ProductKinds $kinds, private readonly GoesWithPartners $partners) {}
 
-    public function goingWith(string $shopId, string $viewed, string $question, int $limit): ?array
+    public function goingWith(string $shopId, string $viewed, string $question, int $limit, array $sources = []): ?array
     {
         $index = LoadedIndex::for($shopId);
         $own = $index['records']['p:'.$viewed] ?? null;
         if ($index === null || $own === null || trim($question) === '' || $limit < 1) {
             return null;
         }
+        $use = ['relations' => true, 'map' => true, 'look' => true];
+        foreach ($use as $source => $default) {
+            $use[$source] = (bool) ($sources[$source] ?? $default);
+        }
         $facets = array_values((array) ($index['facets'] ?? []));
         $asked = self::askedKind($index, $facets, $question, $own);
-        if ($asked === null) {
+        $asksComplement = preg_match(self::ASKS_COMPLEMENT, HebrewSearch::normalize($question)) === 1;
+        if ($asked === null && ! $asksComplement) {
             return null;
+        }
+
+        // what the store knows goes with it: the kinds its map pairs with the product's kind, and the products it pairs itself
+        $typeAt = array_search('type', array_map(fn (array $f): string => (string) ($f['k'] ?? ''), $facets), true);
+        $typeValues = is_int($typeAt) ? (array) ($facets[$typeAt]['v'] ?? []) : [];
+        $ownTypes = is_int($typeAt) ? array_values(array_filter(array_map(fn (int $code): ?string => intdiv($code, 1000) === $typeAt ? (string) ($typeValues[$code % 1000]['k'] ?? '') : null, self::codes($own)))) : [];
+        $partners = [];
+        if ($use['map']) {
+            foreach ($ownTypes as $type) {
+                foreach ($this->partners->partnersOf($shopId, $type) as $partner) {
+                    $partners[$partner['type']] ??= $partner;
+                }
+            }
+        }
+        $paired = [];
+        if ($use['relations']) {
+            foreach ($this->partners->complementsOf($shopId, $viewed) as $relation) {
+                $paired[(string) $relation['external_id']] ??= (int) $relation['score'];
+            }
+        }
+        $partnerCodes = [];
+        foreach ($typeValues as $i => $value) {
+            if (isset($partners[(string) ($value['k'] ?? '')])) {
+                $partnerCodes[] = $typeAt * 1000 + $i;
+            }
+        }
+
+        $complement = $asksComplement;
+        if ($asked === null) {
+            // a complement asked with no kind named: the kinds the map pairs with it, the products the store pairs with it
+            if ($partnerCodes === [] && $paired === []) {
+                return ['kind' => '', 'ids' => [], 'shares' => [], 'complement' => true];
+            }
+            $asked = ['codes' => $partnerCodes, 'label' => implode(' / ', array_values(array_unique(array_map(fn (int $code): string => (string) ($typeValues[$code % 1000]['l'] ?? ''), $partnerCodes))))];
+            $complement = true;
+            $byKind = true;
+        } else {
+            // a kind named: the map saying it goes with the product's makes it a complement; with no match by look allowed,
+            // only a kind the map or the store's pairings know
+            $knownKind = array_intersect($asked['codes'], $partnerCodes) !== [];
+            $complement = $complement || $knownKind;
+            $byKind = $use['look'] || $knownKind;
         }
 
         $products = array_filter($index['records'], fn (array $r): bool => ($r['t'] ?? null) === 'product');
@@ -84,25 +153,35 @@ final class GoingWith implements ProductsGoingWith
         $ownCodes = self::codes($own);
         $ownWeak = array_map('intval', array_keys((array) ($own['ev'] ?? [])));
         $shareable = self::shareable($facets);
+        $anchor = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $viewed)->first();
 
         // what the product says that few others do, by key, with how it writes it
         $ownTitle = self::keyed((string) ($own['title'] ?? ''));
-        $ownOther = self::keyed((string) ($own['kw'] ?? '').' '.$this->description($viewed));
+        $ownOther = self::keyed((string) ($own['kw'] ?? '').' '.($anchor === null ? '' : $anchor->shortDescription().' '.$anchor->description()));
         $kindKeys = self::kindKeys($facets);
         $rare = fn (string $key): bool => ! isset($kindKeys[$key]) && ($words['df'][$key] ?? 0) >= 1 && ($words['df'][$key] ?? 0) <= max(1, (int) floor($total * self::COMMON_SHARE));
         $ownTitle = array_filter($ownTitle, $rare, ARRAY_FILTER_USE_KEY);
         $ownOther = array_diff_key(array_filter($ownOther, fn (string $key): bool => $rare($key) && ($words['df'][$key] ?? 0) >= 2, ARRAY_FILTER_USE_KEY), $ownTitle);
         $idf = fn (int $n): float => log(1 + $total / max(1, $n));
         $ownPrice = isset($own['pr']) ? (float) $own['pr'] : null;
+        $pairedLabel = (string) __('search::storefront.goes_with_paired', [], (string) (Shop::query()->whereKey($shopId)->value('content_locale') ?: 'he'));
 
         $scored = [];
         foreach ($products as $id => $record) {
+            $external = substr((string) $id, 2);
             $codes = self::codes($record);
-            if ($id === 'p:'.$viewed || (int) ($record['s'] ?? 0) !== 1 || array_intersect($codes, $asked['codes']) === []) {
+            $ofKind = $asked['codes'] !== [] && array_intersect($codes, $asked['codes']) !== [];
+            // a product the store pairs with it counts when it is of the kind asked, or when no kind was named
+            $isPaired = isset($paired[$external]) && ($asked['codes'] === [] || $ofKind || ! isset($knownKind));
+            if ($id === 'p:'.$viewed || (int) ($record['s'] ?? 0) !== 1 || ! (($byKind && $ofKind) || $isPaired)) {
                 continue;
             }
             $score = 0.0;
             $shares = [];
+            if ($isPaired) {
+                $score += self::PAIRED + min(300, $paired[$external]) / 100;
+                $shares[] = $pairedLabel;
+            }
             $weak = array_map('intval', array_keys((array) ($record['ev'] ?? [])));
             $sharedGroups = [];
             foreach (array_intersect($ownCodes, $codes) as $code) {
@@ -132,7 +211,7 @@ final class GoingWith implements ProductsGoingWith
             }
             $price = isset($record['pr']) ? (float) $record['pr'] : null;
             $near = $ownPrice !== null && $ownPrice > 0 && $price !== null && $price > 0 ? max(0.0, 1 - abs(log($price / $ownPrice)) / log(4)) : 0.0;
-            $scored[substr((string) $id, 2)] = ['score' => $score, 'near' => $near, 'shares' => array_values(array_unique(array_filter($shares)))];
+            $scored[$external] = ['score' => $score, 'near' => $near, 'shares' => array_values(array_unique(array_filter($shares)))];
         }
 
         $order = function (array &$scored): void {
@@ -140,9 +219,11 @@ final class GoingWith implements ProductsGoingWith
         };
         $order($scored);
 
-        // the best by the index read again with their descriptions: a word of the product's title in theirs ("חוליות")
+        // the best by the index read again with their descriptions and vendors: a word of the product's title in theirs
+        // ("חוליות"), the same vendor on both ("Makita")
         $pool = array_slice(array_keys($scored), 0, self::POOL);
-        if ($pool !== [] && $ownTitle !== []) {
+        $ownVendor = mb_strtolower(trim((string) ($anchor?->brand ?? '')));
+        if ($pool !== [] && ($ownTitle !== [] || $ownVendor !== '')) {
             foreach (CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $pool)->get() as $product) {
                 $id = (string) $product->external_id;
                 $text = array_flip(array_keys(self::keyed($product->shortDescription().' '.$product->description())));
@@ -150,6 +231,12 @@ final class GoingWith implements ProductsGoingWith
                     if (isset($text[$key]) && ! in_array($surface, $scored[$id]['shares'], true) && ! isset(self::valueKeys($scored[$id]['shares'])[$key])) {
                         $scored[$id]['score'] += self::OTHER_WORD * $idf((int) $words['df'][$key]);
                         $scored[$id]['shares'][] = $surface;
+                    }
+                }
+                if ($ownVendor !== '' && mb_strtolower(trim((string) $product->brand)) === $ownVendor) {
+                    $scored[$id]['score'] += self::VENDOR;
+                    if (! in_array((string) $anchor->brand, $scored[$id]['shares'], true) && ! isset(self::valueKeys($scored[$id]['shares'])[HebrewSearch::formKey($ownVendor)])) {
+                        $scored[$id]['shares'][] = (string) $anchor->brand;
                     }
                 }
             }
@@ -163,6 +250,7 @@ final class GoingWith implements ProductsGoingWith
             'kind' => $asked['label'],
             'ids' => $ids,
             'shares' => array_combine($ids, array_map(fn (string $id): array => $scored[$id]['shares'], $ids)) ?: [],
+            'complement' => $complement,
         ];
     }
 
@@ -430,14 +518,6 @@ final class GoingWith implements ProductsGoingWith
         }
 
         return self::$words[$hash] = ['df' => $df, 'keys' => $keys, 'products' => count($products)];
-    }
-
-    /** What the product's own page says of it: its short description and its description. */
-    private function description(string $externalId): string
-    {
-        $product = CatalogProduct::query()->whereNull('removed_at')->where('external_id', $externalId)->first();
-
-        return $product === null ? '' : $product->shortDescription().' '.$product->description();
     }
 
     /**

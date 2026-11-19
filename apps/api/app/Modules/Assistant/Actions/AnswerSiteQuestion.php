@@ -23,6 +23,7 @@ use App\Modules\Assistant\Contracts\ProductsNear;
 use App\Modules\Assistant\Contracts\ProductsPopular;
 use App\Modules\Assistant\Contracts\TriesQuestions;
 use App\Modules\Assistant\Models\AssistantAnswer;
+use App\Modules\Assistant\Models\AssistantGoesWithRules;
 use App\Modules\Assistant\Models\AssistantIgnoredSource;
 use App\Modules\Assistant\Models\AssistantSearchAsk;
 use App\Modules\Assistant\Support\AnswerContext;
@@ -49,6 +50,7 @@ use App\Modules\Catalog\Models\CatalogCategory;
 use App\Modules\Catalog\Models\CatalogContent;
 use App\Modules\Catalog\Models\CatalogProduct;
 use App\Modules\Catalog\Models\CatalogProductChoice;
+use App\Modules\Enrichment\Enums\FactKind;
 use App\Modules\Enrichment\Enums\FactStatus;
 use App\Modules\Enrichment\Models\EnrichmentFact;
 use App\Modules\Retrieval\Contracts\Passages;
@@ -240,10 +242,15 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @var array<string, list<int>>
      */
     // answer_site v40-v42 and verify_site v40 were tried and not released: v43 is the writer, v39 the checker
-    // answer_site v46 (v45, and `analysis.goes_with` read by name: a product of another kind to go with the one on the page,
-    // each match explained by what it shares with it, the product itself not picked again, none found said as none) is a
-    // candidate, 19.11: code gives every version goes_with already (prepare()); released once compared on the stores
-    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42, 46], 'verify_site' => [36, 40], 'scope_site' => [45]];
+    public const CANDIDATES = ['answer_site' => [23, 24, 25, 27, 28, 38, 40, 41, 42], 'verify_site' => [36, 40], 'scope_site' => [45]];
+
+    /**
+     * The writer of a question routed to the goes-with mechanism (a product of another kind to go with the one on the
+     * page: goesWith()): its own prompt, answer_site v45 and `analysis.goes_with` read by name, in its own versioned file
+     * (goes_with_answer.v1). The released answer_site prompt is never changed for it; every other question goes through
+     * it untouched. The same output schema, so code's gate and the checker read the reply as any answer's.
+     */
+    public const GOES_WITH_PROMPT = 'goes_with_answer';
 
     /** A replay's verify_site version that runs no model's check: comparisons only (replay()). */
     public const NO_CHECK = 0;
@@ -395,7 +402,7 @@ final class AnswerSiteQuestion implements TriesQuestions
      * Asks for something to go with a product: "מתאים/ה ל", "שמתאים", "ללכת עם", "סט", "תואם", "להשלים", "משלים", "match",
      * "goes with", "set", "complete the look". A sign only: what is asked for is the kind the question names (goesWith()).
      */
-    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*)(?:[^\p{L}]|$)/iu';
+    private const GOES_WITH = '/(?:^|[^\p{L}])(?:[והכלמש]{0,2}(?:מתאימ|מתאים|מתאימה|מתאימות|מתאימים|תואמ|תואם|תואמת|תואמות|תואמים|משלימ|משלים|משלימה|משלימות|משלימים|להשלים|השלמה|סט|סטים)|ללכת\s+עם|הולכ(?:ת|ים|ות)?\s+עם|הולך\s+עם|מה\s+עוד|עוד\s+(?:משהו|צרי[ךכ]\S*|נחוצ\S*|כדאי)|צרי[ךכ]\S*\s+(?:עוד|גם|בנוסף|איתו|איתה|לזה)|מה\s+(?:צרי[ךכ]\S*|נחוצ\S*|כדאי|מומלצ\S*)\s+(?:ל|עם|איתו|איתה|בנוסף)|match(?:es|ing)?|go(?:es)?\s+with|goes\s+well|pair(?:s|ed)?\s+with|set|complete\s+the\s+look|coordinat\w*|what\s+else|anything\s+else|need\s+(?:with|for\s+(?:this|it|that))|accessor(?:y|ies))(?:[^\p{L}]|$)/iu';
 
     /**
      * What the code found to go with the product asked about (goesWith()): the kind asked, the product, and by id what each
@@ -2169,21 +2176,86 @@ final class AnswerSiteQuestion implements TriesQuestions
             return null;
         }
         $limit = (int) Settings::get('assistant.goes_with_products', $shopId);
+        // which sources the store lets it choose from (GoesWithSettings)
+        $sources = [
+            'relations' => (bool) Settings::get('assistant.goes_with_use_relations', $shopId),
+            'map' => (bool) Settings::get('assistant.goes_with_use_map', $shopId),
+            'look' => (bool) Settings::get('assistant.goes_with_use_look', $shopId),
+        ];
+        $rules = AssistantGoesWithRules::of($shopId);
 
         foreach ($wordings as $wording) {
             try {
-                $found = app(ProductsGoingWith::class)->goingWith($shopId, $anchor, $wording, $limit);
+                // more than shown, so what the store's rules take out leaves enough
+                $found = app(ProductsGoingWith::class)->goingWith($shopId, $anchor, $wording, $rules['pairs'] === [] && $rules['never'] === [] ? $limit : $limit * 3, $sources);
             } catch (\Throwable $e) {
                 report($e);
 
                 return null;
             }
             if ($found !== null) {
-                return ['kind' => $found['kind'], 'anchor' => $anchor, 'ids' => array_values(array_diff(array_map('strval', $found['ids']), [$anchor])), 'shares' => $found['shares']];
+                $ids = array_slice($this->allowedWith($anchor, array_values(array_diff(array_map('strval', $found['ids']), [$anchor])), $rules), 0, $limit);
+
+                return ['kind' => $found['kind'], 'anchor' => $anchor, 'ids' => $ids, 'shares' => array_intersect_key($found['shares'], array_flip($ids)), 'complement' => (bool) ($found['complement'] ?? false)];
             }
         }
 
         return null;
+    }
+
+    /**
+     * Of the products found to go with the anchor, those the store's rules let it offer (AssistantGoesWithRules): none of a
+     * kind, a category or a vendor it never offers; none of a kind it denied beside the anchor's kind; and, once it
+     * allowed kinds for the anchor's kind, only those. A kind is the approved type fact; a product of no known kind passes
+     * the pair rules except where allowed kinds are named.
+     *
+     * @param  list<string>  $ids
+     * @param  array{pairs: list<array{a: string, b: string, allow: bool}>, never: list<array{scope: string, value: string}>}  $rules
+     * @return list<string>
+     */
+    private function allowedWith(string $anchor, array $ids, array $rules): array
+    {
+        if ($ids === [] || ($rules['pairs'] === [] && $rules['never'] === [])) {
+            return $ids;
+        }
+        $products = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', [$anchor, ...$ids])->with('categories:id,name')->get()->keyBy('external_id');
+        $types = EnrichmentFact::query()->where('kind', FactKind::Type)->where('status', FactStatus::Approved)
+            ->whereIn('product_id', $products->pluck('id'))->orderBy('id')->pluck('value_text', 'product_id');
+        $typeOf = fn (string $id): ?string => isset($products[$id]) && isset($types[$products[$id]->id]) ? (string) $types[$products[$id]->id] : null;
+        $same = fn (string $a, string $b): bool => mb_strtolower(trim($a)) === mb_strtolower(trim($b));
+
+        $never = fn (string $id): bool => array_any($rules['never'], function (array $rule) use ($id, $products, $typeOf, $same): bool {
+            $product = $products[$id] ?? null;
+
+            return match ((string) $rule['scope']) {
+                'type' => $typeOf($id) !== null && $same((string) $rule['value'], (string) $typeOf($id)),
+                'category' => $product !== null && $product->categories->contains(fn ($c): bool => $same((string) $rule['value'], (string) $c->name)),
+                'vendor' => $product !== null && $same((string) $rule['value'], (string) $product->brand),
+                default => false,
+            };
+        });
+
+        $anchorType = $typeOf($anchor);
+        $allowed = [];
+        $denied = [];
+        foreach ($rules['pairs'] as $pair) {
+            $other = $anchorType !== null && $pair['a'] === $anchorType ? $pair['b'] : ($anchorType !== null && $pair['b'] === $anchorType ? $pair['a'] : null);
+            if ($other !== null) {
+                ($pair['allow'] ?? true) ? $allowed[$other] = true : $denied[$other] = true;
+            }
+        }
+
+        return array_values(array_filter($ids, function (string $id) use ($never, $typeOf, $allowed, $denied): bool {
+            if ($never($id)) {
+                return false;
+            }
+            $type = $typeOf($id);
+            if ($type !== null && isset($denied[$type])) {
+                return false;
+            }
+
+            return $allowed === [] || ($type !== null && isset($allowed[$type]));
+        }));
     }
 
     /**
@@ -2205,7 +2277,9 @@ final class AnswerSiteQuestion implements TriesQuestions
             }
         }
 
-        return ['kind' => $goesWith['kind'], 'with' => isset($refOf[$goesWith['anchor']]) ? (string) $refOf[$goesWith['anchor']] : null, 'found' => count($matches), 'matches' => $matches];
+        return ['kind' => $goesWith['kind'], 'with' => isset($refOf[$goesWith['anchor']]) ? (string) $refOf[$goesWith['anchor']] : null, 'found' => count($matches), 'matches' => $matches]
+            // what is used with the product (its bits, a belt for the dress), not a match by look: the writer explains the use
+            + (($goesWith['complement'] ?? false) ? ['complement' => true] : []);
     }
 
     /**
@@ -2572,14 +2646,16 @@ final class AnswerSiteQuestion implements TriesQuestions
                     ) / 1_000_000);
 
                     $started = hrtime(true);
-                    $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
+                    // a question routed to the goes-with mechanism is written by its own prompt; every other by the released writer
+                    $writerPrompt = ($prepared['goes_with'] ?? null) !== null ? self::GOES_WITH_PROMPT : 'answer_site';
+                    $reply = $this->call($run, $writer, $writerPrompt, $input, $maxOutput, $effort, 'answer');
                     $replies[] = [$reply, 'answer'];
                     // In the shopper's language, or not at all: written in another, it is asked once more, and a second
                     // in another language is no answer (the team's line, in theirs). Never Hebrew to an English question
                     // (lets-review-test-4, 15.11).
                     if (! self::inLanguage($reply->data, $this->language)) {
                         $checked['language'] = 'asked_again';
-                        $reply = $this->call($run, $writer, 'answer_site', $input, $maxOutput, $effort, 'answer');
+                        $reply = $this->call($run, $writer, $writerPrompt, $input, $maxOutput, $effort, 'answer');
                         $replies[] = [$reply, 'answer'];
                         if (! self::inLanguage($reply->data, $this->language)) {
                             $checked['language'] = 'none';
@@ -2610,6 +2686,10 @@ final class AnswerSiteQuestion implements TriesQuestions
                         $anchor = $prepared['goes_with']['anchor'] ?? null;
                         $others = is_string($anchor) ? array_values(array_filter($picks, fn (array $p): bool => (string) ($p['external_id'] ?? '') !== $anchor)) : [];
                         $picks = $others !== [] ? $others : $picks;
+                        // and as many cards as the store shows for a match (assistant.goes_with_max_picks)
+                        if (is_string($anchor)) {
+                            $picks = array_slice($picks, 0, max(1, (int) Settings::get('assistant.goes_with_max_picks', $shopId)));
+                        }
                     }
                     // Sentences code took out (a number the pages do not have), the rest kept.
                     $checked['trimmed'] = $screened['trimmed'];

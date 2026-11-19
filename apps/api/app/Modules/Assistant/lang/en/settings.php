@@ -428,6 +428,26 @@ return [
         'label' => 'Matching products to choose from',
         'description' => 'When a shopper asks for a product of another kind to go with the one they are looking at ("is there a ring to match this bracelet?"): at most this many products of that kind are offered to the assistant to choose from, the most alike first.',
     ],
+    'goes_with_max_picks' => [
+        'label' => 'Matching products in the answer',
+        'description' => 'At most this many product cards are shown in an answer about a product that goes with another.',
+    ],
+    'goes_with_use_relations' => [
+        'label' => 'Matching products: from the store\'s relations',
+        'description' => 'The products the store set as related and what is bought together (enrichment.relations) are candidates and come first.',
+    ],
+    'goes_with_use_map' => [
+        'label' => 'Matching products: from the goes-with map',
+        'description' => 'The kinds the store\'s goes-with map pairs with the product\'s kind are the candidates for "what else do I need".',
+    ],
+    'goes_with_use_look' => [
+        'label' => 'Matching products: by look',
+        'description' => 'Products of the kind asked that share the product\'s filter values and rare words (metal, karat, style, motif) are candidates, with no relation or map.',
+    ],
+    'goes_with_rules_max' => [
+        'label' => 'Most rules for matching products',
+        'description' => 'How many pairs of kinds and how many "never offer" lines at most a store may write in each list.',
+    ],
     'prepared_per_sync' => [
         'label' => 'Ready questions per sync',
         'description' => 'At most this many questions about the store are answered ahead on each sync. One already answered whose pages did not change is not asked again.',

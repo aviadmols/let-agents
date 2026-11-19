@@ -16,6 +16,7 @@ use App\Modules\Enrichment\Actions\RereadPage;
 use App\Modules\Enrichment\Console\CompleteLooksCommand;
 use App\Modules\Enrichment\Console\EnrichmentCommand;
 use App\Modules\Enrichment\Contracts\ExpertBankNames;
+use App\Modules\Enrichment\Contracts\GoesWithPartners;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
 use App\Modules\Enrichment\Listeners\RebuildCards;
@@ -28,6 +29,7 @@ use App\Modules\Enrichment\Support\FactNotes;
 use App\Modules\Enrichment\Support\KnowledgeOfProducts;
 use App\Modules\Enrichment\Support\StoredCards;
 use App\Modules\Enrichment\Support\StoredExpertBankNames;
+use App\Modules\Enrichment\Support\StoredGoesWithPartners;
 use App\Modules\Enrichment\Support\WrittenSectionQuestions;
 use App\Modules\Retrieval\Contracts\DocumentNotes;
 use App\Modules\Retrieval\Contracts\SectionQuestions;
@@ -59,6 +61,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
         $this->app->bind(ReadsCards::class, StoredCards::class);
         // The category names a store's expert bank already sorts into its own attributes: no second filter of them.
         $this->app->bind(ExpertBankNames::class, StoredExpertBankNames::class);
+        // which kinds and which products go together (the goes-with map, the complement relations): read, never asked live
+        $this->app->bind(GoesWithPartners::class, StoredGoesWithPartners::class);
     }
 
     protected function bootModule(): void
