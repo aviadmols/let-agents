@@ -32,6 +32,22 @@ each tested the reviewer's way (incognito, a fresh store, a reinstall, a long ga
 - [ ] Search alerts: prefill a logged-in customer's email on Shopify, which needs Shopify's protected customer data
       approval (left out for now).
 
+## From the strict mock review of 19.11 (held: each touches the app's scopes, billing, extension or version)
+- [ ] `read_customers`: drop the scope if nothing needs it, or write the two lines that say what does (the privacy
+      policy says Let’s reads no names, emails, phones or addresses from Shopify).
+- [ ] A new free trial after uninstall and reinstall: check the shop domain's trial history before granting trialDays.
+- [ ] App Bridge NavMenu instead of the panel's own menu inside the iframe (static navigation is supported until 12/2026).
+- [ ] One name everywhere: the theme block ("Let's search"), the app ("Let's: AI Search & Answers"), the drawer's title.
+- [ ] The Web Pixel's data access is "Always on": follow the shopper's consent there too.
+- [ ] The store's own /search page (direct visits, links from Google) still shows Shopify's results, not the drawer's.
+- [ ] Load only a small part of the drawer at first and the rest when a shopper opens it (the loader now caches the
+      whole file for a year; a split is the next step for the first visit's weight).
+- [ ] Measure Lighthouse with and without the embed on a clean store (Shopify allows a drop of at most 10 points).
+
 ## Done before approval, for the record
 - 19.11: the email settings of the background worker (team emails for leads and call-back requests ran on the `log`
   mailer and were never sent) — see the status in the conversation of 19.11 before relying on it.
+- 19.11 (mock review): the drawer behind a small loader, cached a year; no Google font; Shopify's Customer Privacy API
+  before any analytics; "Help & support" in the account menu; the app proxy's unknown addresses answer "Not found.";
+  gift cards only for gift searches; a new store's opening screen shows its products; the greeting by the viewer's
+  clock; the WhatsApp example by language; the delete text explains the Shopify uninstall (48 hours).
