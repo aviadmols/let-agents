@@ -29,6 +29,10 @@ return [
         'label' => 'Nightly reading',
         'description' => 'Every night, after the sync, code reads what changed in the shop again: products, promises, articles, superlatives and relations. No model, no cost.',
     ],
+    'read_new_at_once' => [
+        'label' => 'Reading new products at once',
+        'description' => 'A product added to the shop is read by code a minute after the sync: what it is, its material and colour, as the shop files and names it. It is filtered and matched in search the same day, not only after the nightly reading. No model, no cost.',
+    ],
     'auto_review' => [
         'label' => 'Nightly review of waiting details',
         'description' => 'Every night a model of another family checks the details the reader was unsure of: right is approved, wrong rejected, unsure goes to a person.',

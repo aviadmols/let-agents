@@ -33,6 +33,10 @@
             "default": true
         },
         {
+            "name": "read_new_at_once",
+            "default": true
+        },
+        {
             "name": "auto_publish_rules",
             "default": true
         },

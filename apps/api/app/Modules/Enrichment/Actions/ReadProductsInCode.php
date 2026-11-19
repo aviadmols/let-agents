@@ -22,6 +22,7 @@ use App\Modules\Enrichment\Support\VocabularyBranch;
 use App\Modules\Runs\Contracts\RecordsRuns;
 use App\Modules\Runs\Contracts\RunContext;
 use App\Modules\Runs\Models\Run;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,22 +41,36 @@ final class ReadProductsInCode
 
     private const SAMPLES = 20;
 
+    /** One reading of a shop at a time: a whole night's and one of new products never read the same product together. */
+    private const LOCK = 'enrichment:read-in-code:';
+
+    private const LOCK_SECONDS = 1800;
+
+    /** Seconds a reading waits for the one before it. */
+    private const LOCK_WAIT = 900;
+
     public function __construct(
         private readonly RecordsRuns $runs,
         private readonly TenantContext $tenant,
     ) {}
 
-    public function handle(string $shopId): Run
+    /**
+     * @param  list<string>|null  $productIds  only these products (new ones, read as they arrive: ReadNewProductsJob); every
+     *                                         product when null. One reading of a shop at a time, so a product is never read twice at once.
+     */
+    public function handle(string $shopId, ?array $productIds = null): Run
     {
-        return $this->runs->track(
+        return Cache::lock(self::LOCK.$shopId, self::LOCK_SECONDS)->block(self::LOCK_WAIT, fn (): Run => $this->runs->track(
             agent: self::AGENT,
             action: self::ACTION,
             shopId: $shopId,
-            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->read($run, $shopId)),
-        );
+            input: $productIds === null ? [] : ['products' => count($productIds)],
+            work: fn (RunContext $run) => $this->tenant->run($shopId, fn () => $this->read($run, $shopId, $productIds)),
+        ));
     }
 
-    private function read(RunContext $run, string $shopId): void
+    /** @param  list<string>|null  $productIds */
+    private function read(RunContext $run, string $shopId, ?array $productIds = null): void
     {
         $vocabularies = EnrichmentVocabulary::query()->where('active', true)->orderBy('key')->get();
         $candidates = [];
@@ -110,7 +125,7 @@ final class ReadProductsInCode
         $families = [];
         $samples = [];
 
-        foreach (CatalogProduct::query()->whereNull('removed_at')->with('variants')->lazyById(200) as $product) {
+        foreach (CatalogProduct::query()->whereNull('removed_at')->when($productIds !== null, fn ($q) => $q->whereKey($productIds))->with('variants')->lazyById(200) as $product) {
             $counts['products']++;
             $vocabulary = $branchOf[$product->id] ?? null;
             $reading = CodeReading::read($product, $brands, $vocabulary?->definition(), $readText, isset($pictures[$product->id]) ? PictureText::text($pictures[$product->id]) : null);
@@ -268,8 +283,10 @@ final class ReadProductsInCode
             });
         }
 
-        // Readings of products the store no longer publishes.
-        EnrichmentCodeReading::query()->whereHas('product', fn ($q) => $q->whereNotNull('removed_at'))->delete();
+        // Readings of products the store no longer publishes (the whole reading's work).
+        if ($productIds === null) {
+            EnrichmentCodeReading::query()->whereHas('product', fn ($q) => $q->whereNotNull('removed_at'))->delete();
+        }
 
         $familyCount = count(array_filter($families, fn (int $size): bool => $size >= 2));
 

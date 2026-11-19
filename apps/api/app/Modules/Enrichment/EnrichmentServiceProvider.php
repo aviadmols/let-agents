@@ -20,6 +20,7 @@ use App\Modules\Enrichment\Contracts\GoesWithPartners;
 use App\Modules\Enrichment\Contracts\ProductTypes;
 use App\Modules\Enrichment\Contracts\ReadsCards;
 use App\Modules\Enrichment\Contracts\RereadsPages;
+use App\Modules\Enrichment\Listeners\ReadNewProducts;
 use App\Modules\Enrichment\Listeners\RebuildCards;
 use App\Modules\Enrichment\Support\EnrichmentHome;
 use App\Modules\Enrichment\Support\EnrichmentScanDetails;
@@ -73,6 +74,8 @@ final class EnrichmentServiceProvider extends ModuleServiceProvider
     {
         // A sync's products are carded at once: a new product is read by every model minutes after it is published.
         Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], RebuildCards::class);
+        // ...and a product code has never read is read at once, not the next night (enrichment.read_new_at_once)
+        Event::listen([CatalogUpdated::class, CatalogProductsChanged::class], ReadNewProducts::class);
 
         // Every night, after the catalogue has been synced: everything code can read about a shop,
         // read again, skipping what has not changed. And once a week, early Sunday Israel time, the
