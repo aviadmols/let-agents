@@ -20,8 +20,19 @@
     if (!S.open) { return; }
     // the store turned suggestions off (What shoppers see): the results wait for Enter
     if (S.config && S.config.suggest === false) { hideLive(); return; }
-    // the search on screen, left in the field: nothing new to show until the words change
-    if (q === S.keptQ) { hideLive(); return; }
+    // the search on screen, left in the field: nothing new to show until the words change. Typed back to its words, that
+    // search is shown again as it was: typing had put it behind the line, and the field said "טבעת יהלום" over the
+    // opening screen, no search shown (Rocks, 19.11: "טבעת יהלום", then "אדום" typed and taken off). When no turn of it is
+    // left, the words are searched as any others.
+    if (q === S.keptQ) {
+      var kept = S.turns.slice().reverse().filter(function (x) { return x.kind === 'results' && x.q === q; })[0];
+      if (kept) {
+        hideLive();
+        if (kept.prev) { kept.prev = false; S.turns = S.turns.filter(function (x) { return x !== kept; }).concat([kept]); persist(); render(); }
+        return;
+      }
+      S.keptQ = null;
+    }
     if (/\s$/.test(INPUT.value)) { liveFor(q); return; }
     wordTimer = setTimeout(function () { if (INPUT.value.trim() === q) { liveFor(q); } }, WORD_REST_MS);
   }
