@@ -35,7 +35,10 @@ final class MeasureBankQuality
     /** Products judged, spread over the types. */
     public const SAMPLE = 40;
 
-    private const AUDIT_VERSION = 2;
+    /** Whether each sampled product's type is right, and whether a shopper would name it by a finer kind. */
+    private const PROMPT = 'bank_type_check';
+
+    private const PROMPT_VERSION = 1;
 
     private const TOKENS = 4000;
 
@@ -74,7 +77,8 @@ final class MeasureBankQuality
             'measured_at' => now()->toIso8601String(),
             'type_share' => $texts === [] ? 0.0 : round(count($typeOf) / count($texts), 3),
             'accuracy' => $accuracy,
-            'specificity' => $specificity,
+            // what names open with under each type: a hint only (a store whose names open with a model's name looks broad)
+            'openings' => $specificity,
             'departments' => $departments,
         ];
         $stored->forceFill(['measurement' => (array) $stored->measurement + ['quality' => $quality]])->save();
@@ -84,7 +88,7 @@ final class MeasureBankQuality
             'typed' => (int) round($quality['type_share'] * 100),
             'accuracy' => $accuracy['share'] === null ? '-' : (string) (int) round($accuracy['share'] * 100),
             'judged' => (string) $accuracy['sure'],
-            'broad' => (int) round($specificity['broad_share'] * 100),
+            'specific' => $accuracy['specific'] === null ? '-' : (string) (int) round($accuracy['specific'] * 100),
             'weak' => $weak === [] ? '-' : implode(', ', array_map(fn (array $d): string => $d['department'].' '.(int) round($d['share'] * 100).'%', array_slice($weak, 0, 4))),
         ]);
     }
@@ -137,13 +141,13 @@ final class MeasureBankQuality
             $id = (string) $texts[$index]['id'];
             $product = $products->get($id);
             if ($product !== null) {
-                $items[] = ['id' => (string) $n, 'product' => CompleteVocabulary::described($product, $pictures[$id] ?? null), 'tag' => ['attribute' => 'product type', 'value' => $labels[$key] ?? $key]];
+                $items[] = ['id' => (string) $n, 'product' => CompleteVocabulary::described($product, $pictures[$id] ?? null), 'type' => $labels[$key] ?? $key];
             }
         }
 
         $auditor = AgentModel::from('enrichment.expert_bank_checker_provider', 'enrichment.expert_bank_checker_model');
-        $system = (string) file_get_contents(dirname(__DIR__).'/Prompts/bank_audit.v'.self::AUDIT_VERSION.'.md');
-        $schema = ReplySchema::load('bank_audit', self::AUDIT_VERSION);
+        $system = (string) file_get_contents(dirname(__DIR__).'/Prompts/'.self::PROMPT.'.v'.self::PROMPT_VERSION.'.md');
+        $schema = ReplySchema::load(self::PROMPT, self::PROMPT_VERSION);
         $user = (string) json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
         $in = (float) Settings::get('enrichment.expert_bank_checker_input_usd_per_million');
         $out = (float) Settings::get('enrichment.expert_bank_checker_output_usd_per_million');
@@ -155,21 +159,31 @@ final class MeasureBankQuality
 
         $verdicts = [];
         foreach ((array) ($reply->data['verdicts'] ?? []) as $v) {
-            $verdicts[(string) ($v['id'] ?? '')] = (string) ($v['verdict'] ?? 'unsure');
+            $verdicts[(string) ($v['id'] ?? '')] = ['verdict' => (string) ($v['verdict'] ?? 'unsure'), 'finer' => trim((string) ($v['finer'] ?? ''))];
         }
         $correct = 0;
         $incorrect = 0;
         $wrong = [];
+        $coarse = [];
         foreach ($items as $item) {
-            $verdict = $verdicts[$item['id']] ?? 'unsure';
-            $correct += $verdict === 'correct' ? 1 : 0;
+            $verdict = $verdicts[$item['id']]['verdict'] ?? 'unsure';
+            $title = mb_substr((string) $item['product']['title'], 0, 80);
+            if ($verdict === 'correct') {
+                $correct++;
+                // right, but a shopper would ask for it by a finer kind: the bank settled for a department
+                if (($finer = $verdicts[$item['id']]['finer'] ?? '') !== '') {
+                    $coarse[] = ['title' => $title, 'type' => (string) $item['type'], 'finer' => mb_substr($finer, 0, 40)];
+                }
+            }
             if ($verdict === 'incorrect') {
                 $incorrect++;
-                $wrong[] = ['title' => mb_substr((string) $item['product']['title'], 0, 80), 'type' => (string) $item['tag']['value']];
+                $wrong[] = ['title' => $title, 'type' => (string) $item['type']];
             }
         }
         $sure = $correct + $incorrect;
 
-        return ['judged' => count($items), 'sure' => $sure, 'correct' => $correct, 'incorrect' => $incorrect, 'share' => $sure === 0 ? null : round($correct / $sure, 3), 'wrong' => $wrong];
+        return ['judged' => count($items), 'sure' => $sure, 'correct' => $correct, 'incorrect' => $incorrect, 'share' => $sure === 0 ? null : round($correct / $sure, 3), 'wrong' => $wrong,
+            // of those right, the share given the kind a shopper names them by
+            'specific' => $correct === 0 ? null : round(($correct - count($coarse)) / $correct, 3), 'coarse' => $coarse];
     }
 }
