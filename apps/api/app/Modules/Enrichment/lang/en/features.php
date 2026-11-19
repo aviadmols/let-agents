@@ -65,4 +65,8 @@ return [
         'label' => 'Placing the store\'s colour names',
         'description' => 'Colour names code does not know and the store has no swatch for ("Ocean Mist") are placed once among the shades, so the products are found when filtering by colour. One model places them and one of another family checks, in one request a night and only when there are new names.',
     ],
+    'expert_bank' => [
+        'label' => 'Attribute bank written for the store itself (experiment)',
+        'description' => 'A dry run only, on request: an advanced model that knows the trade writes the bank from the store\'s own words, code measures every value on its products, and a model of another family scores every tag. The result is kept as a report. Nothing is activated on the store. Off by default.',
+    ],
 ];

@@ -57,6 +57,10 @@
             "default": true
         },
         {
+            "name": "expert_bank",
+            "default": false
+        },
+        {
             "name": "picture_suggestions",
             "default": true
         },
@@ -738,6 +742,152 @@
             "unit": "usd"
         },
         {
+            "name": "expert_bank_writer_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "anthropic",
+            "scope": "global"
+        },
+        {
+            "name": "expert_bank_writer_model",
+            "type": "string",
+            "default": "claude-opus-5-5",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "expert_bank_writer_input_usd_per_million",
+            "type": "float",
+            "default": 4,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "expert_bank_writer_output_usd_per_million",
+            "type": "float",
+            "default": 20,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "expert_bank_checker_provider",
+            "type": "enum",
+            "options": [
+                "openai",
+                "anthropic",
+                "gemini"
+            ],
+            "default": "openai",
+            "scope": "global"
+        },
+        {
+            "name": "expert_bank_checker_model",
+            "type": "string",
+            "default": "gpt-5.4-mini",
+            "min": 1,
+            "max": 120,
+            "scope": "global"
+        },
+        {
+            "name": "expert_bank_checker_input_usd_per_million",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "expert_bank_checker_output_usd_per_million",
+            "type": "float",
+            "default": 8,
+            "min": 0,
+            "max": 400,
+            "scope": "global",
+            "unit": "usd"
+        },
+        {
+            "name": "expert_bank_sample",
+            "type": "int",
+            "default": 120,
+            "min": 20,
+            "max": 400,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "expert_bank_max_products",
+            "type": "int",
+            "default": 5000,
+            "min": 100,
+            "max": 20000,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "expert_bank_min_score",
+            "type": "int",
+            "default": 70,
+            "min": 50,
+            "max": 100,
+            "scope": "shop",
+            "unit": "points"
+        },
+        {
+            "name": "expert_bank_min_products",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 50,
+            "scope": "shop",
+            "unit": "products"
+        },
+        {
+            "name": "expert_bank_min_attribute_share",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "expert_bank_min_type_share",
+            "type": "int",
+            "default": 70,
+            "min": 30,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "expert_bank_min_filterable_share",
+            "type": "int",
+            "default": 50,
+            "min": 10,
+            "max": 100,
+            "scope": "shop",
+            "unit": "percent"
+        },
+        {
+            "name": "expert_bank_values_per_product",
+            "type": "int",
+            "default": 2,
+            "min": 1,
+            "max": 5,
+            "scope": "shop",
+            "unit": "values"
+        },
+        {
             "name": "card_text_chars",
             "type": "int",
             "default": 4000,
@@ -879,6 +1029,45 @@
             "run": {
                 "command": "enrichment",
                 "step": "schema",
+                "shop_argument": "target"
+            }
+        },
+        {
+            "name": "expert_bank",
+            "action": "build_expert_bank",
+            "when": "on_request",
+            "features": [
+                "expert_bank"
+            ],
+            "roles": [
+                {
+                    "role": "writer",
+                    "provider": "expert_bank_writer_provider",
+                    "model": "expert_bank_writer_model",
+                    "prices": [
+                        "expert_bank_writer_input_usd_per_million",
+                        "expert_bank_writer_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "expert_bank"
+                    ]
+                },
+                {
+                    "role": "checker",
+                    "provider": "expert_bank_checker_provider",
+                    "model": "expert_bank_checker_model",
+                    "prices": [
+                        "expert_bank_checker_input_usd_per_million",
+                        "expert_bank_checker_output_usd_per_million"
+                    ],
+                    "prompts": [
+                        "expert_bank_check"
+                    ]
+                }
+            ],
+            "run": {
+                "command": "enrichment",
+                "step": "expert-bank",
                 "shop_argument": "target"
             }
         },

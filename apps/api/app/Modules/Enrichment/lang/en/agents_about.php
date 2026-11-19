@@ -8,4 +8,5 @@ return [
     'schema_discovery' => 'On request: code counts a sample of products (fields, tags, measurements, repeated words), a model writes a vocabulary from the counts, a model of the other family reviews it, and the operator approves.',
     'web_lookup' => 'On request, from the missing details screen: a model that searches the web names sources with the sentence each rests on; code checks the page holds it; a model of the other family checks it is the same product; a person approves.',
     'colour_namer' => 'Each night, only when there are new names: the store\'s colour names code does not know and that have no swatch are placed among the shades. One model places, a model of another family checks, and only what both agree on goes in. Each name is asked once.',
+    'expert_bank' => 'On request, an experiment only: code counts the store\'s words and fields, an advanced model writes product types, attributes and values from them, code measures every word on the products and removes what has no evidence, one correction round, and a model of another family scores every item and can only remove. The result is kept as a report and is not activated.',
 ];
