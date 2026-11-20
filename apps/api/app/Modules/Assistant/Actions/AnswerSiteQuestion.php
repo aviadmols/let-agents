@@ -2782,6 +2782,13 @@ final class AnswerSiteQuestion implements TriesQuestions
                         // check, to measure what the check adds and what it costs in time. Never a shopper's answer.
                         $checked['skipped'] = 'no_check';
                         $refusal = $answerRefusal;
+                    } elseif (! Features::enabled('assistant.site_check', $shopId)) {
+                        // The store's check switched off (Aviad, 20.11: two days without it, then the answers read to see
+                        // whether it is needed): the writer's answer after code's checks. Marked unchecked; never "safe",
+                        // so it is never shared with another visitor, and each one asking gets an answer written for them.
+                        $checked['skipped'] = 'off';
+                        $refusal = $answerRefusal;
+                        $flags['unchecked'] = true;
                     } else {
                         $started = hrtime(true);
 

@@ -142,6 +142,24 @@ final class SiteQuestionTest extends TestCase
         $this->assertNull($saved->content_id);
     }
 
+    public function test_with_the_stores_check_switched_off_the_answer_shows_unchecked_and_is_never_shared(): void
+    {
+        // Aviad, 20.11: two days with no checker on each answer, then the answers read to see whether it is needed
+        Features::override('assistant.site_check', false, $this->shop->id);
+        $this->replies = [['found' => true, 'answer' => 'בערך 30 ברגים למטר מרובע, שניים בכל מפגש של קרש עם קורה.', 'refs' => ['s1']]];
+
+        $data = $this->ask('כמה ברגים צריך למטר דק?')->assertOk()->json('data');
+
+        $this->assertSame(['answered', 'model'], [$data['outcome'], $data['from']]);
+        $this->assertStringContainsString('30 ברגים', $data['answer']);
+        $this->assertSame([AiProviderName::OpenAi], array_column($this->calls, 'provider'), 'the writer alone: no checker');
+        $saved = $this->inShop(fn () => AnswerSiteQuestion::siteAnswers()->sole());
+        $this->assertTrue(((array) $saved->flags)['unchecked'] ?? false, 'kept marked unchecked, to be read');
+        $this->assertNull(((array) $saved->flags)['safe'] ?? null);
+        $this->assertFalse($saved->isShared(), 'an unchecked answer is never shown to another visitor');
+        $this->assertSame('off', Run::query()->where('agent', AnswerSiteQuestion::AGENT)->sole()->output['check']['skipped'] ?? null);
+    }
+
     public function test_a_writer_that_found_nothing_and_wrote_no_answer_still_says_why_to_the_shopper(): void
     {
         // Sela Meir, "איזה ספר הכי מומלץ?": no answer, no refs, its line dropped as "no answer"
@@ -151,8 +169,10 @@ final class SiteQuestionTest extends TestCase
         $data = $this->ask('איזה ספר הכי מומלץ?')->json('data');
         $asked = count($this->calls);
 
-        $this->assertSame($line, $data['not_found']);
-        $this->assertSame($line, $this->ask('איזה ספר הכי מומלץ?')->json('data.not_found'), 'kept with its line: the next one is told it without a model');
+        // its line as written, the shopper addressed in no one gender ("אם תרצה" is a man's: StoreVoice, 20.11)
+        $neutral = str_replace('אם תרצה,', 'אם מתאים לך,', $line);
+        $this->assertSame($neutral, $data['not_found']);
+        $this->assertSame($neutral, $this->ask('איזה ספר הכי מומלץ?')->json('data.not_found'), 'kept with its line: the next one is told it without a model');
         $this->assertCount($asked, $this->calls);
     }
 

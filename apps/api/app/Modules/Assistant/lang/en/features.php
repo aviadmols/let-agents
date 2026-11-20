@@ -33,6 +33,10 @@ return [
         'label' => 'What the store says about itself',
         'description' => 'What every product page repeats (returns, warranty, payments, shipping), what the team wrote, and the team\'s answers: the assistant reads them before any other page. Read by code, no model.',
     ],
+    'site_check' => [
+        'label' => 'A check of every answer before it shows',
+        'description' => 'A model of another family reads each new answer against the pages it was written from, before it shows. Off: the answer shows after code\'s checks only, is recorded as unchecked and is never shown to other visitors.',
+    ],
     'second_look' => [
         'label' => 'A wider search when no answer was found',
         'description' => 'When the assistant found no answer in the pages the question\'s own words brought, it asks the question in other ways (its parts, its topic as stores write it, and if needed up to three wordings from a small model), searches with each and tries again. So "what is the returns policy?" finds the returns page too.',

@@ -62,6 +62,10 @@
             "default": true
         },
         {
+            "name": "site_check",
+            "default": true
+        },
+        {
             "name": "team_drafts",
             "default": true
         },
