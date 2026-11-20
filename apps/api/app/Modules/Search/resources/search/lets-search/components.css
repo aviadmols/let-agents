@@ -399,6 +399,9 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 .ls-answer-searches .ls-block__title { margin: 0; }
 /* the line that says what the searches are, before them */
 .ls-answer-searches__lead { margin: 0; font-size: var(--lsp-text-sm); line-height: 1.5; color: var(--ls-fg-muted); }
+/* a search open inside an answer (inlineResults): set apart from the answer's cards above it */
+.ls-answer-results { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ls-line); }
+.ls-answer-results > .ls-answer-searches__lead { margin-bottom: 10px; }
 .ls-answer-search { --h: auto; min-height: 36px; max-width: 100%; padding-block: 7px; gap: 6px; white-space: normal; text-align: start; justify-content: flex-start; }
 .ls-answer-search .ls-icon { flex: none; }
 .ls-answer-search .ls-num { color: var(--ls-fg-muted); }

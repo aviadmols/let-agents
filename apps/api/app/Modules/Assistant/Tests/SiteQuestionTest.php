@@ -810,6 +810,15 @@ final class SiteQuestionTest extends TestCase
         $this->assertSame(['805', '807', '806', '801', '802'], $data['set']['ids'], 'every earring up to 500 in stock, cheapest first');
         $this->assertStringStartsWith('מצאנו 5 מוצרים', $data['answer']);
 
+        // ...and where the writer answers, its words are said over that set (Aviad, 20.11: "found 40 products" alone, no
+        // answer written): the set is code's, every one in the price, the words the writer's
+        // (the candidate picker first, keeping all; then the writer and its checker)
+        $this->replies = [[], ['found' => true, 'answer' => 'יש לנו כמה עגילי זהב יפים בתקציב הזה, למשל עגילי פרח.', 'refs' => ['p2'], 'picks' => [['ref' => 'p2', 'why' => 'בתקציב']]], ['supported' => true, 'on_topic' => true, 'safe' => true, 'picks_fit' => true]];
+        $data = $this->askWith('אילו עגילים יש לכם עד 500 ש"ח?', ['801'])->json('data');
+        $this->assertSame(['answered', 'model'], [$data['outcome'], $data['from']]);
+        $this->assertSame('יש לנו כמה עגילי זהב יפים בתקציב הזה, למשל עגילי פרח.', $data['answer']);
+        $this->assertSame(['805', '807', '806', '801', '802'], $data['set']['ids'], 'the set is still every earring up to 500 in stock');
+
         // "cheaper than" is the price, not "the cheapest": every one in the range too; "the cheapest" stays three picks
         $this->assertSame(['805', '807', '806', '801', '802'], $this->askWith('any earrings cheaper than 500 dollars?', ['801'])->json('data.set.ids'));
         $this->assertSame(['805', '807', '806'], array_column($this->askWith('the cheapest earrings under 500 dollars', ['801'])->json('data.picks'), 'external_id'));

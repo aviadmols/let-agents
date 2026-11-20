@@ -69,7 +69,8 @@
   }
   function update(turn, patch) {
     Object.assign(turn, patch);
-    fresh[turn.id] = 1;
+    // a search open inside an answer changes where it is: the conversation is not scrolled back to its top for it
+    if (!turn.inlineOf) { fresh[turn.id] = 1; }
     persist(); render();
   }
 
@@ -87,7 +88,15 @@
   function searchAgainWith(turn, q) {
     q = String(q || '').trim();
     if (turn === S.live) { INPUT.value = q; onType(); return; }
-    var inField = INPUT.value.trim() === String(turn.q || '').trim();
+    // a search open inside an answer is no search typed: the field and the next opening are not its
+    var owner = turn.inlineOf ? turnById(turn.inlineOf) : null;
+    var inField = !owner && INPUT.value.trim() === String(turn.q || '').trim();
+    if (!q && owner) {
+      owner.inline = null;
+      if (S.wide === turn.id) { S.wide = null; }
+      persist(); render();
+      return;
+    }
     if (!q) {
       S.turns = S.turns.filter(function (x) { return x !== turn; });
       if (S.wide === turn.id) { S.wide = null; }
@@ -100,7 +109,7 @@
     turn.c = Object.assign(blankC(), { f: c.f, no: c.no, sort: c.sort, stock: c.stock, sale: c.sale });
     Object.assign(turn, { q: q, loading: true, ids: [], more: null, limit: S.wide === turn.id ? STEP : null, single: null, focus: null, content: [], cats: [], price: null });
     if (inField) { keepInField(q); }
-    keepBack(q, turn.id, S.wide === turn.id);
+    if (!owner) { keepBack(q, turn.id, S.wide === turn.id); }
     update(turn, {});
     runSearch(turn, q);
   }
@@ -987,7 +996,11 @@
   function resultsHtml(turn) {
     if (turn.loading) { return thinking(); }
     if (turn.error) { return errorHtml(turn); }
-    var list = filtered(turn), total = sideKept(turn).length, html = subsHead(turn);
+    // inside an answer (inlineResults): the products and their filters only; the answer above is the words, the field the
+    // way to ask on, so no offer to follow the search, no guides, no card that asks the AI
+    var inl = !!turn.inlineOf;
+    var list = filtered(turn), total = sideKept(turn).length, html = inl ? '' : subsHead(turn);
+    if (inl && !total) { return '<div class="ls-empty-filter">' + esc(t('noFilterMatch')) + '</div>'; }
     if (turn.single && rec(turn.single)) {
       var s = rec(turn.single);
       html += '<div class="ls-exact"><a class="ls-pick__media" href="' + esc(s.url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(s.img) + '" alt=""></a><div><div class="ls-exact__tag">' + icon('check', 'ls-icon--sm') + esc(s.sku && turn.singleBy === 'sku' ? t('exactSku', { sku: s.sku }) : t('exact')) + '</div><a class="ls-pick__title" dir="auto" href="' + esc(s.url) + '" style="color:inherit;text-decoration:none">' + esc(decode(s.title)) + '</a><div class="ls-pick__row">' + priceHtml(s) + buyBtn(s, 'ls-btn--sm') + '</div><div data-after="' + esc(pid(s.id)) + '"></div></div></div>';
@@ -1024,12 +1037,12 @@
     }
     // a guide or a page comes before the products only for a sentence ("איך בוחרים טבעת אירוסין לפי תקציב"), when it
     // names it almost word for word (90% or more) and better than any product does; "טבעת זהב" keeps the products first
-    var guides = guidesFor(turn);
+    var guides = inl ? [] : guidesFor(turn);
     var g0 = guides[0], gm = g0 && meantWords(turn.q).length >= GUIDE_FIRST_WORDS ? matchOf(turn.q, g0.title, (S.records[g0.id] || {}).kw, 0) : 0;
     // a content site (search.content_first): the articles and pages it found first, its products after them
     var guideFirst = (!!(S.config && S.config.contentFirst) && guides.length > 0) || (gm >= GUIDE_FIRST && (!list.length || gm > matchOf(turn.q, decode(list[0].title), list[0].kw, 0)));
     if (guideFirst) { html += guidesHtml(guides, turn.q); }
-    html += noteHtml(turn);
+    html += inl ? '' : noteHtml(turn);
     // no product holds the words at all (only what is near by meaning, "מכניסים"): the card that asks the AI to search the
     // site comes first, above what may not be it (as Aviad asked, 16.11), and not again under the products
     var askTop = !off('ask') && !turn.askShown && turn.held === 0 && !!turn.askBelow;
@@ -1059,7 +1072,7 @@
     }
     if (!off('ask') && !turn.askShown && !askTop) { html += turn.askBelow ? '<div style="margin-top:20px">' + noMatchCard(turn.q, false, askFind(turn.q)) + '</div>' : askSmall(askFind(turn.q)); }
     // the offer to follow the search, under all of it: a search no product holds the words of is the no-exact-match state
-    html += subsTail(turn, askTop || turn.held === 0);
+    html += inl ? '' : subsTail(turn, askTop || turn.held === 0);
     html += (turn.askOpen ? askAboutHtml(turn) : '') + (turn.aiOpen ? myAi(turn) : '');
     return html;
   }

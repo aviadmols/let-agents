@@ -805,10 +805,37 @@ final class AnswerSiteQuestion implements TriesQuestions
     {
         // "The cheapest drill" is arithmetic: code answers it from the products found, before any
         // saved answer (prices and stock change) and without a model.
-        if (($computed = $this->computed($question, $locale, $products, $followUp)) !== null) {
+        $computed = $this->computed($question, $locale, $products, $followUp);
+        if ($computed !== null && ! isset($computed['set'])) {
             return $computed;
         }
+        $written = $this->written($shopId, $question, $visitorHash, $locale, $products, $followUp, $viewing);
 
+        return $computed === null ? $written : self::writtenOverSet($written, $computed);
+    }
+
+    /**
+     * Every product of a price that code found ("שרשראות עדינות עד 2000 ש״ח מזהב צהוב": 40 in stock) is the answer's set, and
+     * the writer's words are said over it, as for any question (Aviad, 20.11: "found 40 products" alone, no answer written).
+     * Code's answer stands where the writer gave none, or a set of its own.
+     *
+     * @param  array<string, mixed>  $written
+     * @param  array<string, mixed>  $computed
+     * @return array<string, mixed>
+     */
+    private static function writtenOverSet(array $written, array $computed): array
+    {
+        return ($written['outcome'] ?? null) === AssistantAnswer::ANSWERED && ! isset($written['set']) && ($written['from'] ?? null) !== 'code'
+            ? ['set' => $computed['set']] + $written
+            : $computed;
+    }
+
+    /**
+     * @param  list<string>  $products
+     * @return array<string, mixed>
+     */
+    private function written(string $shopId, string $question, string $visitorHash, string $locale, array $products, bool $followUp, ?string $viewing): array
+    {
         if ($followUp) {
             return $this->withinDailyLimits($shopId, $visitorHash)
                 ? $this->ask($shopId, $question, $locale, $products, visitorHash: $visitorHash, keep: false, viewing: $viewing)
@@ -1833,14 +1860,15 @@ final class AnswerSiteQuestion implements TriesQuestions
                 return ['result' => $this->fixed($guard['reason'] === 'personal_data' ? 'personal_data' : 'out_of_scope', $locale), 'trace' => ['from' => 'guard', 'refused' => $guard['reason']]];
             }
 
-            if (($computed = $this->computed($question, $locale, $products)) !== null) {
+            $computed = $this->computed($question, $locale, $products);
+            if ($computed !== null && ! isset($computed['set'])) {
                 return ['result' => $computed, 'trace' => ['from' => 'code']];
             }
 
             $trace = [];
             $result = $this->ask($shopId, $question, $locale, $products, $mode, false, $trace);
 
-            return ['result' => $result, 'trace' => $trace];
+            return ['result' => $computed === null ? $result : self::writtenOverSet($result, $computed), 'trace' => $trace];
         });
     }
 
@@ -5545,11 +5573,16 @@ final class AnswerSiteQuestion implements TriesQuestions
         $shown = $set !== null
             ? array_values(array_filter(array_map('strval', (array) ($set['ids'] ?? []))))
             : array_values(array_filter(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), (array) ($result['picks'] ?? []))));
+        // a question in a conversation that is a subject of its own: it names a kind of the store's by its own words and points
+        // at nothing shown ("יש לכם עגילי זהב לבן עם יהלום?" after another question had none, Rocks 20.11); a reply ("כן מה
+        // צריך?", "ומה עם הזול יותר?") still has none
+        $own = $this->conversation !== [] && ! $this->onShown && ! self::pointsBack($question) && app()->bound(ProductsNamed::class)
+            && count(app(ProductsNamed::class)->all($shopId, $question)) >= self::KIND_PRODUCTS;
         if (! Features::enabled('assistant.answer_searches', $shopId) || ! app()->bound(AnswerSearches::class)
             || $result['outcome'] !== AssistantAnswer::ANSWERED || ($set !== null && ($set['search'] ?? null) !== null) || $shown === [] || ! self::aboutProducts($question)
             // "…שתתאים לעגילים האלה?" points at the product of the page, not at results shown: a match asked for keeps its searches
             // (Rocks, 19.11: the earrings' necklaces came with no button)
-            || $this->conversation !== [] || ($this->onShown && $this->goesWith === null) || ($bound && $this->goesWith === null)) {
+            || ($this->conversation !== [] && ! $own) || ($this->onShown && $this->goesWith === null) || ($bound && $this->goesWith === null && ! $own)) {
             return [];
         }
 

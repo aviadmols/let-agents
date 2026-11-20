@@ -114,17 +114,34 @@ final class AnswerSearchesTest extends TestCase
     public function test_a_price_asked_answered_as_a_grid_is_the_same_search_filterable(): void
     {
         $this->jewellery();
+        $this->pick = ['טבעת יהלום זהב לבן קלאסית'];
 
-        // more than three in the price: every one of them, shown as a grid without filters (computed, no model)
+        // more than three in the price: every one of them, as code finds them, and the writer's words over them (Aviad, 20.11)
         $data = $this->ask('יש לכם טבעת יהלום בזהב לבן עד 3000?', ['w1', 'w2', 'w3'])->assertOk()->json('data');
 
         $this->assertNotEmpty($data['set']['ids']);
+        $this->assertSame(['model', 'כן, יש לנו כאלה.'], [$data['from'], $data['answer']]);
         $this->assertCount(1, $data['searches']);
         $search = $data['searches'][0];
         $this->assertSame('טבעת · יהלום · זהב לבן', $search['label'], 'the price apart: the drawer writes it in the store\'s currency');
         $this->assertEquals(['min' => null, 'max' => 3000], $search['price']);
         $this->assertSame(3, $search['count'], 'the three in stock inside the price: never the dear one, nor the one a check refused');
-        $this->assertSame([], $this->calls, 'no model call');
+        $this->assertCount(2, $this->calls, 'one writer, one checker: the searches add none');
+    }
+
+    public function test_a_question_of_its_own_in_a_conversation_gets_its_search_and_a_reply_none(): void
+    {
+        $this->jewellery();
+        $this->pick = ['טבעת יהלום זהב לבן קלאסית'];
+        $thread = [['q' => 'מה מדיניות ההחזרות?', 'a' => 'אפשר להחזיר תוך 14 יום.']];
+
+        // a kind of the store's named by its own words, after a question about returns (Rocks, 20.11)
+        $own = $this->ask('יש לכם טבעת יהלום בזהב לבן?', ['w1', 'w2', 'w3'], thread: $thread)->assertOk()->json('data');
+        $this->assertSame('טבעת · יהלום · זהב לבן', $own['searches'][0]['label'] ?? null);
+
+        // a reply that names nothing of its own
+        $reply = $this->ask('כן מה צריך?', ['w1', 'w2', 'w3'], thread: $thread)->assertOk()->json('data');
+        $this->assertArrayNotHasKey('searches', $reply);
     }
 
     public function test_a_ring_to_go_with_the_bracelet_is_the_rings_sharing_its_values_together_and_one_apart(): void
@@ -275,10 +292,11 @@ final class AnswerSearchesTest extends TestCase
     }
 
     /** @param  list<string>  $products */
-    private function ask(string $question, array $products, bool $page = false): TestResponse
+    /** @param  list<array{q: string, a: string}>  $thread */
+    private function ask(string $question, array $products, bool $page = false, array $thread = []): TestResponse
     {
         return $this->call('POST', '/api/v1/search/'.SiteKeys::site(self::TOKEN).'/ask', server: [
             'HTTP_ORIGIN' => 'https://store.test', 'CONTENT_TYPE' => 'text/plain',
-        ], content: json_encode(['question' => $question, 'vid' => 'anon-visitor1234567890srch', 'locale' => 'he', 'products' => $products] + ($page ? ['page' => 1] : []), JSON_UNESCAPED_UNICODE));
+        ], content: json_encode(['question' => $question, 'vid' => 'anon-visitor1234567890srch', 'locale' => 'he', 'products' => $products] + ($page ? ['page' => 1] : []) + ($thread === [] ? [] : ['previous' => [], 'thread' => $thread]), JSON_UNESCAPED_UNICODE));
     }
 }

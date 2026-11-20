@@ -191,9 +191,11 @@
         return products(picks.map(function (p) { return p.id; }).concat(setIds ? setIds.slice(0, 24) : [], namedIds));
       }).then(function () {
         if (d.outcome === 'answered') {
-          update(turn, { loading: false, answer: d.answer, team: !!d.team, noAnswer: d.no_answer || null, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
+          Object.assign(turn, { loading: false, answer: d.answer, team: !!d.team, noAnswer: d.no_answer || null, picks: picks, sources: d.sources || [], page: d.page || null, general: d.from === 'general', follow: d.follow || [], choices: d.choices || [],
             ids: setIds && setIds.length ? setIds : null, setAsk: set && set.ask || null, setSearch: set && set.search || null, corrected: d.corrected || null, related: d.related || [], storeQ: !!d.store_question, searches: searches,
             alsoIds: named ? namedIds.map(function (id) { return 'p:' + id; }).filter(function (id) { return !!rec(id); }) : undefined, alsoNames: named ? named.names : null, alsoBudget: !!(named && named.budget) });
+          inlineResults(turn);
+          update(turn, {});
           announce(t('announceReady') + ': ' + plainAnswer(d.answer));
           if (!named && !picks.length && !(setIds && setIds.length)) { alsoFor(turn); }
         } else if (d.outcome === 'quoted' && d.quotes && d.quotes.length) {
@@ -354,9 +356,48 @@
     });
     return (answerSearchMemo[key] = out);
   }
+  // Under an answer about products, the search that holds best what was asked, open as the store's search is: its count, its
+  // sort, its filters chosen and the rest to choose, its grid (Aviad, 20.11: "with the relevant filters, not only the
+  // products, as the search module"). A turn of its own kept in the answer (turnById finds it), so each filter, the sort and
+  // "show all" work on it as on any search; the answer's own cards are above it, so they come last in it, and under a match
+  // asked for, those found to go with the product first (the server's `first`). The other searches stay buttons.
+  // Only a search about as narrow as what the answer is about opens: "טבעת (1115)" under nineteen solitaire rings is every
+  // ring, not them (Rocks, 20.11). Then the answer's own set opens instead, filterable; with neither, the buttons as before.
+  var INLINE_MOST = 48, INLINE_SET_LEAST = 4;
+  function inlineResults(turn) {
+    if (!turn || turn.inline) { return; }
+    var shown = Math.max((turn.ids || []).length, (turn.picks || []).length);
+    var one = answerSearches(turn).filter(function (x) { return x.n <= Math.max(3 * shown, INLINE_MOST); })[0];
+    var built = one ? answerSearchOpen(turn, one.i) : null, mine = {}, rank = {};
+    if (built) {
+      (turn.picks || []).forEach(function (pk) { mine['p:' + pid(pk.id)] = 1; });
+      (one.s.first || []).forEach(function (id, k) { rank['p:' + pid(id)] = k + 1; });
+      built.ids = built.ids.map(function (id, k) { return { id: id, k: (rank[id] || 1e6 + k) + (mine[id] ? 2e6 : 0) }; }).sort(function (a, b) { return a.k - b.k; }).map(function (x) { return x.id; });
+      turn.inlineI = one.i;
+    } else if ((turn.ids || []).length >= INLINE_SET_LEAST) {
+      // the set itself ("שרשראות עדינות עד 2000 מזהב צהוב": 40 in the price), its filters those its products have
+      var ids = turn.ids.map(function (id) { return 'p:' + pid(id); }).filter(function (id) { return !!rec(id); });
+      var c = blankC();
+      c.autoStock = stockMeans() && ids.some(function (id) { return rec(id).s === 1; });
+      built = ids.length >= INLINE_SET_LEAST ? { kind: 'results', q: String(turn.q || ''), loading: false, ids: ids, total: ids.length, price: null, c: c } : null;
+      turn.inlineI = null;
+    }
+    if (!built) { return; }
+    built.id = uid(); built.inlineOf = turn.id; built.askShown = true;
+    turn.inline = built;
+  }
+  function inlineResultsHtml(turn) {
+    var rest = answerSearches(turn).filter(function (x) { return x.i !== turn.inlineI; });
+    return '<div class="ls-answer-results" data-tid="' + esc(turn.inline.id) + '"><p class="ls-answer-searches__lead" dir="auto">' + esc(t(turn.inlineI === null ? 'answerResults' : 'answerSearchOne')) + '</p>' + resultsHtml(turn.inline) + '</div>' +
+      (rest.length ? '<div class="ls-answer-searches">' + rest.map(function (x) {
+        return '<button type="button" class="ls-btn ls-btn--secondary ls-btn--sm ls-answer-search" data-answer-search="' + esc(turn.id) + '" data-i="' + x.i + '" dir="auto">' + icon('search', 'ls-icon--sm') +
+          '<span>' + esc(x.label) + ' <span class="ls-num">(' + x.n + ')</span></span></button>';
+      }).join('') + '</div>' : '');
+  }
   // the products of a search shown open (one search alone): the answer's own cards are already above, so the others first
   var ANSWER_SEARCH_ROW = 8;
   function answerSearchesHtml(turn) {
+    if (turn.inline) { return inlineResultsHtml(turn); }
     var list = answerSearches(turn);
     if (!list.length) { return ''; }
     if (list.length === 1) {
@@ -507,7 +548,8 @@
         return '<button class="ls-chip ls-chip--quiet" data-ask="' + esc(base + ' ' + o) + '">' + esc(o) + '</button>';
       }).join('') + '</div>';
     }
-    var list = filtered(turn), n = gridN(turn);
+    // shown open with its filters under the answer (inlineResults), not again as a grid without them
+    var list = turn.inline ? [] : filtered(turn), n = gridN(turn);
     if (list.length) { html += '<div class="ls-grid ls-set__grid">' + list.slice(0, n).map(card).join('') + '</div>'; }
     if (list.length > n) { html += allBtn(turn, allLabel(list.length, n), true); }
     if (turn.setSearch) { html += '<div class="ls-set__search"><button class="ls-btn ls-btn--link" data-q="' + esc(turn.setSearch) + '">' + icon('search', 'ls-icon--sm') + esc(t('searchFor', { q: turn.setSearch })) + '</button></div>'; }

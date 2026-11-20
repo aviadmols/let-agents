@@ -371,5 +371,11 @@
     // no bubble repeating what is being typed: the search line above already says it
     return html + '<section class="ls-turn ls-turn--live">' + resultsHtml(lv) + '</section>';
   }
-  function turnById(id) { return id === 'live' ? S.live : S.turns.filter(function (x) { return x.id === id; })[0]; }
+  function turnById(id) {
+    if (id === 'live') { return S.live; }
+    var found = S.turns.filter(function (x) { return x.id === id; })[0];
+    // or the search open inside an answer (inlineResults)
+    for (var i = 0; !found && i < S.turns.length; i++) { if (S.turns[i].inline && S.turns[i].inline.id === id) { found = S.turns[i].inline; } }
+    return found;
+  }
 
