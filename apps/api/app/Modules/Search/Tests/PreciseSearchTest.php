@@ -103,6 +103,10 @@ final class PreciseSearchTest extends TestCase
         $this->assertSame(['טבעת סוליטר יהלום', null, 1500.0], HebrewSearch::priceRange('טבעת סוליטר יהלום עד 1500.'), 'a full stop after the amount');
         $this->assertSame(['טבעת', null, 1500.0], HebrewSearch::priceRange('טבעת עד 1,500 ש"ח?'));
         $this->assertSame(['טבעת זהב לבן', null, 2500.0], HebrewSearch::priceRange('טבעת עד 2.5 אלף, זהב לבן'));
+        // the letter Hebrew joins to the amount (Rocks, 20.11: "ב-500 שקל" was no price)
+        $this->assertSame(['טבעת עם יהלום', null, 500.0], HebrewSearch::priceRange('טבעת עם יהלום ב-500 שקל'));
+        $this->assertSame(['שרשרת', null, 300.0], HebrewSearch::priceRange('שרשרת ב300 ש"ח'));
+        $this->assertSame(['טבעת במידה 52', null, null], HebrewSearch::priceRange('טבעת במידה 52'), 'a number with no currency stays a word');
         $this->assertSame(['טבעת יהלום', 2000.0, 2500.0], HebrewSearch::priceRange('טבעת יהלום במחיר שבין 2000 עד 2500'), 'a prefix before "בין", and the word that introduced the price');
         $this->assertSame(['שרשרת', 300.0, 600.0], HebrewSearch::priceRange('שרשרת בתקציב של 300 עד 600 ₪'));
         $this->assertSame(['טבעת 14-18K', null, null], HebrewSearch::priceRange('טבעת 14-18K'), 'a karat range is not a price');

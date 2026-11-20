@@ -142,6 +142,11 @@ final class AnswerSearchesTest extends TestCase
         // a reply that names nothing of its own
         $reply = $this->ask('כן מה צריך?', ['w1', 'w2', 'w3'], thread: $thread)->assertOk()->json('data');
         $this->assertArrayNotHasKey('searches', $reply);
+
+        // a question whose words name the product of the page is about it: "מה האורך של הצמיד עכשיו?" on a bracelet's
+        // page was shown every bracelet of the store (Rocks, 20.11)
+        $this_one = $this->ask('איזה יהלום יש בטבעת?', ['w1'], page: true, thread: $thread)->assertOk()->json('data');
+        $this->assertArrayNotHasKey('searches', $this_one);
     }
 
     public function test_a_ring_to_go_with_the_bracelet_is_the_rings_sharing_its_values_together_and_one_apart(): void

@@ -401,7 +401,9 @@ final class HebrewSearch
         }
 
         // A bare amount with its currency ("טבעת 2500 ש״ח"): a budget, so a top.
-        if ($min === null && $max === null && (preg_match('/\s'.$num.'\s*(?:'.self::CURRENCY.')(?=\s)/iu', $text, $m) === 1 || preg_match('/\s[$€£₪]\s*(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)()(?=\s)/iu', $text, $m) === 1)) {
+        // ...the letter Hebrew joins to it too: "טבעת עם יהלום ב-500 שקל" (Rocks, 20.11: unread, and the answer had rings of
+        // every price, the ones at 650 not among them), "ב500 ש״ח", "ו־300 ₪"
+        if ($min === null && $max === null && (preg_match('/\s(?:[בוכל][-־]?)?'.$num.'\s*(?:'.self::CURRENCY.')(?=\s)/iu', $text, $m) === 1 || preg_match('/\s[$€£₪]\s*(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)()(?=\s)/iu', $text, $m) === 1)) {
             $max = $amount($m, 1);
             $text = str_replace($m[0], ' ', $text);
         }

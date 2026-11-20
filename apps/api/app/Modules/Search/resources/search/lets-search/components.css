@@ -397,6 +397,8 @@ button.ls-dot:not([aria-pressed="true"]):hover { box-shadow: 0 0 0 2px var(--lsp
 /* the searches an answer leads into: one clear button each, its whole label read, one under the other */
 .ls-answer-searches { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
 .ls-answer-searches .ls-block__title { margin: 0; }
+/* the row of a search shown open is as wide as the answer, never as its cards: wider, it had nothing to scroll (20.11) */
+.ls-answer-searches > .ls-slider { align-self: stretch; min-width: 0; max-width: 100%; }
 /* the line that says what the searches are, before them */
 .ls-answer-searches__lead { margin: 0; font-size: var(--lsp-text-sm); line-height: 1.5; color: var(--ls-fg-muted); }
 /* a search open inside an answer (inlineResults): set apart from the answer's cards above it */

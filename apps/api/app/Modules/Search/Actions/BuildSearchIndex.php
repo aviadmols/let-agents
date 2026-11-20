@@ -35,6 +35,7 @@ use App\Modules\Search\Support\Evidence;
 use App\Modules\Search\Support\FilterLayoutGate;
 use App\Modules\Search\Support\HebrewSearch;
 use App\Modules\Search\Support\Looks;
+use App\Modules\Search\Support\SameNameFilters;
 use App\Modules\Search\Support\ShownQuestion;
 use App\Modules\Search\Support\StoreFamilies;
 use App\Modules\Search\Support\Transliterate;
@@ -557,6 +558,8 @@ final class BuildSearchIndex
         if ($layout !== null) {
             $facets['facets'] = FilterLayoutGate::onFacets($facets['facets'], $layout, $items);
         }
+        // and one filter under one name: two readers' filters of the same name are one on the screen (SameNameFilters)
+        [$facets['facets'], $items] = SameNameFilters::merged($facets['facets'], $items);
 
         $json = (string) json_encode(['v' => self::VERSION, 'items' => $items, 'facets' => $facets['facets'], 'size' => $facets['size'],
             // words this store's shoppers take off as chips (LearnFromSearches): the drawer reads them as none

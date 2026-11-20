@@ -337,7 +337,10 @@
       // the tab opens inside the press; the link fills it once the server gave the list its code
       var waTab = win.open('about:blank', '_blank');
       wishShare(function (link) {
-        var text = shortWord('share_text', t('saved')) + ' ' + (link || S.saved.map(function (x) { var r = rec(x); return r ? r.url : ''; }).join(' '));
+        // "My wishlist at :shop" with the store's own name, as it shows it ("ב־Rocks and Gold"); with none known, the list's name alone
+        var shop = String((S.config && S.config.shopName) || '').trim(), said = shortWord('share_text', t('saved'));
+        said = said.indexOf(':shop') < 0 ? said : (shop ? said.split('ב:shop').join((/^[֐-׿]/.test(shop) ? 'ב' : 'ב־') + shop).split(':shop').join(shop) : t('saved'));
+        var text = said + ' ' + (link || S.saved.map(function (x) { var r = rec(x); return r ? r.url : ''; }).join(' '));
         if (waTab) { try { waTab.opener = null; } catch (e) { /* fine */ } waTab.location.href = 'https://wa.me/?text=' + encodeURIComponent(text); }
       });
       return;

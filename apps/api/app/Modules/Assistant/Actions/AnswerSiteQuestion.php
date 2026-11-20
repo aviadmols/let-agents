@@ -337,6 +337,9 @@ final class AnswerSiteQuestion implements TriesQuestions
     /** Words before a price that fewer products than this say are a wish, not a kind of product (computed()). */
     private const KIND_PRODUCTS = 3;
 
+    /** A word of a question names a kind on its own when this share of the store's products says it (KIND_PRODUCTS at least). */
+    private const KIND_SHARE = 0.005;
+
     /** Words a question wraps around the product it names. */
     private const NOT_NAMES = ['איזה', 'איזו', 'אילו', 'מה', 'מהו', 'מהי', 'ומה', 'ומהו', 'ואיזה', 'ואיזו', 'ואילו', 'ויש', 'הכי', 'יש', 'לכם', 'אצלכם', 'אפשר', 'בבקשה', 'שלכם', 'מתחת', 'פחות', 'יותר', 'מעל', 'which', 'what', 'the', 'most', 'your', 'under', 'below', 'over', 'between', 'than',
         // Words for the store and its products in general: "מה הכי זול בין המוצרים" names no product.
@@ -401,6 +404,9 @@ final class AnswerSiteQuestion implements TriesQuestions
 
     /** How many products near the one asked about are given to choose from, when the screen shows only it. */
     private const NEAREST_TO = 8;
+
+    /** With nothing inside a price's top, this many of the cheapest above it are given instead. */
+    private const NEAREST_ABOVE = 6;
 
     /**
      * Asks for something to go with a product: "מתאים/ה ל", "שמתאים", "ללכת עם", "סט", "תואם", "להשלים", "משלים", "match",
@@ -563,7 +569,7 @@ final class AnswerSiteQuestion implements TriesQuestions
             $result += $range['min'] === null && $range['max'] === null ? [] : ['range' => $range];
             // The store's searches the answer leads into, each with its filters chosen, as buttons under its cards
             // (assistant.answer_searches); they stand where the chips of the store's groups would
-            $searches = $this->searchesBeside($shopId, $question, $result, $bound);
+            $searches = $this->searchesBeside($shopId, $question, $result, $bound, $viewing === null ? [] : [$viewing]);
             $result += $searches === [] ? [] : ['searches' => $searches];
             // The store's categories and tags the question is about, as chips under the answer to search by.
             $related = $result['outcome'] === AssistantAnswer::ANSWERED && ! $bound && ! isset($result['set']) && $searches === [] ? $this->relatedChips($shopId, $question) : [];
@@ -1958,10 +1964,31 @@ final class AnswerSiteQuestion implements TriesQuestions
             $viewing = $this->goesWith['anchor'];
             $shown = [$viewing, ...$this->goesWith['ids']];
         }
+        // The screen cannot hold the answer, so the store is asked, as from the box (Rocks, 20.11). A price none of the
+        // products on it is in ("מתנה לאישתי עד 2000" on the page of a ring at 21,500, answered "nothing in that budget"
+        // with the ring alone): the question is its own, the screen left behind. Cheaper or dearer asked with one product
+        // on it ("יש משהו יותר עדין וזול?" under one chain, then "לא צריך 21 קראט": no answer): the products nearest it
+        // are those it is measured against, itself kept.
+        if (($viewing !== null || $followUp || $this->conversation !== []) && $shown !== [] && $this->goesWith === null && $this->anchors === []) {
+            $beyond = $this->beyondTheScreen($question, array_map('strval', $shown));
+            if ($beyond === 'price') {
+                [$shown, $viewing, $followUp] = [[], null, false];
+            } elseif ($beyond === 'one') {
+                $shown = array_values(array_unique([(string) $shown[0], ...$this->nearestTo((string) $shown[0])]));
+            }
+        }
         // nothing on the shopper's screen: asked in the box, no search before it
         $nothingShown = $shown === [];
         $this->alone = $viewing ?? (count($shown) === 1 ? (string) $shown[0] : null);
         $named = $viewing === null && $this->anchors === [] ? $this->namedProducts($question) : [];
+        // A word of one product's name is not that product asked about: "יש לכם עגילים קטנים מזהב לבן לילדה בת 8?" named the
+        // pendant "ילדה מחזיקה לב" by "ילדה", the pendant was all the writer had, and the answer was earrings once and "not
+        // found" the next time, from the pages alone (Rocks, 20.11). Named is what the store's own search finds for the
+        // question too ("על מה הספר החטוף?": the book itself); a product's code names it whatever the search finds.
+        if ($named !== [] && ! $followUp && self::aboutProducts($question) && $this->bySku($question) === []
+            && ($searched = $this->searchedFor($shopId, $question)) !== [] && array_intersect($named, $searched) === []) {
+            $named = [];
+        }
         // A question that asks for products ("מתנה לאמא עד 1,500") and happens to say a product's name (the gift card, by the
         // word "מתנה") is still about the products found: that one first, the rest kept. Alone, it was all the writer had, and
         // every gift question was answered with the gift card (Rocks QA, 17.11).
@@ -4730,6 +4757,11 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($asks === null || $productsByRef === []) {
             return null;
         }
+        // one product on the screen is nothing to choose the cheapest of: "יש משהו יותר זול?" on a product's page was
+        // answered "the cheapest we found: " that product itself (every store, 20.11). The writer, with those nearest it.
+        if (count($productsByRef) === 1 && ! $wholeStore && $byName === null && in_array($asks, ['cheapest', 'most_expensive'], true)) {
+            return null;
+        }
 
         // What the question names. Found by the store's search: what it found (hoops titled "חישוקי זהב" are
         // earrings too, "תכשיט" names a category, not a title), less what is only for it: "the cheapest drill"
@@ -4839,6 +4871,45 @@ final class AnswerSiteQuestion implements TriesQuestions
         return null;
     }
 
+    /**
+     * The products a question names as the store's search reads it, by the words its products hold: the search needs every
+     * word, and a question told as a story names nothing by all of them, or three products that happen to say them all
+     * ("ראיתי אצלכם בשבוע שעבר טבעת עם יהלום אמיתי ב-500 שקל. היא עדיין קיימת?"; its words the products hold, "טבעת
+     * יהלום אמיתי", name 945 rings). Code only.
+     *
+     * @return list<string> external ids
+     */
+    private function kindNamed(string $shopId, string $question): array
+    {
+        if (! app()->bound(ProductsNamed::class)) {
+            return [];
+        }
+        $said = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : [];
+        $words = array_values(array_unique(preg_split('/\s+/u', (string) preg_replace('/[^\p{L}\p{N}\s"\'״׳-]+/u', ' ', self::wishWords((string) ($said['words'] ?? $question))), -1, PREG_SPLIT_NO_EMPTY) ?: []));
+        // each word by how many products it names alone; the broadest first, each next one kept only while what all the kept
+        // words name together is still a kind: a word one or two products happen to say ("קיימת") narrows nothing
+        $alone = [];
+        // a word that few of a large store's products say is chance, not a kind: "עדיין" in four of Rocks' 2,000
+        $least = max(self::KIND_PRODUCTS, (int) ceil(CatalogProduct::query()->whereNull('removed_at')->count() * self::KIND_SHARE));
+        foreach ($words as $word) {
+            $n = count(app(ProductsNamed::class)->all($shopId, $word));
+            if ($n >= $least) {
+                $alone[$word] = $n;
+            }
+        }
+        arsort($alone);
+        $kept = [];
+        $named = [];
+        foreach (array_keys($alone) as $word) {
+            $together = app(ProductsNamed::class)->all($shopId, implode(' ', [...$kept, $word]));
+            if (count($together) >= self::KIND_PRODUCTS) {
+                [$kept, $named] = [[...$kept, $word], $together];
+            }
+        }
+
+        return $named;
+    }
+
     private static function wishWords(string $words): string
     {
         $kept = array_filter(preg_split('/\s+/u', trim($words)) ?: [], function (string $w): bool {
@@ -4865,6 +4936,36 @@ final class AnswerSiteQuestion implements TriesQuestions
     private function withoutAnchors(array $picks): array
     {
         return array_values(array_filter($picks, fn (array $p): bool => ! in_array((string) ($p['external_id'] ?? ''), $this->anchors, true)));
+    }
+
+    /** A reply that asks for another than what is shown: not this, without it, something else. */
+    private const TURNS_AWAY = '/(?<!\p{L})(?:לא\s+(?:צריך|צריכה|חייב|חייבת|רוצה|דווקא|רק)|בלי|ללא|משהו\s+אחר|אחר|אחרת|אחרים|אחרות|במקום|without|not\s+(?:this|that|only)|something\s+else|another|other|instead)(?!\p{L})/iu';
+
+    /**
+     * Why the products on the shopper's screen cannot answer a question that asks for products: 'price' when it names a
+     * price none of them is in, 'one' when it asks for a cheaper or a dearer and one product alone is there. Null when
+     * they can, or it asks for neither.
+     *
+     * @param  list<string>  $shown
+     */
+    private function beyondTheScreen(string $question, array $shown): ?string
+    {
+        // a reply that turns away from the one product shown ("לא צריך 21 קראט", "משהו אחר", "בלי יהלומים"): the others
+        if (count($shown) === 1 && $this->conversation !== [] && preg_match(self::TURNS_AWAY, $this->asked !== '' ? $this->asked : $question) === 1) {
+            return 'one';
+        }
+        if (! in_array(AnswerContext::type($question), ['recommendation', 'price_range', 'superlative'], true) && self::analysis($question, [])['asks'] === null) {
+            return null;
+        }
+        $range = app()->bound(PriceRange::class) ? app(PriceRange::class)->read($question) : ['min' => null, 'max' => null];
+        if ($range['min'] !== null || $range['max'] !== null) {
+            $prices = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $shown)->pluck('price')->filter(fn ($p): bool => $p !== null && (float) $p > 0)->map(fn ($p): float => (float) $p);
+            $inside = $prices->filter(fn (float $p): bool => ($range['min'] === null || $p >= $range['min']) && ($range['max'] === null || $p <= $range['max']));
+
+            return $prices->isNotEmpty() && $inside->isEmpty() ? 'price' : null;
+        }
+
+        return count($shown) === 1 && in_array(self::analysis($question, [])['asks'], ['cheapest', 'most_expensive'], true) ? 'one' : null;
     }
 
     /** @return list<string> the products nearest this one by meaning, external ids, nearest first, itself not among them */
@@ -5192,16 +5293,33 @@ final class AnswerSiteQuestion implements TriesQuestions
         if ($this->goesWith !== null) {
             return $inside;
         }
+        // The price is the kind's the question names: "טבעת עם יהלום ב-500 שקל" was given a pendant, a ring sizer and earrings
+        // under 500, and answered "rings start at 1,100" while rings with a diamond were at 650 (Rocks, 20.11). A kind is what
+        // the store's search names by many products; a word one or two products say ("מתנה": the gift card) is none.
+        $named = $this->kindNamed($shopId, $question);
+        if (count($named) >= self::KIND_PRODUCTS) {
+            $ofKind = array_flip(array_map('strval', $named));
+            $inside = array_values(array_filter($inside, fn (array $p): bool => isset($ofKind[(string) ($p['external_id'] ?? '')])));
+        }
 
-        if ($inside === [] && app()->bound(ProductsNamed::class) && ($named = app(ProductsNamed::class)->all($shopId, $question)) !== []) {
+        // ...and every one of the kind in the price, not only those found beside it: those found first, then the store's
+        if (($inside === [] || count($named) >= self::KIND_PRODUCTS) && $named !== []) {
+            $kept = array_map(fn (array $p): string => (string) $p['external_id'], $inside);
             // in the order the store's search named them, what is in stock first
             $stock = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $named)->where('price', '>', 0)
                 ->when($min !== null, fn ($q) => $q->where('price', '>=', $min))
                 ->when($max !== null, fn ($q) => $q->where('price', '<=', $max))
                 ->pluck('in_stock', 'external_id');
-            $ids = array_values(array_filter($named, fn (string $id): bool => isset($stock[$id])));
+            $ids = array_values(array_filter($named, fn (string $id): bool => isset($stock[$id]) && ! in_array($id, $kept, true)));
             usort($ids, fn (string $a, string $b): int => (int) $stock[$b] <=> (int) $stock[$a]);
-            $inside = $this->candidates(array_slice($ids, 0, self::MAX_PRODUCTS));
+            $inside = [...$inside, ...$this->candidates(array_slice($ids, 0, max(0, self::MAX_PRODUCTS - count($inside))))];
+        }
+        // Nothing the words name is inside a top: the nearest above it, the cheapest first, so the answer says what there is
+        // and from what price ("ראיתי טבעת עם יהלום ב-500 שקל": rings with a diamond from 650), never only "not found"
+        if ($inside === [] && $max !== null && $min === null && count($named) >= self::KIND_PRODUCTS) {
+            $above = CatalogProduct::query()->whereNull('removed_at')->whereIn('external_id', $named)->where('in_stock', true)->where('price', '>', $max)
+                ->orderBy('price')->limit(self::NEAREST_ABOVE)->pluck('external_id')->map(fn ($id): string => (string) $id)->all();
+            $inside = $this->candidates($above);
         }
 
         return $inside;
@@ -5574,7 +5692,8 @@ final class AnswerSiteQuestion implements TriesQuestions
      * @param  array<string, mixed>  $result
      * @return list<array<string, mixed>>
      */
-    private function searchesBeside(string $shopId, string $question, array $result, bool $bound): array
+    /** @param  list<string>  $screen  the product whose page the question is asked on, if any */
+    private function searchesBeside(string $shopId, string $question, array $result, bool $bound, array $screen = []): array
     {
         $set = is_array($result['set'] ?? null) ? $result['set'] : null;
         $shown = $set !== null
@@ -5582,9 +5701,11 @@ final class AnswerSiteQuestion implements TriesQuestions
             : array_values(array_filter(array_map(fn (array $p): string => (string) ($p['external_id'] ?? ''), (array) ($result['picks'] ?? []))));
         // a question in a conversation that is a subject of its own: it names a kind of the store's by its own words and points
         // at nothing shown ("יש לכם עגילי זהב לבן עם יהלום?" after another question had none, Rocks 20.11); a reply ("כן מה
-        // צריך?", "ומה עם הזול יותר?") still has none
+        // צריך?", "ומה עם הזול יותר?") still has none. Nor one whose words name what is on the screen: "מה האורך של הצמיד
+        // עכשיו?" on a bracelet's page is about that bracelet, and it was shown every bracelet of the store (Rocks, 20.11)
         $own = $this->conversation !== [] && ! $this->onShown && ! self::pointsBack($question) && app()->bound(ProductsNamed::class)
-            && count(app(ProductsNamed::class)->all($shopId, $question)) >= self::KIND_PRODUCTS;
+            && count(app(ProductsNamed::class)->all($shopId, $question)) >= self::KIND_PRODUCTS
+            && ($screen === [] || app(ProductsNamed::class)->among($shopId, $question, array_map('strval', $screen)) === []);
         if (! Features::enabled('assistant.answer_searches', $shopId) || ! app()->bound(AnswerSearches::class)
             || $result['outcome'] !== AssistantAnswer::ANSWERED || ($set !== null && ($set['search'] ?? null) !== null) || $shown === [] || ! self::aboutProducts($question)
             // "…שתתאים לעגילים האלה?" points at the product of the page, not at results shown: a match asked for keeps its searches
