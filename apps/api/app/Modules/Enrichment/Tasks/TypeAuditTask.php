@@ -283,6 +283,7 @@ final class TypeAuditTask implements AgentTask
                 'filed' => $doubt['names'],
                 'types' => $types,
                 'code_type' => $doubt['type'],
+                'read_from' => $doubt['source'] === TypeDoubt::FROM_TITLE ? 'title' : 'filing',
             ],
         ];
     }

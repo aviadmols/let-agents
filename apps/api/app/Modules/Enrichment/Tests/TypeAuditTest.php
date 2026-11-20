@@ -195,7 +195,8 @@ final class TypeAuditTest extends TestCase
             $this->assertTrue($call['schema'], 'structured output always');
             $this->assertSame('low', $call['effort']);
             $this->assertSame('openai', $call['provider']);
-            $this->assertSame(['id', 'title', 'caption', 'filed', 'types', 'code_type'], array_keys($call['input']));
+            $this->assertSame(['id', 'title', 'caption', 'filed', 'types', 'code_type', 'read_from'], array_keys($call['input']));
+            $this->assertSame('filing', $call['input']['read_from']);
             $this->assertSame(['hoodie', 'shirt', 'tshirt', 'vest'], array_column($call['input']['types'], 'key'));
             $this->assertStringNotContainsString('Vans', $call['system'], 'the prompt holds no store words');
         }
@@ -375,7 +376,7 @@ final class TypeAuditTest extends TestCase
         $bank = $this->inShop(fn () => EnrichmentVocabulary::query()->where('active', true)->sole())->definition();
         $product = $this->inShop(fn () => CatalogProduct::query()->where('external_id', 'mesh')->sole());
 
-        // a type from the title is never doubted
+        // a type from the title is doubted only where its word is not what the name says the product is
         $this->assertNull(TypeDoubt::of($product, $bank, 'tshirt', 'title', null));
         // the title says the type's words: the filing only agreed
         $tee = $this->inShop(fn () => CatalogProduct::query()->where('external_id', 'tee')->sole());
@@ -393,6 +394,46 @@ final class TypeAuditTest extends TestCase
         $this->assertTrue(TypeDoubt::joinsKinds('Tees & Shirts'));
         $this->assertTrue(TypeDoubt::joinsKinds('חולצות טי ומכופתרות'));
         $this->assertFalse(TypeDoubt::joinsKinds('חולצות וינטג\''));
+    }
+
+    /**
+     * A Hebrew name says first what the product is (Shilav, 20.11: a bottle warmer, a gate's extension and a car seat's base
+     * read as a bottle, a gate and a car seat): a type read from a word that comes after another noun, or joined to "ל", is
+     * one code cannot vouch for, and the auditor is asked; a name that counts what it holds first, or opens with a brand,
+     * is still the kind it names.
+     */
+    public function test_a_type_read_from_a_word_that_is_not_what_the_name_says_the_product_is_is_doubted(): void
+    {
+        $words = fn (string ...$w): array => array_map(ExpertBankShape::pattern(...), $w);
+        $bottle = $words('בקבוק');
+        $gate = $words('שער בטיחות');
+        $carrier = $words('סלקל', 'סל קל');
+        $pacifier = $words('מוצץ');
+
+        foreach ([
+            ['מחמם בקבוקים נייד לבן', $bottle, TypeDoubt::NOT_THE_HEAD],
+            ['מברשת לבקבוק סיליקון אפור', $bottle, TypeDoubt::MADE_FOR],
+            ['הארכה לשער בטיחות איזילוק 8 סמ', $gate, TypeDoubt::MADE_FOR],
+            ['בסיס סלקל טרטל', $carrier, TypeDoubt::NOT_THE_HEAD],
+            ['בסיס איזופיקס לסלקל טרטל- בוגבו', $carrier, TypeDoubt::MADE_FOR],
+            // what the name says it is
+            ['בקבוק האכלה 250 מל', $bottle, null],
+            ['זוג מוצצים סיליקון 6+ תכלת', $pacifier, null],
+            ['מארז 2 בקבוקים', $bottle, null],
+            ['BUGABOO סלקל Turtle Air', $carrier, null],
+            // a name in another language says what it is elsewhere
+            ['Glass Baby Bottle', $words('bottle'), null],
+            // no word of the type at all
+            ['כוס אימון', $bottle, null],
+        ] as [$title, $patterns, $reason]) {
+            $this->assertSame($reason, TypeDoubt::notWhatItIs($title, $patterns), $title);
+        }
+
+        // and so the product is asked about, read from its title
+        $bank = $this->inShop(fn () => EnrichmentVocabulary::query()->where('active', true)->sole())->definition();
+        $tee = $this->inShop(fn () => CatalogProduct::query()->where('external_id', 'tee')->sole());
+        $this->inShop(fn () => $tee->update(['title' => 'הדפס לחולצת טי']));
+        $this->assertSame(['made_for'], TypeDoubt::of($tee->fresh(), $bank, 'tshirt', 'title', null)['reasons']);
     }
 
     /**

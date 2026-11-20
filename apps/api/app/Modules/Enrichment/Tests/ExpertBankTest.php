@@ -611,6 +611,24 @@ final class ExpertBankTest extends TestCase
         $this->assertSame(['bad_key', 'duplicate', 'no_label', 'no_words', 'no_type', 'no_values'], array_column($removed, 'why'));
     }
 
+    public function test_a_word_that_names_what_is_made_for_the_type_is_no_word_of_it(): void
+    {
+        // Shilav, 20.11: "הארכה לשער" among the safety gate's words read three gate extensions as safety gates
+        [$bank, $removed] = ExpertBankShape::fromReply([
+            'types' => [
+                ['key' => 'safety_gate', 'label' => 'שער בטיחות', 'words' => ['שער בטיחות', 'הארכה לשער']],
+                // a name of the kind that only shares a word with another of its words stays ("חולצת טי" beside "טי שירט")
+                ['key' => 'tshirt', 'label' => 'חולצת טי', 'words' => ['חולצת טי', 'טי שירט']],
+                ['key' => 'ring', 'label' => 'Ring', 'words' => ['ring', 'ring for kids']],
+            ],
+            'attributes' => [],
+            'notes' => [],
+        ], 'round_1');
+
+        $this->assertSame([['שער בטיחות'], ['חולצת טי', 'טי שירט'], ['ring', 'ring for kids']], array_column($bank['types'], 'words'));
+        $this->assertSame([['id' => 'type:safety_gate', 'kind' => 'type_word', 'why' => 'made_for', 'detail' => 'הארכה לשער']], array_map(fn (array $r): array => array_intersect_key($r, array_flip(['kind', 'id', 'why', 'detail'])), $removed));
+    }
+
     public function test_a_tag_written_as_a_path_says_what_the_product_is_like_a_category(): void
     {
         // Naot, 19.11: the titles are model names ("Abbie"), the kinds are in tags like "Women > Sandals > Elegant Collection",

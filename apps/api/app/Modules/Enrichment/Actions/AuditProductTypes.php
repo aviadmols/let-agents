@@ -35,7 +35,8 @@ use App\Modules\Runs\Models\Run;
  * or none. Code applies the verdict (TypeAuditTask::decide) and the search follows the audited type.
  *
  * 1. Code picks the doubtful products: a type from a category or a tag only, the title silent on it, and the picture
- *    silent too or the filing itself loose. Typically a few percent of a store. Counted and said.
+ *    silent too or the filing itself loose; or a type from a Hebrew title whose word is not what the name says the
+ *    product is ("מחמם בקבוקים", "בסיס לסלקל"). Typically a few percent of a store. Counted and said.
  * 2. Never asked twice: a question with the same fingerprint (title, caption, the store's names, the bank's types, the
  *    type code gave, the prompt's version) answered before is applied again from the stored verdict, without a call.
  * 3. The rest go to the auditor, through the provider's batch API where the shop reads in batches (the answers are

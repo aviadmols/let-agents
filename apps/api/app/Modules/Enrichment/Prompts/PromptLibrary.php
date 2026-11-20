@@ -24,7 +24,7 @@ final class PromptLibrary
         'product_summary' => 1,
         'section_questions' => 1,
         // the type audit (AuditProductTypes): a schema beside it, no store words in it
-        'type_audit' => 1,
+        'type_audit' => 2,
     ];
 
     /**

@@ -40,6 +40,17 @@ final class ExpertBankShape
         foreach ((array) ($reply['types'] ?? []) as $entry) {
             $item = self::item((array) $entry, 'type', 'type:', $types, $out);
             if ($item !== null) {
+                // a word that names what is made for the type is no word of it: "הארכה לשער" beside "שער בטיחות" (Shilav,
+                // 20.11) read three gate extensions as safety gates; the word says "for" the head of another of its words
+                $head = fn (string $w): string => (string) (preg_split('/\s+/u', $w)[0] ?? $w);
+                foreach ($item['words'] as $i => $word) {
+                    $others = array_values(array_unique(array_map(fn (string $w): string => self::pattern($head($w)), array_filter($item['words'], fn (string $w): bool => $head($w) !== $head($word)))));
+                    if ($others !== [] && TypeDoubt::notWhatItIs($word, $others) === TypeDoubt::MADE_FOR) {
+                        $out('type_word', $item['id'], $item['label'], 'made_for', $word);
+                        unset($item['words'][$i]);
+                    }
+                }
+                $item['words'] = array_values($item['words']);
                 // a broad kind ("toy") is only for the products no finer kind reads (expert_bank v5): after them, always
                 $types[$item['key']] = $item + ((((array) $entry)['broad'] ?? false) === true ? ['broad' => true] : []);
             }

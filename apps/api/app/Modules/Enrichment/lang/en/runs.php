@@ -109,5 +109,7 @@ return [
         'no_caption' => 'no described picture',
         'two_types' => 'the categories and tags say two types',
         'joined_name' => 'a category name that joins kinds',
+        'not_the_head' => 'the type word in the title follows another word',
+        'made_for' => 'the title says the product is for the type, not the type',
     ],
 ];
