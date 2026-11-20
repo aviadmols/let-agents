@@ -58,15 +58,26 @@ final class OpenAiBatches implements BatchDriver
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
         }
 
+        // The file goes up named by its own path: OpenAI refuses a "filename" field beside it ("Additional properties are not
+        // allowed", 20.11: every batch failed as provider_error), and reads a batch only from a .jsonl
+        $dir = sys_get_temp_dir().DIRECTORY_SEPARATOR.'openai-batch-'.bin2hex(random_bytes(8));
+        $path = $dir.DIRECTORY_SEPARATOR.'requests.jsonl';
+        $file = null;
         try {
             $client = $this->client($apiKey);
-            $file = fopen('php://temp', 'w+b');
-            fwrite($file, $lines);
-            rewind($file);
-            $uploaded = $client->files()->upload(['purpose' => 'batch', 'file' => $file, 'filename' => 'requests.jsonl']);
+            mkdir($dir, 0700, true);
+            file_put_contents($path, $lines);
+            $file = fopen($path, 'rb');
+            $uploaded = $client->files()->upload(['purpose' => 'batch', 'file' => $file]);
             $batch = $client->batches()->create(['input_file_id' => $uploaded->id, 'endpoint' => self::ENDPOINT, 'completion_window' => '24h']);
         } catch (Throwable $e) {
             throw new ModelCallFailed(ModelCallFailed::PROVIDER_ERROR, $e);
+        } finally {
+            if (is_resource($file)) {
+                fclose($file);
+            }
+            @unlink($path);
+            @rmdir($dir);
         }
 
         return $batch->id;

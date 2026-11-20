@@ -58,6 +58,9 @@ final class BatchDriversTest extends TestCase
         $this->assertStringContainsString('"url":"/v1/chat/completions"', $upload);
         $this->assertStringContainsString('"response_format":{"type":"json_object"}', $upload);
         $this->assertStringContainsString('data:image/jpeg;base64,'.base64_encode('JPG'), $upload, 'a picture rides along as a data address');
+        // the file named by itself, a .jsonl; never a "filename" field beside it, which OpenAI refuses (20.11)
+        $this->assertStringContainsString('name="file"; filename="requests.jsonl"', $upload);
+        $this->assertStringNotContainsString('name="filename"', $upload);
         $this->assertSame(['input_file_id' => 'file-in', 'endpoint' => '/v1/chat/completions', 'completion_window' => '24h'], json_decode((string) $this->sent[1]->getBody(), true));
         $this->assertSame('sk-1', trim(str_replace('Bearer', '', $this->sent[1]->getHeaderLine('Authorization'))));
 
